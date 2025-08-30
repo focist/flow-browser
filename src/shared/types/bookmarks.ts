@@ -9,6 +9,7 @@ export interface Bookmark {
   isGlobal?: boolean;
   dateAdded: Date;
   dateModified?: Date;
+  deletedAt?: Date;
   visitCount: number;
   lastVisited?: Date;
   labels?: BookmarkLabel[];
@@ -61,6 +62,8 @@ export interface BookmarkFilter {
   search?: string;
   isGlobal?: boolean;
   collectionId?: string;
+  includeDeleted?: boolean;
+  onlyDeleted?: boolean;
 }
 
 export interface BookmarkViewMode {

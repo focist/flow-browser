@@ -5,6 +5,8 @@ import {
   updateBookmark,
   deleteBookmark,
   deleteBookmarks,
+  restoreBookmark,
+  permanentlyDeleteBookmark,
   getBookmarks,
   bookmarkExists,
   incrementVisitCount,
@@ -81,6 +83,15 @@ ipcMain.handle("bookmarks:collections:addBookmark", async (_, bookmarkId: string
 
 ipcMain.handle("bookmarks:collections:removeBookmark", async (_, bookmarkId: string, collectionId: string): Promise<void> => {
   return await removeBookmarkFromCollection(bookmarkId, collectionId);
+});
+
+// Trash/Restore operations
+ipcMain.handle("bookmarks:restore", async (_, id: string): Promise<boolean> => {
+  return await restoreBookmark(id);
+});
+
+ipcMain.handle("bookmarks:permanentlyDelete", async (_, id: string): Promise<boolean> => {
+  return await permanentlyDeleteBookmark(id);
 });
 
 // Import/Export operations

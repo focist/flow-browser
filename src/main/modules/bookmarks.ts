@@ -63,10 +63,20 @@ async function initDatabase() {
         table.boolean("isGlobal").defaultTo(false);
         table.timestamp("dateAdded").notNullable();
         table.timestamp("dateModified");
+        table.timestamp("deletedAt");
         table.integer("visitCount").defaultTo(0);
         table.timestamp("lastVisited");
       });
       console.log("BOOKMARKS: Created bookmarks table");
+    }
+
+    // Add deletedAt column if it doesn't exist
+    const hasDeletedAtColumn = await db.schema.hasColumn("bookmarks", "deletedAt");
+    if (!hasDeletedAtColumn) {
+      await db.schema.alterTable("bookmarks", (table) => {
+        table.timestamp("deletedAt");
+      });
+      console.log("BOOKMARKS: Added deletedAt column to bookmarks table");
     }
 
     const hasLabelsTable = await db.schema.hasTable("bookmark_labels");
@@ -331,15 +341,64 @@ export async function updateBookmark(id: string, input: UpdateBookmarkInput): Pr
 export async function deleteBookmark(id: string): Promise<boolean> {
   await whenDatabaseInitialized;
   
-  const deletedCount = await db("bookmarks").where({ id }).delete();
-  return deletedCount > 0;
+  const updatedCount = await db("bookmarks")
+    .where({ id })
+    .update({ 
+      deletedAt: new Date(),
+      dateModified: new Date()
+    });
+  
+  return updatedCount > 0;
+}
+
+export async function restoreBookmark(id: string): Promise<boolean> {
+  await whenDatabaseInitialized;
+  
+  const updatedCount = await db("bookmarks")
+    .where({ id })
+    .update({ 
+      deletedAt: null,
+      dateModified: new Date()
+    });
+  
+  return updatedCount > 0;
+}
+
+export async function permanentlyDeleteBookmark(id: string): Promise<boolean> {
+  await whenDatabaseInitialized;
+  
+  const transaction = await db.transaction();
+  
+  try {
+    // Delete associated labels
+    await transaction("bookmark_labels").where({ bookmarkId: id }).delete();
+    
+    // Delete from collections
+    await transaction("collection_items").where({ bookmarkId: id }).delete();
+    
+    // Delete the bookmark
+    const deletedCount = await transaction("bookmarks").where({ id }).delete();
+    
+    await transaction.commit();
+    
+    return deletedCount > 0;
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
 }
 
 export async function deleteBookmarks(ids: string[]): Promise<number> {
   await whenDatabaseInitialized;
   
-  const deletedCount = await db("bookmarks").whereIn("id", ids).delete();
-  return deletedCount;
+  const updatedCount = await db("bookmarks")
+    .whereIn("id", ids)
+    .update({ 
+      deletedAt: new Date(),
+      dateModified: new Date()
+    });
+  
+  return updatedCount;
 }
 
 export async function getBookmarks(filter?: BookmarkFilter): Promise<Bookmark[]> {
@@ -385,6 +444,17 @@ export async function getBookmarks(filter?: BookmarkFilter): Promise<Bookmark[]>
         .where("collection_items.collectionId", filter.collectionId)
         .orderBy("collection_items.position");
     }
+
+    // Handle deleted filter
+    if (filter.onlyDeleted) {
+      query = query.whereNotNull("bookmarks.deletedAt");
+    } else if (!filter.includeDeleted) {
+      // By default, exclude deleted bookmarks
+      query = query.whereNull("bookmarks.deletedAt");
+    }
+  } else {
+    // By default, exclude deleted bookmarks when no filter is provided
+    query = query.whereNull("bookmarks.deletedAt");
   }
   
   query = query.orderBy("bookmarks.dateAdded", "desc");

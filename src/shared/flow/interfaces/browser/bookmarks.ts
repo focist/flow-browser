@@ -10,6 +10,8 @@ export interface FlowBookmarksAPI {
   exists(url: string, profileId: string, spaceId: string): Promise<boolean>;
   incrementVisit(id: string): Promise<void>;
   getByUrl(url: string): Promise<Bookmark[]>;
+  restore(id: string): Promise<boolean>;
+  permanentlyDelete(id: string): Promise<boolean>;
   
   collections: {
     create(input: {

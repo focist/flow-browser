@@ -19,7 +19,10 @@ import {
   Edit3,
   Upload,
   FileText,
-  CloudUpload
+  CloudUpload,
+  RotateCcw,
+  X,
+  Link
 } from "lucide-react";
 import { 
   DropdownMenu, 
@@ -28,6 +31,13 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
@@ -77,12 +87,14 @@ function BookmarksPage() {
   console.log('BookmarksPage component rendering...');
   
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
+  const [deletedBookmarks, setDeletedBookmarks] = useState<Bookmark[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('card');
   const [sortBy, setSortBy] = useState<SortBy>('dateAdded');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBookmarks, setSelectedBookmarks] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<BookmarkFilter>({});
+  const [showDeleted, setShowDeleted] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
@@ -104,17 +116,152 @@ function BookmarksPage() {
     }
   };
 
+  const loadDeletedBookmarks = async () => {
+    console.log('Loading deleted bookmarks');
+    setIsLoading(true);
+    try {
+      const result = await flow.bookmarks.getAll({ onlyDeleted: true });
+      console.log('Loaded deleted bookmarks:', result);
+      setDeletedBookmarks(result);
+    } catch (error) {
+      console.error('Failed to load deleted bookmarks:', error);
+      toast.error('Failed to load deleted bookmarks');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteBookmark = async (bookmarkId: string) => {
+    try {
+      await flow.bookmarks.delete(bookmarkId);
+      toast.success('Bookmark moved to trash');
+      
+      // Refresh both lists
+      await loadBookmarks();
+      await loadDeletedBookmarks();
+      
+      // Notify about changes
+      window.dispatchEvent(new CustomEvent('bookmarkChanged'));
+    } catch (error) {
+      console.error('Failed to delete bookmark:', error);
+      toast.error('Failed to delete bookmark');
+    }
+  };
+
+  const handleRestoreBookmark = async (bookmarkId: string) => {
+    try {
+      await flow.bookmarks.restore(bookmarkId);
+      toast.success('Bookmark restored');
+      
+      // Refresh both lists
+      await loadBookmarks();
+      await loadDeletedBookmarks();
+      
+      // Notify about changes
+      window.dispatchEvent(new CustomEvent('bookmarkChanged'));
+    } catch (error) {
+      console.error('Failed to restore bookmark:', error);
+      toast.error('Failed to restore bookmark');
+    }
+  };
+
+  const handlePermanentlyDeleteBookmark = async (bookmarkId: string) => {
+    try {
+      await flow.bookmarks.permanentlyDelete(bookmarkId);
+      toast.success('Bookmark permanently deleted');
+      
+      // Refresh deleted list
+      await loadDeletedBookmarks();
+      
+      // Notify about changes
+      window.dispatchEvent(new CustomEvent('bookmarkChanged'));
+    } catch (error) {
+      console.error('Failed to permanently delete bookmark:', error);
+      toast.error('Failed to permanently delete bookmark');
+    }
+  };
+
+  // Context menu component for bookmarks
+  const BookmarkContextMenu = ({ bookmark, children }: { bookmark: Bookmark; children: React.ReactNode }) => (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        {children}
+      </ContextMenuTrigger>
+      <ContextMenuContent className="w-48">
+        <ContextMenuItem onClick={() => handleOpenBookmark(bookmark)}>
+          <ExternalLink className="h-4 w-4 mr-2" />
+          Open bookmark
+        </ContextMenuItem>
+        <ContextMenuItem onClick={() => {
+          navigator.clipboard.writeText(bookmark.url);
+          toast.success('URL copied to clipboard');
+        }}>
+          <Link className="h-4 w-4 mr-2" />
+          Copy URL
+        </ContextMenuItem>
+        <ContextMenuItem onClick={() => {
+          toast.info('Edit functionality coming soon!');
+        }}>
+          <Edit3 className="h-4 w-4 mr-2" />
+          Edit bookmark
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        {showDeleted ? (
+          <>
+            <ContextMenuItem 
+              className="text-blue-600"
+              onClick={() => handleRestoreBookmark(bookmark.id)}
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Restore bookmark
+            </ContextMenuItem>
+            <ContextMenuItem 
+              className="text-destructive"
+              onClick={() => handlePermanentlyDeleteBookmark(bookmark.id)}
+            >
+              <X className="h-4 w-4 mr-2" />
+              Delete forever
+            </ContextMenuItem>
+          </>
+        ) : (
+          <ContextMenuItem 
+            className="text-destructive"
+            onClick={() => handleDeleteBookmark(bookmark.id)}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Move to trash
+          </ContextMenuItem>
+        )}
+      </ContextMenuContent>
+    </ContextMenu>
+  );
+
   // Load bookmarks on mount and filter changes
   useEffect(() => {
     console.log('Loading bookmarks effect triggered');
-    loadBookmarks();
-  }, [filter]);
+    if (showDeleted) {
+      loadDeletedBookmarks();
+    } else {
+      loadBookmarks();
+    }
+  }, [filter, showDeleted]);
+
+  // Load deleted bookmarks once on mount
+  useEffect(() => {
+    loadDeletedBookmarks();
+  }, []);
 
   // Listen for bookmark changes (custom event)
   useEffect(() => {
     const handleBookmarkChange = () => {
       console.log('Bookmark change event received, reloading...');
-      loadBookmarks();
+      if (showDeleted) {
+        loadDeletedBookmarks();
+      } else {
+        loadBookmarks();
+      }
+      // Always refresh deleted bookmarks for the sidebar count
+      loadDeletedBookmarks();
     };
 
     console.log('Setting up bookmark change listeners');
@@ -134,7 +281,7 @@ function BookmarksPage() {
 
   // Filter and sort bookmarks
   const filteredBookmarks = useMemo(() => {
-    let filtered = bookmarks;
+    let filtered = showDeleted ? deletedBookmarks : bookmarks;
 
     // Search filter
     if (searchQuery) {
@@ -165,18 +312,7 @@ function BookmarksPage() {
     });
 
     return filtered;
-  }, [bookmarks, searchQuery, sortBy]);
-
-  const handleDeleteBookmark = async (id: string) => {
-    try {
-      await flow.bookmarks.delete(id);
-      toast.success('Bookmark deleted');
-      loadBookmarks();
-    } catch (error) {
-      console.error('Failed to delete bookmark:', error);
-      toast.error('Failed to delete bookmark');
-    }
-  };
+  }, [bookmarks, deletedBookmarks, showDeleted, searchQuery, sortBy]);
 
   const handleDeleteSelected = async () => {
     if (selectedBookmarks.size === 0) return;
@@ -293,10 +429,10 @@ function BookmarksPage() {
 
 
   const BookmarkCard = ({ bookmark }: { bookmark: Bookmark }) => (
-    <Card className="group hover:shadow-lg transition-all duration-200 cursor-pointer">
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between mb-2">
-          <div className="flex-1 min-w-0 pr-2">
+    <BookmarkContextMenu bookmark={bookmark}>
+      <Card className="group hover:shadow-lg transition-all duration-200 cursor-pointer relative">
+        <CardContent className="px-3 pt-3 pb-12">
+          <div className="mb-1">
             <div className="flex items-center gap-2 mb-1">
               {bookmark.favicon && (
                 <img src={bookmark.favicon} alt="" className="w-4 h-4 rounded-sm" />
@@ -309,7 +445,7 @@ function BookmarksPage() {
               </h3>
             </div>
             <p 
-              className="text-xs text-muted-foreground mb-2 break-all"
+              className="text-xs text-muted-foreground mb-1 break-all"
               style={{ 
                 wordBreak: 'break-all',
                 overflowWrap: 'break-word',
@@ -320,139 +456,225 @@ function BookmarksPage() {
               {formatUrlForDisplay(bookmark.url, 60)}
             </p>
             {bookmark.description && (
-              <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
+              <p className="text-xs text-muted-foreground line-clamp-2 mb-1">
                 {bookmark.description}
               </p>
             )}
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleOpenBookmark(bookmark)}>
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Open
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Edit3 className="h-4 w-4 mr-2" />
-                Edit
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem 
-                className="text-destructive"
-                onClick={() => handleDeleteBookmark(bookmark.id)}
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
 
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-3 w-3" />
-            {new Date(bookmark.dateAdded).toLocaleDateString()}
-          </div>
-          {bookmark.visitCount > 0 && (
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-3 w-3" />
+              {new Date(bookmark.dateAdded).toLocaleDateString()}
+            </div>
             <div className="flex items-center gap-1">
-              <span>{bookmark.visitCount} visits</span>
+              <span>{bookmark.visitCount || 0} visits</span>
+            </div>
+          </div>
+
+          {bookmark.labels && bookmark.labels.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {bookmark.labels.slice(0, 3).map((label, index) => (
+                <Badge key={index} variant="secondary" className="text-xs">
+                  {label.label}
+                </Badge>
+              ))}
+              {bookmark.labels.length > 3 && (
+                <Badge variant="outline" className="text-xs">
+                  +{bookmark.labels.length - 3}
+                </Badge>
+              )}
             </div>
           )}
-        </div>
 
-        {bookmark.labels && bookmark.labels.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-2">
-            {bookmark.labels.slice(0, 3).map((label, index) => (
-              <Badge key={index} variant="secondary" className="text-xs">
-                {label.label}
-              </Badge>
-            ))}
-            {bookmark.labels.length > 3 && (
-              <Badge variant="outline" className="text-xs">
-                +{bookmark.labels.length - 3}
-              </Badge>
+          {/* Action Buttons */}
+          <div className="absolute bottom-2 left-0 right-0 flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-7 w-7 p-0 hover:bg-blue-100 hover:text-blue-600"
+              onClick={(e) => {e.stopPropagation(); handleOpenBookmark(bookmark);}}
+              title="Open bookmark"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-7 w-7 p-0 hover:bg-green-100 hover:text-green-600"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigator.clipboard.writeText(bookmark.url);
+                toast.success('URL copied to clipboard');
+              }}
+              title="Copy URL"
+            >
+              <Link className="h-3.5 w-3.5" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-7 w-7 p-0 hover:bg-gray-100 hover:text-gray-600"
+              onClick={(e) => {
+                e.stopPropagation();
+                toast.info('Edit functionality coming soon!');
+              }}
+              title="Edit bookmark"
+            >
+              <Edit3 className="h-3.5 w-3.5" />
+            </Button>
+            {showDeleted ? (
+              <>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-7 w-7 p-0 hover:bg-blue-100 hover:text-blue-600"
+                  onClick={(e) => {e.stopPropagation(); handleRestoreBookmark(bookmark.id);}}
+                  title="Restore bookmark"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-7 w-7 p-0 hover:bg-red-100 hover:text-red-600"
+                  onClick={(e) => {e.stopPropagation(); handlePermanentlyDeleteBookmark(bookmark.id);}}
+                  title="Delete forever"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </>
+            ) : (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-7 w-7 p-0 hover:bg-red-100 hover:text-red-600"
+                onClick={(e) => {e.stopPropagation(); handleDeleteBookmark(bookmark.id);}}
+                title="Delete bookmark"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
             )}
           </div>
-        )}
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </BookmarkContextMenu>
   );
 
   const BookmarkListItem = ({ bookmark }: { bookmark: Bookmark }) => (
-    <div className="group flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
-      <div className="flex items-center gap-2 flex-1 min-w-0">
-        {bookmark.favicon && (
-          <img src={bookmark.favicon} alt="" className="w-4 h-4 rounded-sm flex-shrink-0" />
-        )}
-        <div className="flex-1 min-w-0 pr-2">
-          <div className="flex items-center gap-2">
-            <h3 
-              className="font-medium text-sm truncate hover:text-primary cursor-pointer" 
-              onClick={() => handleOpenBookmark(bookmark)}
+    <BookmarkContextMenu bookmark={bookmark}>
+      <div className="group flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          {bookmark.favicon && (
+            <img src={bookmark.favicon} alt="" className="w-4 h-4 rounded-sm flex-shrink-0" />
+          )}
+          <div className="flex-1 min-w-0 pr-2">
+            <div className="flex items-center gap-2">
+              <h3 
+                className="font-medium text-sm truncate hover:text-primary cursor-pointer" 
+                onClick={() => handleOpenBookmark(bookmark)}
+              >
+                {bookmark.title}
+              </h3>
+              {bookmark.labels && bookmark.labels.length > 0 && (
+                <div className="flex gap-1">
+                  {bookmark.labels.slice(0, 2).map((label, index) => (
+                    <Badge key={index} variant="secondary" className="text-xs">
+                      {label.label}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+            <p 
+              className="text-xs text-muted-foreground flex-1 break-all"
+              style={{ 
+                wordBreak: 'break-all',
+                overflowWrap: 'break-word',
+                lineHeight: '1.3'
+              }}
+              title={bookmark.url}
             >
-              {bookmark.title}
-            </h3>
-            {bookmark.labels && bookmark.labels.length > 0 && (
-              <div className="flex gap-1">
-                {bookmark.labels.slice(0, 2).map((label, index) => (
-                  <Badge key={index} variant="secondary" className="text-xs">
-                    {label.label}
-                  </Badge>
-                ))}
-              </div>
-            )}
+              {formatUrlForDisplay(bookmark.url, 80)}
+            </p>
           </div>
-          <p 
-            className="text-xs text-muted-foreground flex-1 break-all"
-            style={{ 
-              wordBreak: 'break-all',
-              overflowWrap: 'break-word',
-              lineHeight: '1.3'
-            }}
-            title={bookmark.url}
+        </div>
+
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span>{new Date(bookmark.dateAdded).toLocaleDateString()}</span>
+          <span>{bookmark.visitCount || 0} visits</span>
+        </div>
+
+        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-7 w-7 p-0 hover:bg-blue-100 hover:text-blue-600"
+            onClick={(e) => {e.stopPropagation(); handleOpenBookmark(bookmark);}}
+            title="Open bookmark"
           >
-            {formatUrlForDisplay(bookmark.url, 80)}
-          </p>
+            <ExternalLink className="h-3.5 w-3.5" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-7 w-7 p-0 hover:bg-green-100 hover:text-green-600"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigator.clipboard.writeText(bookmark.url);
+              toast.success('URL copied to clipboard');
+            }}
+            title="Copy URL"
+          >
+            <Link className="h-3.5 w-3.5" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-7 w-7 p-0 hover:bg-gray-100 hover:text-gray-600"
+            onClick={(e) => {
+              e.stopPropagation();
+              toast.info('Edit functionality coming soon!');
+            }}
+            title="Edit bookmark"
+          >
+            <Edit3 className="h-3.5 w-3.5" />
+          </Button>
+          {showDeleted ? (
+            <>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-7 w-7 p-0 hover:bg-blue-100 hover:text-blue-600"
+                onClick={(e) => {e.stopPropagation(); handleRestoreBookmark(bookmark.id);}}
+                title="Restore bookmark"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-7 w-7 p-0 hover:bg-red-100 hover:text-red-600"
+                onClick={(e) => {e.stopPropagation(); handlePermanentlyDeleteBookmark(bookmark.id);}}
+                title="Delete forever"
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </>
+          ) : (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-7 w-7 p-0 hover:bg-red-100 hover:text-red-600"
+              onClick={(e) => {e.stopPropagation(); handleDeleteBookmark(bookmark.id);}}
+              title="Delete bookmark"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          )}
         </div>
       </div>
-
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <span>{new Date(bookmark.dateAdded).toLocaleDateString()}</span>
-        {bookmark.visitCount > 0 && (
-          <span>{bookmark.visitCount} visits</span>
-        )}
-      </div>
-
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100">
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => handleOpenBookmark(bookmark)}>
-            <ExternalLink className="h-4 w-4 mr-2" />
-            Open
-          </DropdownMenuItem>
-          <DropdownMenuItem>
-            <Edit3 className="h-4 w-4 mr-2" />
-            Edit
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem 
-            className="text-destructive"
-            onClick={() => handleDeleteBookmark(bookmark.id)}
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
+    </BookmarkContextMenu>
   );
 
   return (
@@ -483,8 +705,11 @@ function BookmarksPage() {
               <div className="text-xs font-medium text-muted-foreground mb-2">QUICK FILTERS</div>
               <div className="space-y-1">
                 <button 
-                  className="flex items-center gap-2 w-full p-2 text-sm hover:bg-muted/50 rounded-lg transition-colors"
-                  onClick={() => setFilter({})}
+                  className={`flex items-center gap-2 w-full p-2 text-sm hover:bg-muted/50 rounded-lg transition-colors ${!showDeleted ? 'bg-muted/50' : ''}`}
+                  onClick={() => {
+                    setShowDeleted(false);
+                    setFilter({});
+                  }}
                 >
                   <BookmarkIcon className="h-4 w-4" />
                   All Bookmarks
@@ -498,6 +723,7 @@ function BookmarksPage() {
                 <button 
                   className="flex items-center gap-2 w-full p-2 text-sm hover:bg-muted/50 rounded-lg transition-colors"
                   onClick={() => {
+                    setShowDeleted(false);
                     setSortBy('dateAdded');
                     setFilter({});
                   }}
@@ -509,12 +735,29 @@ function BookmarksPage() {
                 <button 
                   className="flex items-center gap-2 w-full p-2 text-sm hover:bg-muted/50 rounded-lg transition-colors"
                   onClick={() => {
+                    setShowDeleted(false);
                     setSortBy('visitCount');
                     setFilter({});
                   }}
                 >
                   <Star className="h-4 w-4" />
                   Most Visited
+                </button>
+
+                <button 
+                  className={`flex items-center gap-2 w-full p-2 text-sm hover:bg-muted/50 rounded-lg transition-colors ${showDeleted ? 'bg-muted/50' : ''}`}
+                  onClick={() => {
+                    setShowDeleted(true);
+                    setFilter({});
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Deleted Bookmarks
+                  {deletedBookmarks.length > 0 && (
+                    <Badge variant="secondary" className="ml-auto text-xs">
+                      {deletedBookmarks.length}
+                    </Badge>
+                  )}
                 </button>
               </div>
             </div>
@@ -578,9 +821,11 @@ function BookmarksPage() {
         <div className="border-b border-border bg-card">
           <div className="flex items-center justify-between p-4">
             <div>
-              <h1 className="text-xl font-semibold">Bookmarks</h1>
+              <h1 className="text-xl font-semibold">
+                {showDeleted ? 'Deleted Bookmarks' : 'Bookmarks'}
+              </h1>
               <p className="text-sm text-muted-foreground">
-                {filteredBookmarks.length} bookmarks
+                {filteredBookmarks.length} {showDeleted ? 'deleted ' : ''}bookmarks
               </p>
             </div>
 
@@ -889,45 +1134,20 @@ function BookmarksPage() {
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
                   {filteredBookmarks.map((bookmark) => (
-                    <div 
-                      key={bookmark.id}
-                      className="group aspect-square bg-card border border-border rounded-lg p-3 hover:shadow-lg transition-all cursor-pointer flex flex-col"
-                      onClick={() => handleOpenBookmark(bookmark)}
-                    >
-                      <div className="flex items-center justify-between mb-2">
+                    <BookmarkContextMenu key={bookmark.id} bookmark={bookmark}>
+                      <div 
+                        className="group aspect-square bg-card border border-border rounded-lg p-3 hover:shadow-lg transition-all cursor-pointer flex flex-col relative"
+                        onClick={() => handleOpenBookmark(bookmark)}
+                      >
+                      <div className="flex items-center mb-2">
                         {bookmark.favicon && (
                           <img src={bookmark.favicon} alt="" className="w-6 h-6 rounded" />
                         )}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                            <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={(e) => {e.stopPropagation(); handleOpenBookmark(bookmark);}}>
-                              <ExternalLink className="h-4 w-4 mr-2" />
-                              Open
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
-                              <Edit3 className="h-4 w-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem 
-                              className="text-destructive"
-                              onClick={(e) => {e.stopPropagation(); handleDeleteBookmark(bookmark.id);}}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
                       </div>
                       
                       <h3 className="font-medium text-sm line-clamp-2 mb-1">{bookmark.title}</h3>
                       <p 
-                        className="text-xs text-muted-foreground flex-1 break-all"
+                        className="text-xs text-muted-foreground break-all mb-1"
                         style={{ 
                           wordBreak: 'break-all',
                           overflowWrap: 'break-word',
@@ -944,6 +1164,10 @@ function BookmarksPage() {
                         })()}
                       </p>
                       
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+                        <span>{bookmark.visitCount || 0} visits</span>
+                      </div>
+                      
                       {bookmark.labels && bookmark.labels.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-2">
                           {bookmark.labels.slice(0, 2).map((label, index) => (
@@ -953,7 +1177,78 @@ function BookmarksPage() {
                           ))}
                         </div>
                       )}
+
+                      {/* Action Buttons */}
+                      <div className="absolute bottom-2 left-0 right-0 flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-6 w-6 p-0 hover:bg-blue-100 hover:text-blue-600"
+                          onClick={(e) => {e.stopPropagation(); handleOpenBookmark(bookmark);}}
+                          title="Open bookmark"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-6 w-6 p-0 hover:bg-green-100 hover:text-green-600"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigator.clipboard.writeText(bookmark.url);
+                            toast.success('URL copied to clipboard');
+                          }}
+                          title="Copy URL"
+                        >
+                          <Link className="h-3 w-3" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-6 w-6 p-0 hover:bg-gray-100 hover:text-gray-600"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toast.info('Edit functionality coming soon!');
+                          }}
+                          title="Edit bookmark"
+                        >
+                          <Edit3 className="h-3 w-3" />
+                        </Button>
+                        {showDeleted ? (
+                          <>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-6 w-6 p-0 hover:bg-blue-100 hover:text-blue-600"
+                              onClick={(e) => {e.stopPropagation(); handleRestoreBookmark(bookmark.id);}}
+                              title="Restore bookmark"
+                            >
+                              <RotateCcw className="h-3 w-3" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-6 w-6 p-0 hover:bg-red-100 hover:text-red-600"
+                              onClick={(e) => {e.stopPropagation(); handlePermanentlyDeleteBookmark(bookmark.id);}}
+                              title="Delete forever"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </>
+                        ) : (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-6 w-6 p-0 hover:bg-red-100 hover:text-red-600"
+                            onClick={(e) => {e.stopPropagation(); handleDeleteBookmark(bookmark.id);}}
+                            title="Delete bookmark"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
+                    </BookmarkContextMenu>
                   ))}
                 </div>
               )}

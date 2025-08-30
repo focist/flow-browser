@@ -29,12 +29,12 @@ export function BookmarkButton() {
     }
     
     try {
-      // Get all bookmarks for this URL
+      // Get all bookmarks for this URL (exclude deleted ones)
       const existingBookmarks = await flow.bookmarks.getByUrl(addressUrl);
       
-      // Find bookmark for current profile and space
+      // Find bookmark for current profile and space that isn't deleted
       const bookmark = existingBookmarks.find(
-        b => b.profileId === currentSpace.profileId && b.spaceId === currentSpace.id
+        b => b.profileId === currentSpace.profileId && b.spaceId === currentSpace.id && !b.deletedAt
       );
       
       if (bookmark) {
@@ -74,12 +74,33 @@ export function BookmarkButton() {
 
     try {
       if (isBookmarked && currentBookmarkId) {
-        // Remove bookmark
+        // Remove bookmark (soft delete)
         const success = await flow.bookmarks.delete(currentBookmarkId);
         if (success) {
+          const bookmarkId = currentBookmarkId;
           setIsBookmarked(false);
           setCurrentBookmarkId(null);
-          toast.success('Bookmark removed');
+          
+          // Show undo toast
+          toast.success('Bookmark moved to trash', {
+            action: {
+              label: 'Undo',
+              onClick: async () => {
+                try {
+                  await flow.bookmarks.restore(bookmarkId);
+                  // Refresh bookmark status
+                  await checkBookmarkStatus();
+                  // Notify bookmark manager to refresh
+                  window.dispatchEvent(new CustomEvent('bookmarkChanged'));
+                  toast.success('Bookmark restored');
+                } catch (error) {
+                  console.error('Failed to restore bookmark:', error);
+                  toast.error('Failed to restore bookmark');
+                }
+              }
+            }
+          });
+          
           // Notify bookmark manager to refresh
           window.dispatchEvent(new CustomEvent('bookmarkChanged'));
         } else {
