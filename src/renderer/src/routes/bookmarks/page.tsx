@@ -22,7 +22,8 @@ import {
   CloudUpload,
   RotateCcw,
   X,
-  Link
+  Link,
+  Info
 } from "lucide-react";
 import { 
   DropdownMenu, 
@@ -38,6 +39,11 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
@@ -100,6 +106,8 @@ function BookmarksPage() {
   const [importProgress, setImportProgress] = useState(0);
   const [importStats, setImportStats] = useState<ImportStats | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [selectedBookmarkInfo, setSelectedBookmarkInfo] = useState<Bookmark | null>(null);
+  const [showInfoPanel, setShowInfoPanel] = useState(false);
 
   const loadBookmarks = async () => {
     console.log('Loading bookmarks with filter:', filter);
@@ -338,6 +346,11 @@ function BookmarksPage() {
     }
   };
 
+  const handleShowInfoPanel = (bookmark: Bookmark) => {
+    setSelectedBookmarkInfo(bookmark);
+    setShowInfoPanel(true);
+  };
+
   const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -523,6 +536,35 @@ function BookmarksPage() {
             >
               <Edit3 className="h-3.5 w-3.5" />
             </Button>
+            <HoverCard>
+              <HoverCardTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-7 w-7 p-0 hover:bg-purple-100 hover:text-purple-600"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleShowInfoPanel(bookmark);
+                  }}
+                  title="Show bookmark info"
+                >
+                  <Info className="h-3.5 w-3.5" />
+                </Button>
+              </HoverCardTrigger>
+              <HoverCardContent>
+                <div className="space-y-2">
+                  <h4 className="text-sm font-semibold">{bookmark.title}</h4>
+                  <p className="text-xs text-muted-foreground break-all">{bookmark.url}</p>
+                  <div className="flex justify-between text-xs">
+                    <span>Added: {new Date(bookmark.dateAdded).toLocaleDateString()}</span>
+                    <span>{bookmark.visitCount || 0} visits</span>
+                  </div>
+                  {bookmark.description && (
+                    <p className="text-xs text-muted-foreground">{bookmark.description}</p>
+                  )}
+                </div>
+              </HoverCardContent>
+            </HoverCard>
             {showDeleted ? (
               <>
                 <Button 
@@ -640,6 +682,35 @@ function BookmarksPage() {
           >
             <Edit3 className="h-3.5 w-3.5" />
           </Button>
+          <HoverCard>
+            <HoverCardTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-7 w-7 p-0 hover:bg-purple-100 hover:text-purple-600"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleShowInfoPanel(bookmark);
+                }}
+                title="Show bookmark info"
+              >
+                <Info className="h-3.5 w-3.5" />
+              </Button>
+            </HoverCardTrigger>
+            <HoverCardContent>
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold">{bookmark.title}</h4>
+                <p className="text-xs text-muted-foreground break-all">{bookmark.url}</p>
+                <div className="flex justify-between text-xs">
+                  <span>Added: {new Date(bookmark.dateAdded).toLocaleDateString()}</span>
+                  <span>{bookmark.visitCount || 0} visits</span>
+                </div>
+                {bookmark.description && (
+                  <p className="text-xs text-muted-foreground">{bookmark.description}</p>
+                )}
+              </div>
+            </HoverCardContent>
+          </HoverCard>
           {showDeleted ? (
             <>
               <Button 
@@ -1214,6 +1285,35 @@ function BookmarksPage() {
                         >
                           <Edit3 className="h-3 w-3" />
                         </Button>
+                        <HoverCard>
+                          <HoverCardTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-6 w-6 p-0 hover:bg-purple-100 hover:text-purple-600"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleShowInfoPanel(bookmark);
+                              }}
+                              title="Show bookmark info"
+                            >
+                              <Info className="h-3 w-3" />
+                            </Button>
+                          </HoverCardTrigger>
+                          <HoverCardContent>
+                            <div className="space-y-2">
+                              <h4 className="text-sm font-semibold">{bookmark.title}</h4>
+                              <p className="text-xs text-muted-foreground break-all">{bookmark.url}</p>
+                              <div className="flex justify-between text-xs">
+                                <span>Added: {new Date(bookmark.dateAdded).toLocaleDateString()}</span>
+                                <span>{bookmark.visitCount || 0} visits</span>
+                              </div>
+                              {bookmark.description && (
+                                <p className="text-xs text-muted-foreground">{bookmark.description}</p>
+                              )}
+                            </div>
+                          </HoverCardContent>
+                        </HoverCard>
                         {showDeleted ? (
                           <>
                             <Button 
@@ -1256,6 +1356,147 @@ function BookmarksPage() {
           )}
         </div>
       </div>
+
+      {/* Info Panel - Slides in from right */}
+      <div
+        className={`fixed top-0 right-0 h-full w-96 bg-card border-l border-border shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${
+          showInfoPanel ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
+        {selectedBookmarkInfo && (
+          <div className="h-full flex flex-col">
+            {/* Header */}
+            <div className="p-4 border-b border-border flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Bookmark Info</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0"
+                onClick={() => setShowInfoPanel(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-auto p-4 space-y-6">
+              {/* Favicon and Title */}
+              <div className="flex items-start gap-3">
+                {selectedBookmarkInfo.favicon ? (
+                  <img
+                    src={selectedBookmarkInfo.favicon}
+                    alt=""
+                    className="w-8 h-8 rounded flex-shrink-0 mt-1"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded bg-muted flex items-center justify-center flex-shrink-0 mt-1">
+                    <BookmarkIcon className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-medium text-lg leading-tight mb-2">
+                    {selectedBookmarkInfo.title}
+                  </h3>
+                  <p className="text-sm text-muted-foreground break-all">
+                    {selectedBookmarkInfo.url}
+                  </p>
+                </div>
+              </div>
+
+              {/* Description */}
+              {selectedBookmarkInfo.description && (
+                <div>
+                  <h4 className="text-sm font-medium mb-2">Description</h4>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedBookmarkInfo.description}
+                  </p>
+                </div>
+              )}
+
+              {/* Labels */}
+              {selectedBookmarkInfo.labels && selectedBookmarkInfo.labels.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium mb-2">Labels</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedBookmarkInfo.labels.map((label, index) => (
+                      <Badge key={index} variant="secondary">
+                        {label.label}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Metadata */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h4 className="text-sm font-medium mb-1">Date Added</h4>
+                  <p className="text-sm text-muted-foreground">
+                    {new Date(selectedBookmarkInfo.dateAdded).toLocaleDateString()}
+                  </p>
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium mb-1">Visit Count</h4>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedBookmarkInfo.visitCount || 0} visits
+                  </p>
+                </div>
+                {selectedBookmarkInfo.lastVisited && (
+                  <div className="col-span-2">
+                    <h4 className="text-sm font-medium mb-1">Last Visited</h4>
+                    <p className="text-sm text-muted-foreground">
+                      {new Date(selectedBookmarkInfo.lastVisited).toLocaleDateString()}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="space-y-2 pt-4 border-t border-border">
+                <Button
+                  className="w-full justify-start"
+                  onClick={() => {
+                    handleOpenBookmark(selectedBookmarkInfo);
+                    setShowInfoPanel(false);
+                  }}
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Open Bookmark
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() => {
+                    navigator.clipboard.writeText(selectedBookmarkInfo.url);
+                    toast.success('URL copied to clipboard');
+                  }}
+                >
+                  <Link className="h-4 w-4 mr-2" />
+                  Copy URL
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() => {
+                    toast.info('Edit functionality coming soon!');
+                  }}
+                >
+                  <Edit3 className="h-4 w-4 mr-2" />
+                  Edit Bookmark
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Overlay */}
+      {showInfoPanel && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40"
+          onClick={() => setShowInfoPanel(false)}
+        />
+      )}
     </div>
   );
 }
