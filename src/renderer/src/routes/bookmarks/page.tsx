@@ -14,7 +14,6 @@ import {
   Tag,
   Calendar,
   ExternalLink,
-  MoreHorizontal,
   Trash2,
   Edit3,
   Upload,
@@ -23,15 +22,10 @@ import {
   RotateCcw,
   X,
   Link,
-  Info
+  Info,
+  Folder,
+  FolderPlus
 } from "lucide-react";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuSeparator, 
-  DropdownMenuTrigger 
-} from "@/components/ui/dropdown-menu";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -48,10 +42,84 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { Bookmark, BookmarkFilter, ImportStats } from "~/types/bookmarks";
+import { Bookmark, BookmarkCollection, BookmarkFilter, ImportStats } from "~/types/bookmarks";
 
 type ViewMode = 'card' | 'list' | 'grid';
 type SortBy = 'dateAdded' | 'title' | 'visitCount' | 'lastVisited';
+
+// Create Folder Form Component
+function CreateFolderForm({ onSuccess, onCancel }: { 
+  onSuccess: () => void; 
+  onCancel: () => void; 
+}) {
+  const [folderName, setFolderName] = useState('');
+  const [description, setDescription] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!folderName.trim()) return;
+
+    setIsLoading(true);
+    try {
+      // For now, use demo values for profileId and spaceId
+      // In a real implementation, these would come from the current user session
+      await flow.bookmarks.collections.create({
+        name: folderName.trim(),
+        description: description.trim() || undefined,
+        profileId: 'default-profile', // TODO: get from current session
+        spaceId: 'default-space', // TODO: get from current session
+        isAuto: false
+      });
+      
+      toast.success('Folder created successfully');
+      onSuccess();
+    } catch (error) {
+      console.error('Failed to create folder:', error);
+      toast.error('Failed to create folder');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label htmlFor="folderName" className="text-sm font-medium">
+          Folder Name *
+        </label>
+        <Input
+          id="folderName"
+          value={folderName}
+          onChange={(e) => setFolderName(e.target.value)}
+          placeholder="Enter folder name"
+          className="mt-1"
+          required
+        />
+      </div>
+      <div>
+        <label htmlFor="description" className="text-sm font-medium">
+          Description (optional)
+        </label>
+        <Input
+          id="description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Enter description"
+          className="mt-1"
+        />
+      </div>
+      <div className="flex justify-end gap-2 pt-4">
+        <Button type="button" variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="submit" disabled={!folderName.trim() || isLoading}>
+          {isLoading ? 'Creating...' : 'Create Folder'}
+        </Button>
+      </div>
+    </form>
+  );
+}
 
 // Utility function to format URLs for display
 const formatUrlForDisplay = (url: string, maxLength: number = 50): string => {
@@ -108,6 +176,9 @@ function BookmarksPage() {
   const [isDragOver, setIsDragOver] = useState(false);
   const [selectedBookmarkInfo, setSelectedBookmarkInfo] = useState<Bookmark | null>(null);
   const [showInfoPanel, setShowInfoPanel] = useState(false);
+  const [folders, setFolders] = useState<BookmarkCollection[]>([]);
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+  const [showCreateFolderDialog, setShowCreateFolderDialog] = useState(false);
 
   const loadBookmarks = async () => {
     console.log('Loading bookmarks with filter:', filter);
@@ -252,6 +323,7 @@ function BookmarksPage() {
     } else {
       loadBookmarks();
     }
+    loadFolders();
   }, [filter, showDeleted]);
 
   // Load deleted bookmarks once on mount
@@ -270,6 +342,8 @@ function BookmarksPage() {
       }
       // Always refresh deleted bookmarks for the sidebar count
       loadDeletedBookmarks();
+      // Also refresh folders to update bookmark counts
+      loadFolders();
     };
 
     console.log('Setting up bookmark change listeners');
@@ -349,6 +423,16 @@ function BookmarksPage() {
   const handleShowInfoPanel = (bookmark: Bookmark) => {
     setSelectedBookmarkInfo(bookmark);
     setShowInfoPanel(true);
+  };
+
+  const loadFolders = async () => {
+    try {
+      // For now, get all folders - later we can filter by profile
+      const allFolders = await flow.bookmarks.collections.getAll();
+      setFolders(allFolders);
+    } catch (error) {
+      console.error('Failed to load folders:', error);
+    }
   };
 
   const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -776,9 +860,10 @@ function BookmarksPage() {
               <div className="text-xs font-medium text-muted-foreground mb-2">QUICK FILTERS</div>
               <div className="space-y-1">
                 <button 
-                  className={`flex items-center gap-2 w-full p-2 text-sm hover:bg-muted/50 rounded-lg transition-colors ${!showDeleted ? 'bg-muted/50' : ''}`}
+                  className={`flex items-center gap-2 w-full p-2 text-sm hover:bg-muted/50 rounded-lg transition-colors ${!showDeleted && !selectedFolder ? 'bg-muted/50' : ''}`}
                   onClick={() => {
                     setShowDeleted(false);
+                    setSelectedFolder(null);
                     setFilter({});
                   }}
                 >
@@ -819,6 +904,7 @@ function BookmarksPage() {
                   className={`flex items-center gap-2 w-full p-2 text-sm hover:bg-muted/50 rounded-lg transition-colors ${showDeleted ? 'bg-muted/50' : ''}`}
                   onClick={() => {
                     setShowDeleted(true);
+                    setSelectedFolder(null);
                     setFilter({});
                   }}
                 >
@@ -833,23 +919,64 @@ function BookmarksPage() {
               </div>
             </div>
 
-            {/* Collections */}
+            {/* Folders */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-muted-foreground">COLLECTIONS</span>
+                <span className="text-xs font-medium text-muted-foreground">FOLDERS</span>
                 <Button 
                   variant="ghost" 
                   size="sm" 
                   className="h-5 w-5 p-0"
-                  onClick={() => {
-                    toast.info('Collections feature coming soon!');
-                  }}
+                  onClick={() => setShowCreateFolderDialog(true)}
+                  title="Create new folder"
                 >
-                  <Plus className="h-3 w-3" />
+                  <FolderPlus className="h-3 w-3" />
                 </Button>
               </div>
-              <div className="text-xs text-muted-foreground italic">
-                No collections yet
+              
+              <div className="space-y-1">
+                {folders.length > 0 ? (
+                  folders.map((folder) => (
+                    <button
+                      key={folder.id}
+                      className={`flex items-center gap-2 w-full p-2 text-sm hover:bg-muted/50 rounded-lg transition-colors ${
+                        selectedFolder === folder.id ? 'bg-muted/50' : ''
+                      }`}
+                      onClick={() => {
+                        if (selectedFolder === folder.id) {
+                          // Deselect folder
+                          setSelectedFolder(null);
+                          setFilter({});
+                        } else {
+                          // Select folder
+                          setSelectedFolder(folder.id);
+                          setFilter({ collectionId: folder.id });
+                        }
+                      }}
+                    >
+                      <Folder className="h-4 w-4" />
+                      <span className="flex-1 text-left truncate">{folder.name}</span>
+                      {folder.bookmarkCount !== undefined && folder.bookmarkCount > 0 && (
+                        <Badge variant="secondary" className="text-xs">
+                          {folder.bookmarkCount}
+                        </Badge>
+                      )}
+                    </button>
+                  ))
+                ) : (
+                  <div className="text-xs text-muted-foreground italic">
+                    No folders yet
+                  </div>
+                )}
+                
+                {/* New Folder Button - Always visible for drag & drop */}
+                <button
+                  className="flex items-center gap-2 w-full p-2 text-sm hover:bg-muted/50 rounded-lg transition-colors border-2 border-dashed border-muted-foreground/30 hover:border-muted-foreground/50"
+                  onClick={() => setShowCreateFolderDialog(true)}
+                >
+                  <FolderPlus className="h-4 w-4" />
+                  <span className="text-muted-foreground">New Folder</span>
+                </button>
               </div>
             </div>
 
@@ -1356,6 +1483,25 @@ function BookmarksPage() {
           )}
         </div>
       </div>
+
+      {/* Create Folder Dialog */}
+      <Dialog open={showCreateFolderDialog} onOpenChange={setShowCreateFolderDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Create New Folder</DialogTitle>
+            <DialogDescription>
+              Create a new folder to organize your bookmarks.
+            </DialogDescription>
+          </DialogHeader>
+          <CreateFolderForm 
+            onSuccess={() => {
+              setShowCreateFolderDialog(false);
+              loadFolders(); // Reload folders
+            }}
+            onCancel={() => setShowCreateFolderDialog(false)}
+          />
+        </DialogContent>
+      </Dialog>
 
       {/* Info Panel - Slides in from right */}
       <div
