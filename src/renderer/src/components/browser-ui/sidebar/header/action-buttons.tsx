@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/resizable-sidebar";
 import { NavigationEntry } from "~/flow/interfaces/browser/navigation";
 import { cn } from "@/lib/utils";
-import { SidebarCloseIcon, SidebarOpenIcon, XIcon } from "lucide-react";
+import { SidebarCloseIcon, SidebarOpenIcon, XIcon, BookmarkIcon } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { ComponentProps, useCallback, useEffect, useRef, useState } from "react";
 import { TabData } from "~/types/tabs";
@@ -167,6 +167,10 @@ export function NavigationControls({
 
   const SidebarIcon = variant === "floating" && open ? SidebarOpenIcon : SidebarCloseIcon;
 
+  const handleBookmarksClick = () => {
+    flow.tabs.newTab('flow://bookmarks', true);
+  };
+
   return (
     <SidebarGroup className="px-1">
       <SidebarMenu className="flex flex-row justify-between">
@@ -176,6 +180,13 @@ export function NavigationControls({
             icon={<SidebarIcon className="w-4 h-4" />}
             onClick={closeSidebar}
             className={SIDEBAR_HOVER_COLOR}
+          />
+
+          <SidebarActionButton
+            icon={<BookmarkIcon className="w-4 h-4" />}
+            onClick={handleBookmarksClick}
+            className={SIDEBAR_HOVER_COLOR}
+            title="Open Bookmarks Manager"
           />
 
           {/* Browser Actions */}

@@ -5,7 +5,7 @@ import { PlusIcon } from "lucide-react";
 import { SIDEBAR_HOVER_COLOR } from "@/components/browser-ui/browser-sidebar";
 import { cn } from "@/lib/utils";
 
-const MotionSidebarMenuButton = motion(SidebarMenuButton);
+const MotionSidebarMenuButton = motion.create(SidebarMenuButton);
 
 export function NewTabButton() {
   const [isPressed, setIsPressed] = useState(false);

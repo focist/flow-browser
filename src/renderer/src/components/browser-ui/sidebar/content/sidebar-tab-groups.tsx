@@ -1,4 +1,3 @@
-import { Button } from "@/components/ui/button";
 import { SidebarMenuButton, useSidebar } from "@/components/ui/resizable-sidebar";
 import { cn, craftActiveFaviconURL } from "@/lib/utils";
 import { XIcon, Volume2, VolumeX } from "lucide-react";
@@ -14,7 +13,7 @@ import { attachClosestEdge, extractClosestEdge, Edge } from "@atlaskit/pragmatic
 import { TabData } from "~/types/tabs";
 import { DropIndicator } from "@/components/browser-ui/sidebar/content/space-sidebar";
 
-const MotionSidebarMenuButton = motion(SidebarMenuButton);
+const MotionSidebarMenuButton = motion.create(SidebarMenuButton);
 
 export function SidebarTab({ tab, isFocused }: { tab: TabData; isFocused: boolean }) {
   const [cachedFaviconUrl, setCachedFaviconUrl] = useState<string | null>(tab.faviconURL);
@@ -151,15 +150,21 @@ export function SidebarTab({ tab, isFocused }: { tab: TabData; isFocused: boolea
                   whileTap={{ scale: 0.95 }}
                   className="flex items-center justify-center overflow-hidden ml-0.5"
                 >
-                  <Button
-                    variant="ghost"
-                    size="icon"
+                  <div
+                    role="button"
+                    tabIndex={0}
                     onClick={handleToggleMute}
-                    className="size-5 bg-transparent rounded-sm hover:bg-black/10 dark:hover:bg-white/10"
+                    className="size-5 bg-transparent rounded-sm hover:bg-black/10 dark:hover:bg-white/10 flex items-center justify-center cursor-pointer"
                     onMouseDown={(event) => event.stopPropagation()}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        handleToggleMute(event as any);
+                      }
+                    }}
                   >
                     <VolumeIcon className={cn("size-4", "text-muted-foreground/60 dark:text-white/50")} />
-                  </Button>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -171,15 +176,21 @@ export function SidebarTab({ tab, isFocused }: { tab: TabData; isFocused: boolea
             {/* Close tab button */}
             {isHovered && (
               <motion.div whileTap={{ scale: 0.95 }} className="flex items-center justify-center">
-                <Button
-                  variant="ghost"
-                  size="icon"
+                <div
+                  role="button"
+                  tabIndex={0}
                   onClick={handleCloseTab}
-                  className="size-5 bg-transparent rounded-sm hover:bg-black/10 dark:hover:bg-white/10 flex items-center justify-center"
+                  className="size-5 bg-transparent rounded-sm hover:bg-black/10 dark:hover:bg-white/10 flex items-center justify-center cursor-pointer"
                   onMouseDown={(event) => event.stopPropagation()}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      handleCloseTab(event as any);
+                    }
+                  }}
                 >
                   <XIcon className="size-4 text-muted-foreground dark:text-white" />
-                </Button>
+                </div>
               </motion.div>
             )}
           </div>

@@ -35,6 +35,8 @@ import { FlowTabsAPI } from "~/flow/interfaces/browser/tabs";
 import { FlowUpdatesAPI } from "~/flow/interfaces/app/updates";
 import { FlowActionsAPI } from "~/flow/interfaces/app/actions";
 import { FlowShortcutsAPI, ShortcutsData } from "~/flow/interfaces/app/shortcuts";
+import { FlowBookmarksAPI } from "~/flow/interfaces/browser/bookmarks";
+import { CreateBookmarkInput, UpdateBookmarkInput, BookmarkFilter } from "~/types/bookmarks";
 
 // API CHECKS //
 function isProtocol(protocol: string) {
@@ -581,6 +583,61 @@ const shortcutsAPI: FlowShortcutsAPI = {
   }
 };
 
+// BOOKMARKS API //
+const bookmarksAPI: FlowBookmarksAPI = {
+  create: async (input: CreateBookmarkInput) => {
+    return ipcRenderer.invoke("bookmarks:create", input);
+  },
+  get: async (id: string) => {
+    return ipcRenderer.invoke("bookmarks:get", id);
+  },
+  update: async (id: string, input: UpdateBookmarkInput) => {
+    return ipcRenderer.invoke("bookmarks:update", id, input);
+  },
+  delete: async (id: string) => {
+    return ipcRenderer.invoke("bookmarks:delete", id);
+  },
+  deleteMany: async (ids: string[]) => {
+    return ipcRenderer.invoke("bookmarks:deleteMany", ids);
+  },
+  getAll: async (filter?: BookmarkFilter) => {
+    return ipcRenderer.invoke("bookmarks:getAll", filter);
+  },
+  exists: async (url: string, profileId: string, spaceId: string) => {
+    return ipcRenderer.invoke("bookmarks:exists", url, profileId, spaceId);
+  },
+  incrementVisit: async (id: string) => {
+    return ipcRenderer.invoke("bookmarks:incrementVisit", id);
+  },
+  getByUrl: async (url: string) => {
+    return ipcRenderer.invoke("bookmarks:getByUrl", url);
+  },
+  collections: {
+    create: async (input: {
+      name: string;
+      description?: string;
+      profileId: string;
+      spaceId?: string;
+      isAuto?: boolean;
+      rules?: any;
+    }) => {
+      return ipcRenderer.invoke("bookmarks:collections:create", input);
+    },
+    getAll: async (profileId?: string) => {
+      return ipcRenderer.invoke("bookmarks:collections:getAll", profileId);
+    },
+    addBookmark: async (bookmarkId: string, collectionId: string) => {
+      return ipcRenderer.invoke("bookmarks:collections:addBookmark", bookmarkId, collectionId);
+    },
+    removeBookmark: async (bookmarkId: string, collectionId: string) => {
+      return ipcRenderer.invoke("bookmarks:collections:removeBookmark", bookmarkId, collectionId);
+    }
+  },
+  importChrome: async (htmlContent: string, profileId: string, spaceId: string) => {
+    return ipcRenderer.invoke("bookmarks:importChrome", htmlContent, profileId, spaceId);
+  }
+};
+
 // EXPOSE FLOW API //
 const flowAPI: typeof flow = {
   // App APIs
@@ -607,6 +664,7 @@ const flowAPI: typeof flow = {
   }),
   omnibox: wrapAPI(omniboxAPI, "browser"),
   newTab: wrapAPI(newTabAPI, "browser"),
+  bookmarks: wrapAPI(bookmarksAPI, "app"),
 
   // Session APIs
   profiles: wrapAPI(profilesAPI, "session", {

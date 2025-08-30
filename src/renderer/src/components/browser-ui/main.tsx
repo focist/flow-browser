@@ -3,7 +3,7 @@ import { SidebarInset, SidebarProvider, useSidebar } from "@/components/ui/resiz
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
 import { BrowserSidebar } from "@/components/browser-ui/browser-sidebar";
-import { SpacesProvider } from "@/components/providers/spaces-provider";
+import { SpacesProvider, useSpaces } from "@/components/providers/spaces-provider";
 import { useEffect, useMemo, useRef } from "react";
 import { useState } from "react";
 import { TabsProvider, useTabs } from "@/components/providers/tabs-provider";
@@ -16,6 +16,7 @@ import MinimalToastProvider from "@/components/providers/minimal-toast-provider"
 import { AppUpdatesProvider } from "@/components/providers/app-updates-provider";
 import { ActionsProvider } from "@/components/providers/actions-provider";
 import { SidebarAddressBar } from "@/components/browser-ui/sidebar/header/address-bar/address-bar";
+import { toast } from "sonner";
 
 export type CollapseMode = "icon" | "offcanvas";
 export type SidebarVariant = "sidebar" | "floating";
@@ -26,7 +27,8 @@ export type WindowType = "main" | "popup";
 function InternalBrowserUI({ isReady, type }: { isReady: boolean; type: WindowType }) {
   const { open, setOpen } = useSidebar();
   const { getSetting } = useSettings();
-  const { focusedTab, tabGroups } = useTabs();
+  const { focusedTab, tabGroups, addressUrl } = useTabs();
+  const { currentSpace } = useSpaces();
 
   const [variant, setVariant] = useState<SidebarVariant>("sidebar");
   const [isHoveringSidebar, setIsHoveringSidebar] = useState(false);
@@ -58,6 +60,78 @@ function InternalBrowserUI({ isReady, type }: { isReady: boolean; type: WindowTy
       setOpen(false);
     }
   }, [isHoveringSidebar, open, variant, setOpen, setVariant]);
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      // Cmd+D (Mac) or Ctrl+D (Windows/Linux) for bookmark
+      if ((e.metaKey || e.ctrlKey) && e.key === 'd') {
+        e.preventDefault();
+        
+        // Don't bookmark internal pages
+        if (!addressUrl || addressUrl.startsWith('flow://') || addressUrl.startsWith('flow-internal://')) {
+          toast.error('Cannot bookmark internal pages');
+          return;
+        }
+
+        if (!currentSpace?.profileId || !currentSpace?.id) {
+          toast.error('Cannot bookmark - missing profile or space');
+          return;
+        }
+
+        try {
+          // Check if already bookmarked
+          const existingBookmarks = await flow.bookmarks.getByUrl(addressUrl);
+          const bookmark = existingBookmarks.find(
+            b => b.profileId === currentSpace.profileId && b.spaceId === currentSpace.id
+          );
+
+          if (bookmark) {
+            // Remove bookmark
+            const success = await flow.bookmarks.delete(bookmark.id);
+            if (success) {
+              toast.success('Bookmark removed');
+              window.dispatchEvent(new CustomEvent('bookmarkChanged'));
+            } else {
+              toast.error('Failed to remove bookmark');
+            }
+          } else {
+            // Add bookmark
+            let title = focusedTab?.title || '';
+            if (!title) {
+              try {
+                title = new URL(addressUrl).hostname;
+              } catch {
+                title = addressUrl;
+              }
+            }
+
+            const newBookmark = await flow.bookmarks.create({
+              url: addressUrl,
+              title: title,
+              profileId: currentSpace.profileId,
+              spaceId: currentSpace.id
+            });
+
+            if (newBookmark) {
+              toast.success('Bookmark added');
+              window.dispatchEvent(new CustomEvent('bookmarkChanged'));
+            } else {
+              toast.error('Failed to add bookmark');
+            }
+          }
+        } catch (error) {
+          console.error('Failed to toggle bookmark:', error);
+          toast.error('Failed to update bookmark');
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [addressUrl, focusedTab, currentSpace]);
 
   // Only show the browser content if the focused tab is in full screen mode
   if (focusedTab?.fullScreen) {

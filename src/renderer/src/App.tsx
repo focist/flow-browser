@@ -23,6 +23,7 @@ import OmniboxDebugRoute from "./routes/omnibox-debug/route";
 import OnboardingRoute from "./routes/onboarding/route";
 import ExtensionsRoute from "./routes/extensions/route";
 import PDFViewerRoute from "./routes/pdf-viewer/route";
+import BookmarksRoute from "./routes/bookmarks/route";
 
 // Routes //
 function Routes() {
@@ -63,6 +64,9 @@ function Routes() {
       </Route>
       <Route protocol={flowProtocol} hostname="pdf-viewer">
         <PDFViewerRoute />
+      </Route>
+      <Route protocol={flowProtocol} hostname="bookmarks">
+        <BookmarksRoute />
       </Route>
     </RouterProvider>
   );

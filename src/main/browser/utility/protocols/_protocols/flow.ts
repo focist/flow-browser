@@ -16,7 +16,8 @@ const FLOW_PROTOCOL_ALLOWED_DOMAINS: AllowedDomains = {
   games: true,
   omnibox: true,
   extensions: true,
-  "pdf-viewer": true
+  "pdf-viewer": true,
+  bookmarks: true
 };
 
 const PDF_CACHE = new Map<string, Response>();

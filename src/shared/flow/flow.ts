@@ -9,6 +9,7 @@ import { FlowNavigationAPI } from "~/flow/interfaces/browser/navigation";
 import { FlowInterfaceAPI } from "~/flow/interfaces/browser/interface";
 import { FlowOmniboxAPI } from "~/flow/interfaces/browser/omnibox";
 import { FlowNewTabAPI } from "~/flow/interfaces/browser/newTab";
+import { FlowBookmarksAPI } from "~/flow/interfaces/browser/bookmarks";
 
 import { FlowProfilesAPI } from "~/flow/interfaces/sessions/profiles";
 import { FlowSpacesAPI } from "~/flow/interfaces/sessions/spaces";
@@ -43,6 +44,7 @@ declare global {
     interface: FlowInterfaceAPI;
     omnibox: FlowOmniboxAPI;
     newTab: FlowNewTabAPI;
+    bookmarks: FlowBookmarksAPI;
 
     // Session APIs
     profiles: FlowProfilesAPI;
