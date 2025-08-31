@@ -115,6 +115,7 @@ async function initDatabase() {
         table.json("rules"); // For smart collections
         table.timestamp("dateCreated").notNullable();
         table.timestamp("dateModified");
+        table.timestamp("deletedAt");
       });
       console.log("BOOKMARKS: Created bookmark_collections table");
     } else {
@@ -125,6 +126,15 @@ async function initDatabase() {
           table.string("parentId").index();
         });
         console.log("BOOKMARKS: Added parentId column to bookmark_collections table");
+      }
+      
+      // Check if deletedAt column exists, add it if not (migration)
+      const hasDeletedAtColumn = await db.schema.hasColumn("bookmark_collections", "deletedAt");
+      if (!hasDeletedAtColumn) {
+        await db.schema.alterTable("bookmark_collections", (table) => {
+          table.timestamp("deletedAt");
+        });
+        console.log("BOOKMARKS: Added deletedAt column to bookmark_collections table");
       }
     }
 
@@ -549,6 +559,7 @@ export async function deleteCollection(id: string): Promise<boolean> {
     // First, check if this collection has child collections
     const childCollections = await trx("bookmark_collections")
       .where({ parentId: id })
+      .whereNull("deletedAt") // Only consider non-deleted child collections
       .select("id");
     
     // Move child collections to have the same parent as the deleted collection
@@ -562,18 +573,20 @@ export async function deleteCollection(id: string): Promise<boolean> {
       
       await trx("bookmark_collections")
         .whereIn("id", childCollections.map(c => c.id))
-        .update({ parentId: newParentId });
+        .update({ 
+          parentId: newParentId,
+          dateModified: new Date()
+        });
     }
     
-    // Delete collection_items relationships
-    await trx("collection_items")
-      .where({ collectionId: id })
-      .delete();
-    
-    // Delete the collection itself
+    // Soft delete the collection by setting deletedAt timestamp
     const deletedRows = await trx("bookmark_collections")
       .where({ id })
-      .delete();
+      .whereNull("deletedAt") // Only delete if not already deleted
+      .update({ 
+        deletedAt: new Date(),
+        dateModified: new Date()
+      });
     
     return deletedRows > 0;
   });
@@ -585,6 +598,7 @@ export async function getCollections(profileId?: string): Promise<BookmarkCollec
   let query = db("bookmark_collections")
     .select("bookmark_collections.*", db.raw("COUNT(collection_items.id) as bookmarkCount"))
     .leftJoin("collection_items", "bookmark_collections.id", "collection_items.collectionId")
+    .whereNull("bookmark_collections.deletedAt") // Only get non-deleted collections
     .groupBy("bookmark_collections.id");
   
   if (profileId) {
@@ -653,6 +667,58 @@ export async function getCollections(profileId?: string): Promise<BookmarkCollec
   );
   
   return flattenedCollections;
+}
+
+export async function restoreCollection(id: string): Promise<boolean> {
+  await whenDatabaseInitialized;
+  
+  const updatedCount = await db("bookmark_collections")
+    .where({ id })
+    .whereNotNull("deletedAt")
+    .update({ 
+      deletedAt: null,
+      dateModified: new Date()
+    });
+  
+  return updatedCount > 0;
+}
+
+export async function permanentlyDeleteCollection(id: string): Promise<boolean> {
+  await whenDatabaseInitialized;
+  
+  return await db.transaction(async (trx) => {
+    // Delete collection_items relationships
+    await trx("collection_items")
+      .where({ collectionId: id })
+      .delete();
+    
+    // Permanently delete the collection
+    const deletedRows = await trx("bookmark_collections")
+      .where({ id })
+      .delete();
+    
+    return deletedRows > 0;
+  });
+}
+
+export async function getDeletedCollections(profileId?: string): Promise<BookmarkCollection[]> {
+  await whenDatabaseInitialized;
+  
+  let query = db("bookmark_collections")
+    .select("*")
+    .whereNotNull("deletedAt");
+  
+  if (profileId) {
+    query = query.where("profileId", profileId);
+  }
+  
+  const collections = await query;
+  
+  return collections.map((c: any) => ({
+    ...c,
+    rules: c.rules ? JSON.parse(c.rules) : null,
+    bookmarkCount: 0 // Deleted collections don't show bookmark counts
+  }));
 }
 
 export async function addBookmarkToCollection(bookmarkId: string, collectionId: string): Promise<void> {

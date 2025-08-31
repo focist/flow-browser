@@ -639,6 +639,15 @@ const bookmarksAPI: FlowBookmarksAPI = {
     delete: async (id: string) => {
       return ipcRenderer.invoke("bookmarks:collections:delete", id);
     },
+    restore: async (id: string) => {
+      return ipcRenderer.invoke("bookmarks:collections:restore", id);
+    },
+    permanentlyDelete: async (id: string) => {
+      return ipcRenderer.invoke("bookmarks:collections:permanentlyDelete", id);
+    },
+    getDeleted: async (profileId?: string) => {
+      return ipcRenderer.invoke("bookmarks:collections:getDeleted", profileId);
+    },
     addBookmark: async (bookmarkId: string, collectionId: string) => {
       return ipcRenderer.invoke("bookmarks:collections:addBookmark", bookmarkId, collectionId);
     },

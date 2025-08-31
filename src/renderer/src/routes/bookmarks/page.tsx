@@ -2,7 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { 
   Search, 
   Plus, 
@@ -24,7 +24,8 @@ import {
   Link,
   Info,
   Folder,
-  FolderPlus
+  FolderPlus,
+  ChevronRight
 } from "lucide-react";
 import {
   ContextMenu,
@@ -256,10 +257,11 @@ function BookmarksPage() {
     try {
       const result = await flow.bookmarks.getAll(filter);
       console.log('Loaded bookmarks:', result);
-      setBookmarks(result);
+      setBookmarks(result || []); // Ensure we always set an array
     } catch (error) {
       console.error('Failed to load bookmarks:', error);
       toast.error('Failed to load bookmarks');
+      setBookmarks([]); // Set empty array on error
     } finally {
       setIsLoading(false);
     }
@@ -424,9 +426,34 @@ function BookmarksPage() {
     </ContextMenu>
   );
 
+  // Initialize from localStorage when folders are loaded (only on mount)
+  useEffect(() => {
+    const saved = localStorage.getItem('bookmarks-selected-folder');
+    if (saved && folders.length > 0 && !selectedFolder && !showDeleted) {
+      const folderExists = folders.some(f => f.id === saved);
+      if (folderExists) {
+        console.log('Restoring folder selection from localStorage:', saved);
+        setSelectedFolder(saved);
+        setFilter({ collectionId: saved });
+      } else {
+        // Clean up localStorage if folder no longer exists
+        localStorage.removeItem('bookmarks-selected-folder');
+      }
+    }
+  }, [folders]); // Only run when folders change, not when selectedFolder changes
+
+  // Persist selectedFolder to localStorage (only when not viewing deleted)
+  useEffect(() => {
+    if (selectedFolder && !showDeleted) {
+      localStorage.setItem('bookmarks-selected-folder', selectedFolder);
+    } else if (!selectedFolder) {
+      localStorage.removeItem('bookmarks-selected-folder');
+    }
+  }, [selectedFolder, showDeleted]);
+
   // Load bookmarks on mount and filter changes
   useEffect(() => {
-    console.log('Loading bookmarks effect triggered');
+    console.log('Loading bookmarks effect triggered with filter:', filter, 'showDeleted:', showDeleted);
     if (showDeleted) {
       loadDeletedBookmarks();
     } else {
@@ -681,13 +708,14 @@ function BookmarksPage() {
       const success = await flow.bookmarks.collections.delete(folderToDelete.id);
 
       if (success) {
-        toast.success('Folder deleted successfully');
+        toast.success('Folder moved to trash successfully');
         setShowDeleteFolderDialog(false);
         setFolderToDelete(null);
         
         // Clear selected folder if it was the deleted one
         if (selectedFolder === folderToDelete.id) {
           setSelectedFolder(null);
+          setFilter({}); // Also clear the filter
         }
         
         await loadFolders();
@@ -1187,7 +1215,7 @@ function BookmarksPage() {
                           }`}
                           style={{ marginLeft: `${folderInfo.depth * 16}px` }}
                           onClick={() => {
-                            if (selectedFolder === folder.id) {
+                            if (selectedFolder === folder.id && !showDeleted) {
                               // Deselect folder
                               setSelectedFolder(null);
                               setFilter({});
@@ -1195,6 +1223,7 @@ function BookmarksPage() {
                               // Select folder
                               setSelectedFolder(folder.id);
                               setFilter({ collectionId: folder.id });
+                              setShowDeleted(false); // Switch away from deleted view
                             }
                           }}
                           title={folderInfo.isSubfolder ? `Subfolder (depth ${folderInfo.depth})` : folder.name}
@@ -1268,8 +1297,54 @@ function BookmarksPage() {
         <div className="border-b border-border bg-card">
           <div className="flex items-center justify-between p-4">
             <div>
+              {/* Breadcrumb Navigation */}
+              {selectedFolder && (() => {
+                const currentFolder = folders.find(f => f.id === selectedFolder);
+                const breadcrumbPath: BookmarkCollection[] = [];
+                
+                // Build path from current folder to root
+                let folder = currentFolder;
+                while (folder) {
+                  breadcrumbPath.unshift(folder);
+                  folder = folder.parentId ? folders.find(f => f.id === folder!.parentId) : undefined;
+                }
+                
+                return (
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
+                    <button 
+                      onClick={() => {
+                        setSelectedFolder(null);
+                        setFilter({});
+                        setShowDeleted(false); // Switch away from deleted view
+                      }}
+                      className="hover:text-foreground transition-colors"
+                    >
+                      Bookmarks
+                    </button>
+                    {breadcrumbPath.map((folder, index) => (
+                      <React.Fragment key={folder.id}>
+                        <ChevronRight className="h-3 w-3" />
+                        {index === breadcrumbPath.length - 1 ? (
+                          <span className="text-foreground">{folder.name}</span>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setSelectedFolder(folder.id);
+                              setFilter({ collectionId: folder.id });
+                              setShowDeleted(false); // Switch away from deleted view
+                            }}
+                            className="hover:text-foreground transition-colors"
+                          >
+                            {folder.name}
+                          </button>
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </div>
+                );
+              })()}
               <h1 className="text-xl font-semibold">
-                {showDeleted ? 'Deleted Bookmarks' : 'Bookmarks'}
+                {showDeleted ? 'Deleted Bookmarks' : selectedFolder ? folders.find(f => f.id === selectedFolder)?.name || 'Folder' : 'Bookmarks'}
               </h1>
               <p className="text-sm text-muted-foreground">
                 {filteredBookmarks.length} {showDeleted ? 'deleted ' : ''}bookmarks
@@ -1467,7 +1542,7 @@ function BookmarksPage() {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-auto p-4">
+        <div className="flex-1 overflow-auto p-4 min-h-0">
           {isLoading ? (
             <div className="flex items-center justify-center h-full">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -1481,6 +1556,8 @@ function BookmarksPage() {
                   <div className="relative bg-card border border-border rounded-full p-6 shadow-lg w-28 h-28 flex items-center justify-center">
                     {showDeleted ? (
                       <Trash2 className="h-16 w-16 text-muted-foreground" />
+                    ) : selectedFolder ? (
+                      <Folder className="h-16 w-16 text-muted-foreground" />
                     ) : (
                       <BookmarkIcon className="h-16 w-16 text-primary" />
                     )}
@@ -1493,18 +1570,22 @@ function BookmarksPage() {
                     ? 'No deleted bookmarks' 
                     : searchQuery 
                       ? 'No bookmarks found' 
-                      : 'Welcome to Bookmarks'}
+                      : selectedFolder
+                        ? 'Empty Folder'
+                        : 'Welcome to Bookmarks'}
                 </h3>
                 <p className="text-muted-foreground mb-8 text-base">
                   {showDeleted
                     ? 'Your trash is empty. Deleted bookmarks will appear here.'
                     : searchQuery 
                       ? `No bookmarks match "${searchQuery}". Try a different search term.`
-                      : 'Save your favorite websites for quick access. Organize them with labels and collections.'}
+                      : selectedFolder
+                        ? `This folder is empty.`
+                        : 'Save your favorite websites for quick access. Organize them with labels and collections.'}
                 </p>
 
                 {/* Quick Tips or Actions */}
-                {!searchQuery && !showDeleted && (
+                {!searchQuery && !showDeleted && !selectedFolder && (
                   <div className="space-y-4 mb-8">
                     <div className="bg-muted/30 rounded-lg p-4 text-left">
                       <h4 className="font-medium mb-2 flex items-center gap-2">
@@ -1853,15 +1934,18 @@ function BookmarksPage() {
           <DialogHeader>
             <DialogTitle>Delete Folder</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete "{folderToDelete?.name}"? 
+              Are you sure you want to move "{folderToDelete?.name}" to trash? 
               {folderToDelete && (
                 <div className="mt-2 text-sm">
                   <p>This action will:</p>
                   <ul className="list-disc list-inside mt-1 space-y-1">
-                    <li>Remove the folder permanently</li>
+                    <li>Move the folder to trash (can be restored later)</li>
                     <li>Move any subfolders to the parent level</li>
                     <li>Remove bookmarks from this folder (bookmarks themselves will not be deleted)</li>
                   </ul>
+                  <p className="mt-2 text-muted-foreground">
+                    You can restore this folder from the trash later if needed.
+                  </p>
                 </div>
               )}
             </DialogDescription>
@@ -1879,7 +1963,7 @@ function BookmarksPage() {
               onClick={handleConfirmDeleteFolder}
               disabled={isLoading}
             >
-              {isLoading ? 'Deleting...' : 'Delete Folder'}
+              {isLoading ? 'Moving to Trash...' : 'Move to Trash'}
             </Button>
           </div>
         </DialogContent>

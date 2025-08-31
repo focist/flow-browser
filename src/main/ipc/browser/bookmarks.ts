@@ -13,7 +13,10 @@ import {
   createCollection,
   updateCollection,
   deleteCollection,
+  restoreCollection,
+  permanentlyDeleteCollection,
   getCollections,
+  getDeletedCollections,
   addBookmarkToCollection,
   removeBookmarkFromCollection,
   getBookmarksByUrl,
@@ -87,6 +90,18 @@ ipcMain.handle("bookmarks:collections:update", async (_, id: string, input: Upda
 
 ipcMain.handle("bookmarks:collections:delete", async (_, id: string): Promise<boolean> => {
   return await deleteCollection(id);
+});
+
+ipcMain.handle("bookmarks:collections:restore", async (_, id: string): Promise<boolean> => {
+  return await restoreCollection(id);
+});
+
+ipcMain.handle("bookmarks:collections:permanentlyDelete", async (_, id: string): Promise<boolean> => {
+  return await permanentlyDeleteCollection(id);
+});
+
+ipcMain.handle("bookmarks:collections:getDeleted", async (_, profileId?: string): Promise<BookmarkCollection[]> => {
+  return await getDeletedCollections(profileId);
 });
 
 ipcMain.handle("bookmarks:collections:addBookmark", async (_, bookmarkId: string, collectionId: string): Promise<void> => {

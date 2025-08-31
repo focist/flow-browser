@@ -34,6 +34,7 @@ export interface BookmarkCollection {
   rules?: any;
   dateCreated: Date;
   dateModified?: Date;
+  deletedAt?: Date;
   bookmarkCount?: number;
   children?: BookmarkCollection[];
   depth?: number;

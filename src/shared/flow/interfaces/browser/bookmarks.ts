@@ -25,7 +25,10 @@ export interface FlowBookmarksAPI {
     }): Promise<BookmarkCollection>;
     update(id: string, input: UpdateCollectionInput): Promise<BookmarkCollection | null>;
     delete(id: string): Promise<boolean>;
+    restore(id: string): Promise<boolean>;
+    permanentlyDelete(id: string): Promise<boolean>;
     getAll(profileId?: string): Promise<BookmarkCollection[]>;
+    getDeleted(profileId?: string): Promise<BookmarkCollection[]>;
     addBookmark(bookmarkId: string, collectionId: string): Promise<void>;
     removeBookmark(bookmarkId: string, collectionId: string): Promise<void>;
   };
