@@ -11,6 +11,8 @@ import {
   bookmarkExists,
   incrementVisitCount,
   createCollection,
+  updateCollection,
+  deleteCollection,
   getCollections,
   addBookmarkToCollection,
   removeBookmarkFromCollection,
@@ -20,6 +22,7 @@ import {
   type BookmarkCollection,
   type CreateBookmarkInput,
   type UpdateBookmarkInput,
+  type UpdateCollectionInput,
   type BookmarkFilter,
   type ImportStats
 } from "@/modules/bookmarks";
@@ -67,6 +70,7 @@ ipcMain.handle("bookmarks:collections:create", async (_, input: {
   description?: string;
   profileId: string;
   spaceId?: string;
+  parentId?: string;
   isAuto?: boolean;
   rules?: any;
 }): Promise<BookmarkCollection> => {
@@ -75,6 +79,14 @@ ipcMain.handle("bookmarks:collections:create", async (_, input: {
 
 ipcMain.handle("bookmarks:collections:getAll", async (_, profileId?: string): Promise<BookmarkCollection[]> => {
   return await getCollections(profileId);
+});
+
+ipcMain.handle("bookmarks:collections:update", async (_, id: string, input: UpdateCollectionInput): Promise<BookmarkCollection | null> => {
+  return await updateCollection(id, input);
+});
+
+ipcMain.handle("bookmarks:collections:delete", async (_, id: string): Promise<boolean> => {
+  return await deleteCollection(id);
 });
 
 ipcMain.handle("bookmarks:collections:addBookmark", async (_, bookmarkId: string, collectionId: string): Promise<void> => {

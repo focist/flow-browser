@@ -624,6 +624,7 @@ const bookmarksAPI: FlowBookmarksAPI = {
       description?: string;
       profileId: string;
       spaceId?: string;
+      parentId?: string;
       isAuto?: boolean;
       rules?: any;
     }) => {
@@ -631,6 +632,12 @@ const bookmarksAPI: FlowBookmarksAPI = {
     },
     getAll: async (profileId?: string) => {
       return ipcRenderer.invoke("bookmarks:collections:getAll", profileId);
+    },
+    update: async (id: string, input: { name?: string; description?: string; }) => {
+      return ipcRenderer.invoke("bookmarks:collections:update", id, input);
+    },
+    delete: async (id: string) => {
+      return ipcRenderer.invoke("bookmarks:collections:delete", id);
     },
     addBookmark: async (bookmarkId: string, collectionId: string) => {
       return ipcRenderer.invoke("bookmarks:collections:addBookmark", bookmarkId, collectionId);

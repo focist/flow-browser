@@ -2,6 +2,15 @@ import path from "path";
 import { knex } from "knex";
 import { FLOW_DATA_DIR } from "./paths";
 import { createHash } from "crypto";
+import type { 
+  Bookmark,
+  BookmarkFilter, 
+  BookmarkCollection, 
+  CreateBookmarkInput,
+  UpdateBookmarkInput,
+  UpdateCollectionInput,
+  ImportStats 
+} from "~/types/bookmarks";
 
 const dbPath = path.join(FLOW_DATA_DIR, "bookmarks.db");
 
@@ -101,12 +110,22 @@ async function initDatabase() {
         table.text("description");
         table.string("profileId").notNullable().index();
         table.string("spaceId").index();
+        table.string("parentId").index(); // Parent collection ID
         table.boolean("isAuto").defaultTo(false);
         table.json("rules"); // For smart collections
         table.timestamp("dateCreated").notNullable();
         table.timestamp("dateModified");
       });
       console.log("BOOKMARKS: Created bookmark_collections table");
+    } else {
+      // Check if parentId column exists, add it if not (migration)
+      const hasParentIdColumn = await db.schema.hasColumn("bookmark_collections", "parentId");
+      if (!hasParentIdColumn) {
+        await db.schema.alterTable("bookmark_collections", (table) => {
+          table.string("parentId").index();
+        });
+        console.log("BOOKMARKS: Added parentId column to bookmark_collections table");
+      }
     }
 
     const hasCollectionItemsTable = await db.schema.hasTable("collection_items");
@@ -150,70 +169,19 @@ async function initDatabaseWithRetry() {
 initDatabaseWithRetry();
 
 // Types
-export interface Bookmark {
-  id: string;
-  url: string;
-  title: string;
-  description?: string;
-  favicon?: string;
-  profileId: string;
-  spaceId: string;
-  isGlobal?: boolean;
-  dateAdded: Date;
-  dateModified?: Date;
-  visitCount: number;
-  lastVisited?: Date;
-  labels?: BookmarkLabel[];
-  collections?: string[];
-}
 
-export interface BookmarkLabel {
-  label: string;
-  source: 'user' | 'ai' | 'auto';
-  confidence?: number;
-  category?: 'topic' | 'type' | 'project' | 'priority';
-}
-
-export interface BookmarkCollection {
-  id: string;
-  name: string;
-  description?: string;
-  profileId: string;
-  spaceId?: string;
-  isAuto: boolean;
-  rules?: any;
-  dateCreated: Date;
-  dateModified?: Date;
-  bookmarkCount?: number;
-}
-
-export interface CreateBookmarkInput {
-  url: string;
-  title: string;
-  description?: string;
-  favicon?: string;
-  profileId: string;
-  spaceId: string;
-  isGlobal?: boolean;
-  labels?: string[];
-}
-
-export interface UpdateBookmarkInput {
-  title?: string;
-  description?: string;
-  favicon?: string;
-  isGlobal?: boolean;
-  labels?: string[];
-}
-
-export interface BookmarkFilter {
-  profileId?: string;
-  spaceId?: string;
-  labels?: string[];
-  search?: string;
-  isGlobal?: boolean;
-  collectionId?: string;
-}
+// Re-export types from shared module for convenience
+export type {
+  Bookmark,
+  BookmarkCollection,
+  BookmarkLabel,
+  CreateBookmarkInput,
+  UpdateBookmarkInput,
+  UpdateCollectionInput,
+  BookmarkFilter,
+  BookmarkViewMode,
+  ImportStats
+} from "~/types/bookmarks";
 
 // CRUD Operations
 
@@ -511,6 +479,7 @@ export async function createCollection(input: {
   description?: string;
   profileId: string;
   spaceId?: string;
+  parentId?: string;
   isAuto?: boolean;
   rules?: any;
 }): Promise<BookmarkCollection> {
@@ -524,6 +493,7 @@ export async function createCollection(input: {
     description: input.description,
     profileId: input.profileId,
     spaceId: input.spaceId,
+    parentId: input.parentId || null,
     isAuto: input.isAuto || false,
     rules: input.rules ? JSON.stringify(input.rules) : null,
     dateCreated: new Date()
@@ -536,6 +506,77 @@ export async function createCollection(input: {
     ...result,
     rules: result.rules ? JSON.parse(result.rules) : null
   };
+}
+
+export async function updateCollection(id: string, input: UpdateCollectionInput): Promise<BookmarkCollection | null> {
+  await whenDatabaseInitialized;
+  
+  const updateData: any = {
+    dateModified: new Date()
+  };
+  
+  if (input.name !== undefined) {
+    updateData.name = input.name;
+  }
+  
+  if (input.description !== undefined) {
+    updateData.description = input.description;
+  }
+  
+  const updatedRows = await db("bookmark_collections")
+    .where({ id })
+    .update(updateData);
+  
+  if (updatedRows === 0) {
+    return null;
+  }
+  
+  const result = await db("bookmark_collections").where({ id }).first();
+  if (!result) {
+    return null;
+  }
+  
+  return {
+    ...result,
+    rules: result.rules ? JSON.parse(result.rules) : null
+  };
+}
+
+export async function deleteCollection(id: string): Promise<boolean> {
+  await whenDatabaseInitialized;
+  
+  return await db.transaction(async (trx) => {
+    // First, check if this collection has child collections
+    const childCollections = await trx("bookmark_collections")
+      .where({ parentId: id })
+      .select("id");
+    
+    // Move child collections to have the same parent as the deleted collection
+    if (childCollections.length > 0) {
+      const parentCollection = await trx("bookmark_collections")
+        .where({ id })
+        .select("parentId")
+        .first();
+      
+      const newParentId = parentCollection?.parentId || null;
+      
+      await trx("bookmark_collections")
+        .whereIn("id", childCollections.map(c => c.id))
+        .update({ parentId: newParentId });
+    }
+    
+    // Delete collection_items relationships
+    await trx("collection_items")
+      .where({ collectionId: id })
+      .delete();
+    
+    // Delete the collection itself
+    const deletedRows = await trx("bookmark_collections")
+      .where({ id })
+      .delete();
+    
+    return deletedRows > 0;
+  });
 }
 
 export async function getCollections(profileId?: string): Promise<BookmarkCollection[]> {
@@ -552,11 +593,66 @@ export async function getCollections(profileId?: string): Promise<BookmarkCollec
   
   const collections = await query;
   
-  return collections.map((c: any) => ({
+  const processedCollections = collections.map((c: any) => ({
     ...c,
     rules: c.rules ? JSON.parse(c.rules) : null,
-    bookmarkCount: Number(c.bookmarkCount)
+    bookmarkCount: Number(c.bookmarkCount),
+    children: []
   }));
+  
+  // Build tree structure
+  const collectionsMap = new Map<string, any>();
+  const rootCollections: any[] = [];
+  
+  // First pass: create map of all collections
+  processedCollections.forEach((collection: any) => {
+    collectionsMap.set(collection.id, collection);
+  });
+  
+  // Second pass: build hierarchy
+  processedCollections.forEach((collection: any) => {
+    if (collection.parentId) {
+      const parent = collectionsMap.get(collection.parentId);
+      if (parent) {
+        parent.children.push(collection);
+      } else {
+        // Parent doesn't exist, treat as root
+        rootCollections.push(collection);
+      }
+    } else {
+      rootCollections.push(collection);
+    }
+  });
+  
+  // Flatten tree for current UI compatibility
+  const flattenedCollections: any[] = [];
+  
+  function addCollectionAndChildren(collection: any, depth = 0) {
+    flattenedCollections.push({
+      ...collection,
+      depth
+    });
+    
+    // Sort children by dateCreated
+    collection.children?.sort((a: any, b: any) => 
+      new Date(b.dateCreated).getTime() - new Date(a.dateCreated).getTime()
+    );
+    
+    collection.children?.forEach((child: any) => 
+      addCollectionAndChildren(child, depth + 1)
+    );
+  }
+  
+  // Sort root collections by dateCreated
+  rootCollections.sort((a: any, b: any) => 
+    new Date(b.dateCreated).getTime() - new Date(a.dateCreated).getTime()
+  );
+  
+  rootCollections.forEach((collection: any) => 
+    addCollectionAndChildren(collection, 0)
+  );
+  
+  return flattenedCollections;
 }
 
 export async function addBookmarkToCollection(bookmarkId: string, collectionId: string): Promise<void> {
@@ -611,12 +707,6 @@ export async function getBookmarksByUrl(url: string): Promise<Bookmark[]> {
 
 // Import functionality
 
-export interface ImportStats {
-  total: number;
-  imported: number;
-  skipped: number;
-  errors: number;
-}
 
 export async function importChromeBookmarks(
   htmlContent: string, 

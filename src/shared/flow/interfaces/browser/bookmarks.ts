@@ -1,4 +1,4 @@
-import { Bookmark, BookmarkCollection, CreateBookmarkInput, UpdateBookmarkInput, BookmarkFilter, ImportStats } from "~/types/bookmarks";
+import { Bookmark, BookmarkCollection, CreateBookmarkInput, UpdateBookmarkInput, UpdateCollectionInput, BookmarkFilter, ImportStats } from "~/types/bookmarks";
 
 export interface FlowBookmarksAPI {
   create(input: CreateBookmarkInput): Promise<Bookmark>;
@@ -19,9 +19,12 @@ export interface FlowBookmarksAPI {
       description?: string;
       profileId: string;
       spaceId?: string;
+      parentId?: string;
       isAuto?: boolean;
       rules?: any;
     }): Promise<BookmarkCollection>;
+    update(id: string, input: UpdateCollectionInput): Promise<BookmarkCollection | null>;
+    delete(id: string): Promise<boolean>;
     getAll(profileId?: string): Promise<BookmarkCollection[]>;
     addBookmark(bookmarkId: string, collectionId: string): Promise<void>;
     removeBookmark(bookmarkId: string, collectionId: string): Promise<void>;

@@ -47,10 +47,56 @@ import { Bookmark, BookmarkCollection, BookmarkFilter, ImportStats } from "~/typ
 type ViewMode = 'card' | 'list' | 'grid';
 type SortBy = 'dateAdded' | 'title' | 'visitCount' | 'lastVisited';
 
+// Folder Context Menu Component  
+function FolderContextMenu({ 
+  folder, 
+  children, 
+  onCreateChildFolder,
+  onRenameFolder,
+  onDeleteFolder
+}: { 
+  folder: BookmarkCollection; 
+  children: React.ReactNode;
+  onCreateChildFolder: (parentFolder: BookmarkCollection) => void;
+  onRenameFolder: (folder: BookmarkCollection) => void;
+  onDeleteFolder: (folder: BookmarkCollection) => void;
+}) {
+  const handleCreateChildFolder = () => {
+    onCreateChildFolder(folder);
+  };
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        {children}
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem onClick={handleCreateChildFolder}>
+          <FolderPlus className="h-4 w-4 mr-2" />
+          New Subfolder
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem onClick={() => onRenameFolder(folder)}>
+          <Edit3 className="h-4 w-4 mr-2" />
+          Rename Folder
+        </ContextMenuItem>
+        <ContextMenuItem 
+          onClick={() => onDeleteFolder(folder)}
+          className="text-red-600 focus:text-red-600"
+        >
+          <Trash2 className="h-4 w-4 mr-2" />
+          Delete Folder
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  );
+}
+
 // Create Folder Form Component
-function CreateFolderForm({ onSuccess, onCancel }: { 
+function CreateFolderForm({ onSuccess, onCancel, parentFolder }: { 
   onSuccess: () => void; 
-  onCancel: () => void; 
+  onCancel: () => void;
+  parentFolder?: BookmarkCollection | null;
 }) {
   const [folderName, setFolderName] = useState('');
   const [description, setDescription] = useState('');
@@ -63,12 +109,13 @@ function CreateFolderForm({ onSuccess, onCancel }: {
     setIsLoading(true);
     try {
       // For now, use demo values for profileId and spaceId
-      // In a real implementation, these would come from the current user session
+      // In a real implementation, these would come from the current user session        
       await flow.bookmarks.collections.create({
         name: folderName.trim(),
         description: description.trim() || undefined,
         profileId: 'default-profile', // TODO: get from current session
         spaceId: 'default-space', // TODO: get from current session
+        parentId: parentFolder?.id,
         isAuto: false
       });
       
@@ -84,15 +131,22 @@ function CreateFolderForm({ onSuccess, onCancel }: {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {parentFolder && (
+        <div className="p-3 bg-muted/50 rounded-lg">
+          <p className="text-sm text-muted-foreground">
+            Creating subfolder in: <span className="font-medium">{parentFolder.name}</span>
+          </p>
+        </div>
+      )}
       <div>
         <label htmlFor="folderName" className="text-sm font-medium">
-          Folder Name *
+          {parentFolder ? 'Subfolder' : 'Folder'} Name *
         </label>
         <Input
           id="folderName"
           value={folderName}
           onChange={(e) => setFolderName(e.target.value)}
-          placeholder="Enter folder name"
+          placeholder={`Enter ${parentFolder ? 'subfolder' : 'folder'} name`}
           className="mt-1"
           required
         />
@@ -120,6 +174,15 @@ function CreateFolderForm({ onSuccess, onCancel }: {
     </form>
   );
 }
+
+// Utility function to get folder display info based on depth
+const getFolderDisplayInfo = (folder: BookmarkCollection): { isSubfolder: boolean; displayName: string; depth: number } => {
+  return {
+    isSubfolder: (folder.depth || 0) > 0,
+    displayName: folder.name,
+    depth: folder.depth || 0
+  };
+};
 
 // Utility function to format URLs for display
 const formatUrlForDisplay = (url: string, maxLength: number = 50): string => {
@@ -179,6 +242,13 @@ function BookmarksPage() {
   const [folders, setFolders] = useState<BookmarkCollection[]>([]);
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const [showCreateFolderDialog, setShowCreateFolderDialog] = useState(false);
+  const [parentFolder, setParentFolder] = useState<BookmarkCollection | null>(null);
+  const [recentlyDeletedIds, setRecentlyDeletedIds] = useState<Set<string>>(new Set());
+  const [showRenameFolderDialog, setShowRenameFolderDialog] = useState(false);
+  const [folderToRename, setFolderToRename] = useState<BookmarkCollection | null>(null);
+  const [renameFolderName, setRenameFolderName] = useState('');
+  const [showDeleteFolderDialog, setShowDeleteFolderDialog] = useState(false);
+  const [folderToDelete, setFolderToDelete] = useState<BookmarkCollection | null>(null);
 
   const loadBookmarks = async () => {
     console.log('Loading bookmarks with filter:', filter);
@@ -212,18 +282,57 @@ function BookmarksPage() {
 
   const handleDeleteBookmark = async (bookmarkId: string) => {
     try {
+      // Mark as recently deleted first (optimistic update)
+      setRecentlyDeletedIds(prev => new Set([...prev, bookmarkId]));
+      
+      // Delete the bookmark
       await flow.bookmarks.delete(bookmarkId);
-      toast.success('Bookmark moved to trash');
       
-      // Refresh both lists
-      await loadBookmarks();
-      await loadDeletedBookmarks();
+      // Show undo toast
+      toast.success('Bookmark moved to trash', {
+        action: {
+          label: 'Undo',
+          onClick: async () => {
+            try {
+              await flow.bookmarks.restore(bookmarkId);
+              // Remove from recently deleted
+              setRecentlyDeletedIds(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(bookmarkId);
+                return newSet;
+              });
+              toast.success('Bookmark restored');
+            } catch (error) {
+              console.error('Failed to restore bookmark:', error);
+              toast.error('Failed to restore bookmark');
+              // If restore fails, reload to get accurate state
+              await loadBookmarks();
+            }
+          }
+        }
+      });
       
-      // Notify about changes
-      window.dispatchEvent(new CustomEvent('bookmarkChanged'));
+      // Remove from recently deleted after a delay (if not undone)
+      setTimeout(async () => {
+        setRecentlyDeletedIds(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(bookmarkId);
+          return newSet;
+        });
+        // Refresh lists to get accurate counts
+        await loadBookmarks();
+        await loadDeletedBookmarks();
+      }, 5000); // 5 seconds to undo
+      
     } catch (error) {
       console.error('Failed to delete bookmark:', error);
       toast.error('Failed to delete bookmark');
+      // Remove from recently deleted on error
+      setRecentlyDeletedIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(bookmarkId);
+        return newSet;
+      });
     }
   };
 
@@ -524,10 +633,81 @@ function BookmarksPage() {
     document.getElementById('bookmark-file')?.click();
   };
 
+  const handleRenameFolder = (folder: BookmarkCollection) => {
+    setFolderToRename(folder);
+    setRenameFolderName(folder.name);
+    setShowRenameFolderDialog(true);
+  };
+
+  const handleDeleteFolder = (folder: BookmarkCollection) => {
+    setFolderToDelete(folder);
+    setShowDeleteFolderDialog(true);
+  };
+
+  const handleConfirmRenameFolder = async () => {
+    if (!folderToRename || !renameFolderName.trim()) {
+      toast.error('Please enter a valid folder name');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const result = await flow.bookmarks.collections.update(folderToRename.id, {
+        name: renameFolderName.trim()
+      });
+
+      if (result) {
+        toast.success('Folder renamed successfully');
+        setShowRenameFolderDialog(false);
+        setFolderToRename(null);
+        setRenameFolderName('');
+        await loadFolders();
+      } else {
+        toast.error('Failed to rename folder');
+      }
+    } catch (error) {
+      console.error('Failed to rename folder:', error);
+      toast.error('Failed to rename folder');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleConfirmDeleteFolder = async () => {
+    if (!folderToDelete) return;
+
+    try {
+      setIsLoading(true);
+      const success = await flow.bookmarks.collections.delete(folderToDelete.id);
+
+      if (success) {
+        toast.success('Folder deleted successfully');
+        setShowDeleteFolderDialog(false);
+        setFolderToDelete(null);
+        
+        // Clear selected folder if it was the deleted one
+        if (selectedFolder === folderToDelete.id) {
+          setSelectedFolder(null);
+        }
+        
+        await loadFolders();
+        await loadBookmarks();
+      } else {
+        toast.error('Failed to delete folder');
+      }
+    } catch (error) {
+      console.error('Failed to delete folder:', error);
+      toast.error('Failed to delete folder');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const BookmarkCard = ({ bookmark }: { bookmark: Bookmark }) => (
     <BookmarkContextMenu bookmark={bookmark}>
-      <Card className="group hover:shadow-lg transition-all duration-200 cursor-pointer relative">
+      <Card className={`group hover:shadow-lg transition-all duration-200 cursor-pointer relative ${
+        recentlyDeletedIds.has(bookmark.id) ? 'opacity-60' : ''
+      }`}>
         <CardContent className="px-3 pt-3 pb-12">
           <div className="mb-1">
             <div className="flex items-center gap-2 mb-1">
@@ -670,6 +850,31 @@ function BookmarksPage() {
                   <X className="h-3.5 w-3.5" />
                 </Button>
               </>
+            ) : recentlyDeletedIds.has(bookmark.id) ? (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-7 w-7 p-0 hover:bg-blue-100 hover:text-blue-600"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  try {
+                    await flow.bookmarks.restore(bookmark.id);
+                    setRecentlyDeletedIds(prev => {
+                      const newSet = new Set(prev);
+                      newSet.delete(bookmark.id);
+                      return newSet;
+                    });
+                    toast.success('Bookmark restored');
+                  } catch (error) {
+                    console.error('Failed to restore bookmark:', error);
+                    toast.error('Failed to restore bookmark');
+                    await loadBookmarks();
+                  }
+                }}
+                title="Undo delete"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+              </Button>
             ) : (
               <Button 
                 variant="ghost" 
@@ -689,7 +894,9 @@ function BookmarksPage() {
 
   const BookmarkListItem = ({ bookmark }: { bookmark: Bookmark }) => (
     <BookmarkContextMenu bookmark={bookmark}>
-      <div className="group flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
+      <div className={`group flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors ${
+        recentlyDeletedIds.has(bookmark.id) ? 'opacity-60' : ''
+      }`}>
         <div className="flex items-center gap-2 flex-1 min-w-0">
           {bookmark.favicon && (
             <img src={bookmark.favicon} alt="" className="w-4 h-4 rounded-sm flex-shrink-0" />
@@ -816,6 +1023,31 @@ function BookmarksPage() {
                 <X className="h-3.5 w-3.5" />
               </Button>
             </>
+          ) : recentlyDeletedIds.has(bookmark.id) ? (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-7 w-7 p-0 hover:bg-blue-100 hover:text-blue-600"
+              onClick={async (e) => {
+                e.stopPropagation();
+                try {
+                  await flow.bookmarks.restore(bookmark.id);
+                  setRecentlyDeletedIds(prev => {
+                    const newSet = new Set(prev);
+                    newSet.delete(bookmark.id);
+                    return newSet;
+                  });
+                  toast.success('Bookmark restored');
+                } catch (error) {
+                  console.error('Failed to restore bookmark:', error);
+                  toast.error('Failed to restore bookmark');
+                  await loadBookmarks();
+                }
+              }}
+              title="Undo delete"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+            </Button>
           ) : (
             <Button 
               variant="ghost" 
@@ -936,33 +1168,50 @@ function BookmarksPage() {
               
               <div className="space-y-1">
                 {folders.length > 0 ? (
-                  folders.map((folder) => (
-                    <button
-                      key={folder.id}
-                      className={`flex items-center gap-2 w-full p-2 text-sm hover:bg-muted/50 rounded-lg transition-colors ${
-                        selectedFolder === folder.id ? 'bg-muted/50' : ''
-                      }`}
-                      onClick={() => {
-                        if (selectedFolder === folder.id) {
-                          // Deselect folder
-                          setSelectedFolder(null);
-                          setFilter({});
-                        } else {
-                          // Select folder
-                          setSelectedFolder(folder.id);
-                          setFilter({ collectionId: folder.id });
-                        }
-                      }}
-                    >
-                      <Folder className="h-4 w-4" />
-                      <span className="flex-1 text-left truncate">{folder.name}</span>
-                      {folder.bookmarkCount !== undefined && folder.bookmarkCount > 0 && (
-                        <Badge variant="secondary" className="text-xs">
-                          {folder.bookmarkCount}
-                        </Badge>
-                      )}
-                    </button>
-                  ))
+                  folders.map((folder) => {
+                    const folderInfo = getFolderDisplayInfo(folder);
+                    return (
+                      <FolderContextMenu 
+                        key={folder.id} 
+                        folder={folder}
+                        onCreateChildFolder={(parentFolder) => {
+                          setParentFolder(parentFolder);
+                          setShowCreateFolderDialog(true);
+                        }}
+                        onRenameFolder={handleRenameFolder}
+                        onDeleteFolder={handleDeleteFolder}
+                      >
+                        <button
+                          className={`flex items-center gap-2 w-full p-2 text-sm hover:bg-muted/50 rounded-lg transition-colors ${
+                            selectedFolder === folder.id ? 'bg-muted/50' : ''
+                          }`}
+                          style={{ marginLeft: `${folderInfo.depth * 16}px` }}
+                          onClick={() => {
+                            if (selectedFolder === folder.id) {
+                              // Deselect folder
+                              setSelectedFolder(null);
+                              setFilter({});
+                            } else {
+                              // Select folder
+                              setSelectedFolder(folder.id);
+                              setFilter({ collectionId: folder.id });
+                            }
+                          }}
+                          title={folderInfo.isSubfolder ? `Subfolder (depth ${folderInfo.depth})` : folder.name}
+                        >
+                          <Folder className={`h-4 w-4 ${folderInfo.isSubfolder ? 'text-muted-foreground' : ''}`} />
+                          <span className={`flex-1 text-left truncate ${folderInfo.isSubfolder ? 'text-muted-foreground' : ''}`}>
+                            {folderInfo.displayName}
+                          </span>
+                          {folder.bookmarkCount !== undefined && folder.bookmarkCount > 0 && (
+                            <Badge variant="secondary" className="text-xs">
+                              {folder.bookmarkCount}
+                            </Badge>
+                          )}
+                        </button>
+                      </FolderContextMenu>
+                    );
+                  })
                 ) : (
                   <div className="text-xs text-muted-foreground italic">
                     No folders yet
@@ -1227,25 +1476,35 @@ function BookmarksPage() {
             <div className="flex flex-col items-center justify-center h-full text-center px-4">
               <div className="max-w-md">
                 {/* Large Icon with gradient background */}
-                <div className="relative mb-6">
+                <div className="relative mb-6 mx-auto w-fit">
                   <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/5 rounded-full blur-3xl" />
-                  <div className="relative bg-card border border-border rounded-full p-6 shadow-lg">
-                    <BookmarkIcon className="h-16 w-16 text-primary" />
+                  <div className="relative bg-card border border-border rounded-full p-6 shadow-lg w-28 h-28 flex items-center justify-center">
+                    {showDeleted ? (
+                      <Trash2 className="h-16 w-16 text-muted-foreground" />
+                    ) : (
+                      <BookmarkIcon className="h-16 w-16 text-primary" />
+                    )}
                   </div>
                 </div>
 
                 {/* Title and Description */}
                 <h3 className="text-2xl font-semibold mb-3">
-                  {searchQuery ? 'No bookmarks found' : 'Welcome to Bookmarks'}
+                  {showDeleted 
+                    ? 'No deleted bookmarks' 
+                    : searchQuery 
+                      ? 'No bookmarks found' 
+                      : 'Welcome to Bookmarks'}
                 </h3>
                 <p className="text-muted-foreground mb-8 text-base">
-                  {searchQuery 
-                    ? `No bookmarks match "${searchQuery}". Try a different search term.`
-                    : 'Save your favorite websites for quick access. Organize them with labels and collections.'}
+                  {showDeleted
+                    ? 'Your trash is empty. Deleted bookmarks will appear here.'
+                    : searchQuery 
+                      ? `No bookmarks match "${searchQuery}". Try a different search term.`
+                      : 'Save your favorite websites for quick access. Organize them with labels and collections.'}
                 </p>
 
                 {/* Quick Tips or Actions */}
-                {!searchQuery && (
+                {!searchQuery && !showDeleted && (
                   <div className="space-y-4 mb-8">
                     <div className="bg-muted/30 rounded-lg p-4 text-left">
                       <h4 className="font-medium mb-2 flex items-center gap-2">
@@ -1280,17 +1539,18 @@ function BookmarksPage() {
                 )}
 
                 {/* Action Buttons */}
-                <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  {searchQuery ? (
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setSearchQuery('')}
-                    >
-                      <Search className="h-4 w-4 mr-2" />
-                      Clear Search
-                    </Button>
-                  ) : (
-                    <>
+                {!showDeleted && (
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                    {searchQuery ? (
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setSearchQuery('')}
+                      >
+                        <Search className="h-4 w-4 mr-2" />
+                        Clear Search
+                      </Button>
+                    ) : (
+                      <>
                       <Button 
                         onClick={() => {
                           // Go back to browsing
@@ -1312,7 +1572,8 @@ function BookmarksPage() {
                       </Button>
                     </>
                   )}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
           ) : (
@@ -1334,7 +1595,9 @@ function BookmarksPage() {
                   {filteredBookmarks.map((bookmark) => (
                     <BookmarkContextMenu key={bookmark.id} bookmark={bookmark}>
                       <div 
-                        className="group aspect-square bg-card border border-border rounded-lg p-3 hover:shadow-lg transition-all cursor-pointer flex flex-col relative"
+                        className={`group aspect-square bg-card border border-border rounded-lg p-3 hover:shadow-lg transition-all cursor-pointer flex flex-col relative ${
+                          recentlyDeletedIds.has(bookmark.id) ? 'opacity-60' : ''
+                        }`}
                         onClick={() => handleOpenBookmark(bookmark)}
                       >
                       <div className="flex items-center mb-2">
@@ -1462,6 +1725,31 @@ function BookmarksPage() {
                               <X className="h-3 w-3" />
                             </Button>
                           </>
+                        ) : recentlyDeletedIds.has(bookmark.id) ? (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-6 w-6 p-0 hover:bg-blue-100 hover:text-blue-600"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              try {
+                                await flow.bookmarks.restore(bookmark.id);
+                                setRecentlyDeletedIds(prev => {
+                                  const newSet = new Set(prev);
+                                  newSet.delete(bookmark.id);
+                                  return newSet;
+                                });
+                                toast.success('Bookmark restored');
+                              } catch (error) {
+                                console.error('Failed to restore bookmark:', error);
+                                toast.error('Failed to restore bookmark');
+                                await loadBookmarks();
+                              }
+                            }}
+                            title="Undo delete"
+                          >
+                            <RotateCcw className="h-3 w-3" />
+                          </Button>
                         ) : (
                           <Button 
                             variant="ghost" 
@@ -1488,18 +1776,112 @@ function BookmarksPage() {
       <Dialog open={showCreateFolderDialog} onOpenChange={setShowCreateFolderDialog}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Create New Folder</DialogTitle>
+            <DialogTitle>
+              {parentFolder ? `Create Subfolder in "${parentFolder.name}"` : 'Create New Folder'}
+            </DialogTitle>
             <DialogDescription>
-              Create a new folder to organize your bookmarks.
+              {parentFolder 
+                ? `Create a new subfolder within "${parentFolder.name}".`
+                : 'Create a new folder to organize your bookmarks.'
+              }
             </DialogDescription>
           </DialogHeader>
           <CreateFolderForm 
+            parentFolder={parentFolder}
             onSuccess={() => {
               setShowCreateFolderDialog(false);
+              setParentFolder(null);
               loadFolders(); // Reload folders
             }}
-            onCancel={() => setShowCreateFolderDialog(false)}
+            onCancel={() => {
+              setShowCreateFolderDialog(false);
+              setParentFolder(null);
+            }}
           />
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename Folder Dialog */}
+      <Dialog open={showRenameFolderDialog} onOpenChange={setShowRenameFolderDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Rename Folder</DialogTitle>
+            <DialogDescription>
+              Change the name of "{folderToRename?.name}"
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label htmlFor="rename-folder-name" className="text-sm font-medium">
+                Folder Name
+              </label>
+              <Input
+                id="rename-folder-name"
+                value={renameFolderName}
+                onChange={(e) => setRenameFolderName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleConfirmRenameFolder();
+                  }
+                }}
+                placeholder="Enter folder name"
+                autoFocus
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowRenameFolderDialog(false)}
+              disabled={isLoading}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleConfirmRenameFolder}
+              disabled={isLoading || !renameFolderName.trim()}
+            >
+              {isLoading ? 'Renaming...' : 'Rename'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Folder Dialog */}
+      <Dialog open={showDeleteFolderDialog} onOpenChange={setShowDeleteFolderDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete Folder</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete "{folderToDelete?.name}"? 
+              {folderToDelete && (
+                <div className="mt-2 text-sm">
+                  <p>This action will:</p>
+                  <ul className="list-disc list-inside mt-1 space-y-1">
+                    <li>Remove the folder permanently</li>
+                    <li>Move any subfolders to the parent level</li>
+                    <li>Remove bookmarks from this folder (bookmarks themselves will not be deleted)</li>
+                  </ul>
+                </div>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowDeleteFolderDialog(false)}
+              disabled={isLoading}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={handleConfirmDeleteFolder}
+              disabled={isLoading}
+            >
+              {isLoading ? 'Deleting...' : 'Delete Folder'}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 

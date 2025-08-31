@@ -29,11 +29,14 @@ export interface BookmarkCollection {
   description?: string;
   profileId: string;
   spaceId?: string;
+  parentId?: string;
   isAuto: boolean;
   rules?: any;
   dateCreated: Date;
   dateModified?: Date;
   bookmarkCount?: number;
+  children?: BookmarkCollection[];
+  depth?: number;
 }
 
 export interface CreateBookmarkInput {
@@ -53,6 +56,11 @@ export interface UpdateBookmarkInput {
   favicon?: string;
   isGlobal?: boolean;
   labels?: string[];
+}
+
+export interface UpdateCollectionInput {
+  name?: string;
+  description?: string;
 }
 
 export interface BookmarkFilter {
