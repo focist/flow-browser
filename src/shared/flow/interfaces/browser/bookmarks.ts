@@ -12,6 +12,7 @@ export interface FlowBookmarksAPI {
   getByUrl(url: string): Promise<Bookmark[]>;
   restore(id: string): Promise<boolean>;
   permanentlyDelete(id: string): Promise<boolean>;
+  moveToCollection(bookmarkId: string, fromCollectionId: string | null, toCollectionId: string): Promise<void>;
   
   collections: {
     create(input: {
@@ -31,6 +32,7 @@ export interface FlowBookmarksAPI {
     getDeleted(profileId?: string): Promise<BookmarkCollection[]>;
     addBookmark(bookmarkId: string, collectionId: string): Promise<void>;
     removeBookmark(bookmarkId: string, collectionId: string): Promise<void>;
+    moveBookmark(bookmarkId: string, fromCollectionId: string | null, toCollectionId: string): Promise<void>;
   };
   
   importChrome(htmlContent: string, profileId: string, spaceId: string): Promise<ImportStats>;

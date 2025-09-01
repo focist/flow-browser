@@ -618,6 +618,9 @@ const bookmarksAPI: FlowBookmarksAPI = {
   permanentlyDelete: async (id: string) => {
     return ipcRenderer.invoke("bookmarks:permanentlyDelete", id);
   },
+  moveToCollection: async (bookmarkId: string, fromCollectionId: string | null, toCollectionId: string) => {
+    return ipcRenderer.invoke("bookmarks:moveToCollection", bookmarkId, fromCollectionId, toCollectionId);
+  },
   collections: {
     create: async (input: {
       name: string;
@@ -653,6 +656,9 @@ const bookmarksAPI: FlowBookmarksAPI = {
     },
     removeBookmark: async (bookmarkId: string, collectionId: string) => {
       return ipcRenderer.invoke("bookmarks:collections:removeBookmark", bookmarkId, collectionId);
+    },
+    moveBookmark: async (bookmarkId: string, fromCollectionId: string | null, toCollectionId: string) => {
+      return ipcRenderer.invoke("bookmarks:collections:moveBookmark", bookmarkId, fromCollectionId, toCollectionId);
     }
   },
   importChrome: async (htmlContent: string, profileId: string, spaceId: string) => {

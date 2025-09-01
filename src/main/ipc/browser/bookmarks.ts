@@ -19,6 +19,7 @@ import {
   getDeletedCollections,
   addBookmarkToCollection,
   removeBookmarkFromCollection,
+  moveBookmarkToCollection,
   getBookmarksByUrl,
   importChromeBookmarks,
   type Bookmark,
@@ -112,6 +113,10 @@ ipcMain.handle("bookmarks:collections:removeBookmark", async (_, bookmarkId: str
   return await removeBookmarkFromCollection(bookmarkId, collectionId);
 });
 
+ipcMain.handle("bookmarks:collections:moveBookmark", async (_, bookmarkId: string, fromCollectionId: string | null, toCollectionId: string): Promise<void> => {
+  return await moveBookmarkToCollection(bookmarkId, fromCollectionId, toCollectionId);
+});
+
 // Trash/Restore operations
 ipcMain.handle("bookmarks:restore", async (_, id: string): Promise<boolean> => {
   return await restoreBookmark(id);
@@ -124,4 +129,9 @@ ipcMain.handle("bookmarks:permanentlyDelete", async (_, id: string): Promise<boo
 // Import/Export operations
 ipcMain.handle("bookmarks:importChrome", async (_, htmlContent: string, profileId: string, spaceId: string): Promise<ImportStats> => {
   return await importChromeBookmarks(htmlContent, profileId, spaceId);
+});
+
+// Drag & Drop operations
+ipcMain.handle("bookmarks:moveToCollection", async (_, bookmarkId: string, fromCollectionId: string | null, toCollectionId: string): Promise<void> => {
+  return await moveBookmarkToCollection(bookmarkId, fromCollectionId, toCollectionId);
 });

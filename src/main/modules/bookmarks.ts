@@ -746,6 +746,33 @@ export async function removeBookmarkFromCollection(bookmarkId: string, collectio
     .delete();
 }
 
+export async function moveBookmarkToCollection(bookmarkId: string, fromCollectionId: string | null, toCollectionId: string): Promise<void> {
+  await whenDatabaseInitialized;
+
+  await db.transaction(async (trx) => {
+    // Remove from the original collection if it exists
+    if (fromCollectionId) {
+      await trx("collection_items")
+        .where({ bookmarkId, collectionId: fromCollectionId })
+        .delete();
+    }
+
+    // Add to the new collection
+    const maxPosition = await trx("collection_items")
+      .where({ collectionId: toCollectionId })
+      .max("position as max")
+      .first();
+
+    const position = (maxPosition?.max || 0) + 1;
+
+    await trx("collection_items").insert({
+      bookmarkId,
+      collectionId: toCollectionId,
+      position
+    }).onConflict(["collectionId", "bookmarkId"]).ignore();
+  });
+}
+
 export async function getBookmarksByUrl(url: string): Promise<Bookmark[]> {
   await whenDatabaseInitialized;
   
@@ -868,3 +895,4 @@ function parseChromeBookmarkHtml(htmlContent: string): ParsedBookmark[] {
   
   return bookmarks;
 }
+
