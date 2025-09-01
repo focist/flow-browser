@@ -241,6 +241,7 @@ function BookmarksPage() {
   const [selectedBookmarkInfo, setSelectedBookmarkInfo] = useState<Bookmark | null>(null);
   const [showInfoPanel, setShowInfoPanel] = useState(false);
   const [folders, setFolders] = useState<BookmarkCollection[]>([]);
+  const [deletedFolders, setDeletedFolders] = useState<BookmarkCollection[]>([]);
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const [showCreateFolderDialog, setShowCreateFolderDialog] = useState(false);
   const [parentFolder, setParentFolder] = useState<BookmarkCollection | null>(null);
@@ -456,6 +457,7 @@ function BookmarksPage() {
     console.log('Loading bookmarks effect triggered with filter:', filter, 'showDeleted:', showDeleted);
     if (showDeleted) {
       loadDeletedBookmarks();
+      loadDeletedFolders();
     } else {
       loadBookmarks();
     }
@@ -571,6 +573,15 @@ function BookmarksPage() {
     }
   };
 
+  const loadDeletedFolders = async () => {
+    try {
+      const deletedFoldersList = await flow.bookmarks.collections.getDeleted();
+      setDeletedFolders(deletedFoldersList);
+    } catch (error) {
+      console.error('Failed to load deleted folders:', error);
+    }
+  };
+
   const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -625,7 +636,7 @@ function BookmarksPage() {
     }
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleFileDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(true);
@@ -739,182 +750,182 @@ function BookmarksPage() {
         <CardContent className="px-3 pt-3 pb-12">
           <div className="mb-1">
             <div className="flex items-center gap-2 mb-1">
-              {bookmark.favicon && (
-                <img src={bookmark.favicon} alt="" className="w-4 h-4 rounded-sm" />
-              )}
-              <h3 
-                className="font-medium text-sm truncate hover:text-primary" 
-                onClick={() => handleOpenBookmark(bookmark)}
-              >
-                {bookmark.title}
-              </h3>
-            </div>
-            <p 
-              className="text-xs text-muted-foreground mb-1 break-all"
-              style={{ 
-                wordBreak: 'break-all',
-                overflowWrap: 'break-word',
-                lineHeight: '1.3'
-              }}
-              title={bookmark.url}
-            >
-              {formatUrlForDisplay(bookmark.url, 60)}
-            </p>
-            {bookmark.description && (
-              <p className="text-xs text-muted-foreground line-clamp-2 mb-1">
-                {bookmark.description}
-              </p>
-            )}
-          </div>
-
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <Calendar className="h-3 w-3" />
-              {new Date(bookmark.dateAdded).toLocaleDateString()}
-            </div>
-            <div className="flex items-center gap-1">
-              <span>{bookmark.visitCount || 0} visits</span>
-            </div>
-          </div>
-
-          {bookmark.labels && bookmark.labels.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-2">
-              {bookmark.labels.slice(0, 3).map((label, index) => (
-                <Badge key={index} variant="secondary" className="text-xs">
-                  {label.label}
-                </Badge>
-              ))}
-              {bookmark.labels.length > 3 && (
-                <Badge variant="outline" className="text-xs">
-                  +{bookmark.labels.length - 3}
-                </Badge>
-              )}
-            </div>
-          )}
-
-          {/* Action Buttons */}
-          <div className="absolute bottom-2 left-0 right-0 flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="h-7 w-7 p-0 hover:bg-blue-100 hover:text-blue-600"
-              onClick={(e) => {e.stopPropagation(); handleOpenBookmark(bookmark);}}
-              title="Open bookmark"
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="h-7 w-7 p-0 hover:bg-green-100 hover:text-green-600"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigator.clipboard.writeText(bookmark.url);
-                toast.success('URL copied to clipboard');
-              }}
-              title="Copy URL"
-            >
-              <Link className="h-3.5 w-3.5" />
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="h-7 w-7 p-0 hover:bg-gray-100 hover:text-gray-600"
-              onClick={(e) => {
-                e.stopPropagation();
-                toast.info('Edit functionality coming soon!');
-              }}
-              title="Edit bookmark"
-            >
-              <Edit3 className="h-3.5 w-3.5" />
-            </Button>
-            <HoverCard>
-              <HoverCardTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-7 w-7 p-0 hover:bg-purple-100 hover:text-purple-600"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleShowInfoPanel(bookmark);
+                  {bookmark.favicon && (
+                    <img src={bookmark.favicon} alt="" className="w-4 h-4 rounded-sm" />
+                  )}
+                  <h3 
+                    className="font-medium text-sm truncate hover:text-primary" 
+                    onClick={() => handleOpenBookmark(bookmark)}
+                  >
+                    {bookmark.title}
+                  </h3>
+                </div>
+                <p 
+                  className="text-xs text-muted-foreground mb-1 break-all"
+                  style={{ 
+                    wordBreak: 'break-all',
+                    overflowWrap: 'break-word',
+                    lineHeight: '1.3'
                   }}
-                  title="Show bookmark info"
+                  title={bookmark.url}
                 >
-                  <Info className="h-3.5 w-3.5" />
-                </Button>
-              </HoverCardTrigger>
-              <HoverCardContent>
-                <div className="space-y-2">
-                  <h4 className="text-sm font-semibold">{bookmark.title}</h4>
-                  <p className="text-xs text-muted-foreground break-all">{bookmark.url}</p>
-                  <div className="flex justify-between text-xs">
-                    <span>Added: {new Date(bookmark.dateAdded).toLocaleDateString()}</span>
-                    <span>{bookmark.visitCount || 0} visits</span>
-                  </div>
-                  {bookmark.description && (
-                    <p className="text-xs text-muted-foreground">{bookmark.description}</p>
+                  {formatUrlForDisplay(bookmark.url, 60)}
+                </p>
+                {bookmark.description && (
+                  <p className="text-xs text-muted-foreground line-clamp-2 mb-1">
+                    {bookmark.description}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-3 w-3" />
+                  {new Date(bookmark.dateAdded).toLocaleDateString()}
+                </div>
+                <div className="flex items-center gap-1">
+                  <span>{bookmark.visitCount || 0} visits</span>
+                </div>
+              </div>
+
+              {bookmark.labels && bookmark.labels.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {bookmark.labels.slice(0, 3).map((label, index) => (
+                    <Badge key={index} variant="secondary" className="text-xs">
+                      {label.label}
+                    </Badge>
+                  ))}
+                  {bookmark.labels.length > 3 && (
+                    <Badge variant="outline" className="text-xs">
+                      +{bookmark.labels.length - 3}
+                    </Badge>
                   )}
                 </div>
-              </HoverCardContent>
-            </HoverCard>
-            {showDeleted ? (
-              <>
+              )}
+
+              {/* Action Buttons */}
+              <div className="absolute bottom-2 left-0 right-0 flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
                 <Button 
                   variant="ghost" 
                   size="sm" 
                   className="h-7 w-7 p-0 hover:bg-blue-100 hover:text-blue-600"
-                  onClick={(e) => {e.stopPropagation(); handleRestoreBookmark(bookmark.id);}}
-                  title="Restore bookmark"
+                  onClick={(e) => {e.stopPropagation(); handleOpenBookmark(bookmark);}}
+                  title="Open bookmark"
                 >
-                  <RotateCcw className="h-3.5 w-3.5" />
+                  <ExternalLink className="h-3.5 w-3.5" />
                 </Button>
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  className="h-7 w-7 p-0 hover:bg-red-100 hover:text-red-600"
-                  onClick={(e) => {e.stopPropagation(); handlePermanentlyDeleteBookmark(bookmark.id);}}
-                  title="Delete forever"
+                  className="h-7 w-7 p-0 hover:bg-green-100 hover:text-green-600"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigator.clipboard.writeText(bookmark.url);
+                    toast.success('URL copied to clipboard');
+                  }}
+                  title="Copy URL"
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <Link className="h-3.5 w-3.5" />
                 </Button>
-              </>
-            ) : recentlyDeletedIds.has(bookmark.id) ? (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-7 w-7 p-0 hover:bg-blue-100 hover:text-blue-600"
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  try {
-                    await flow.bookmarks.restore(bookmark.id);
-                    setRecentlyDeletedIds(prev => {
-                      const newSet = new Set(prev);
-                      newSet.delete(bookmark.id);
-                      return newSet;
-                    });
-                    toast.success('Bookmark restored');
-                  } catch (error) {
-                    console.error('Failed to restore bookmark:', error);
-                    toast.error('Failed to restore bookmark');
-                    await loadBookmarks();
-                  }
-                }}
-                title="Undo delete"
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-              </Button>
-            ) : (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-7 w-7 p-0 hover:bg-red-100 hover:text-red-600"
-                onClick={(e) => {e.stopPropagation(); handleDeleteBookmark(bookmark.id);}}
-                title="Delete bookmark"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            )}
-          </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-7 w-7 p-0 hover:bg-gray-100 hover:text-gray-600"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toast.info('Edit functionality coming soon!');
+                  }}
+                  title="Edit bookmark"
+                >
+                  <Edit3 className="h-3.5 w-3.5" />
+                </Button>
+                <HoverCard>
+                  <HoverCardTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-7 w-7 p-0 hover:bg-purple-100 hover:text-purple-600"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleShowInfoPanel(bookmark);
+                      }}
+                      title="Show bookmark info"
+                    >
+                      <Info className="h-3.5 w-3.5" />
+                    </Button>
+                  </HoverCardTrigger>
+                  <HoverCardContent>
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-semibold">{bookmark.title}</h4>
+                      <p className="text-xs text-muted-foreground break-all">{bookmark.url}</p>
+                      <div className="flex justify-between text-xs">
+                        <span>Added: {new Date(bookmark.dateAdded).toLocaleDateString()}</span>
+                        <span>{bookmark.visitCount || 0} visits</span>
+                      </div>
+                      {bookmark.description && (
+                        <p className="text-xs text-muted-foreground">{bookmark.description}</p>
+                      )}
+                    </div>
+                  </HoverCardContent>
+                </HoverCard>
+                {showDeleted ? (
+                  <>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-7 w-7 p-0 hover:bg-blue-100 hover:text-blue-600"
+                      onClick={(e) => {e.stopPropagation(); handleRestoreBookmark(bookmark.id);}}
+                      title="Restore bookmark"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-7 w-7 p-0 hover:bg-red-100 hover:text-red-600"
+                      onClick={(e) => {e.stopPropagation(); handlePermanentlyDeleteBookmark(bookmark.id);}}
+                      title="Delete forever"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </>
+                ) : recentlyDeletedIds.has(bookmark.id) ? (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-7 w-7 p-0 hover:bg-blue-100 hover:text-blue-600"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      try {
+                        await flow.bookmarks.restore(bookmark.id);
+                        setRecentlyDeletedIds(prev => {
+                          const newSet = new Set(prev);
+                          newSet.delete(bookmark.id);
+                          return newSet;
+                        });
+                        toast.success('Bookmark restored');
+                      } catch (error) {
+                        console.error('Failed to restore bookmark:', error);
+                        toast.error('Failed to restore bookmark');
+                        await loadBookmarks();
+                      }
+                    }}
+                    title="Undo delete"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                  </Button>
+                ) : (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-7 w-7 p-0 hover:bg-red-100 hover:text-red-600"
+                    onClick={(e) => {e.stopPropagation(); handleDeleteBookmark(bookmark.id);}}
+                    title="Delete bookmark"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
         </CardContent>
       </Card>
     </BookmarkContextMenu>
@@ -1195,59 +1206,68 @@ function BookmarksPage() {
               </div>
               
               <div className="space-y-1">
-                {folders.length > 0 ? (
-                  folders.map((folder) => {
-                    const folderInfo = getFolderDisplayInfo(folder);
-                    return (
-                      <FolderContextMenu 
-                        key={folder.id} 
-                        folder={folder}
-                        onCreateChildFolder={(parentFolder) => {
-                          setParentFolder(parentFolder);
-                          setShowCreateFolderDialog(true);
-                        }}
-                        onRenameFolder={handleRenameFolder}
-                        onDeleteFolder={handleDeleteFolder}
-                      >
-                        <button
-                          className={`flex items-center gap-2 w-full p-2 text-sm hover:bg-muted/50 rounded-lg transition-colors ${
-                            selectedFolder === folder.id ? 'bg-muted/50' : ''
-                          }`}
-                          style={{ marginLeft: `${folderInfo.depth * 16}px` }}
-                          onClick={() => {
-                            if (selectedFolder === folder.id && !showDeleted) {
-                              // Deselect folder
-                              setSelectedFolder(null);
-                              setFilter({});
-                            } else {
-                              // Select folder
-                              setSelectedFolder(folder.id);
-                              setFilter({ collectionId: folder.id });
-                              setShowDeleted(false); // Switch away from deleted view
-                            }
+                {!showDeleted ? (
+                  // Show regular folders when not viewing deleted items
+                  folders.length > 0 ? (
+                    folders.map((folder) => {
+                      const folderInfo = getFolderDisplayInfo(folder);
+                      return (
+                        <FolderContextMenu 
+                          key={folder.id} 
+                          folder={folder}
+                          onCreateChildFolder={(parentFolder) => {
+                            setParentFolder(parentFolder);
+                            setShowCreateFolderDialog(true);
                           }}
-                          title={folderInfo.isSubfolder ? `Subfolder (depth ${folderInfo.depth})` : folder.name}
+                          onRenameFolder={handleRenameFolder}
+                          onDeleteFolder={handleDeleteFolder}
                         >
-                          <Folder className={`h-4 w-4 ${folderInfo.isSubfolder ? 'text-muted-foreground' : ''}`} />
-                          <span className={`flex-1 text-left truncate ${folderInfo.isSubfolder ? 'text-muted-foreground' : ''}`}>
-                            {folderInfo.displayName}
-                          </span>
-                          {folder.bookmarkCount !== undefined && folder.bookmarkCount > 0 && (
-                            <Badge variant="secondary" className="text-xs">
-                              {folder.bookmarkCount}
-                            </Badge>
-                          )}
-                        </button>
-                      </FolderContextMenu>
-                    );
-                  })
+                          <button
+                            className={`flex items-center gap-2 w-full p-2 text-sm hover:bg-muted/50 rounded-lg transition-colors ${
+                              selectedFolder === folder.id ? 'bg-muted/50' : ''
+                            }`}
+                            style={{ marginLeft: `${folderInfo.depth * 16}px` }}
+                            onClick={() => {
+                              if (selectedFolder === folder.id && !showDeleted) {
+                                // Deselect folder
+                                setSelectedFolder(null);
+                                setFilter({});
+                                localStorage.removeItem('bookmarks-selected-folder');
+                              } else {
+                                // Select folder
+                                setSelectedFolder(folder.id);
+                                setFilter({ collectionId: folder.id });
+                                setShowDeleted(false);
+                                localStorage.setItem('bookmarks-selected-folder', folder.id);
+                              }
+                            }}
+                            title={folderInfo.isSubfolder ? `Subfolder (depth ${folderInfo.depth})` : folder.name}
+                          >
+                            <Folder className={`h-4 w-4 ${folderInfo.isSubfolder ? 'text-muted-foreground' : ''}`} />
+                            <span className={`flex-1 text-left truncate ${folderInfo.isSubfolder ? 'text-muted-foreground' : ''}`}>
+                              {folderInfo.displayName}
+                            </span>
+                            {folder.bookmarkCount !== undefined && folder.bookmarkCount > 0 && (
+                              <Badge variant="secondary" className="text-xs">
+                                {folder.bookmarkCount}
+                              </Badge>
+                            )}
+                          </button>
+                        </FolderContextMenu>
+                      );
+                    })
+                  ) : (
+                    <div className="text-xs text-muted-foreground italic">
+                      No folders yet
+                    </div>
+                  )
                 ) : (
                   <div className="text-xs text-muted-foreground italic">
-                    No folders yet
+                    Folders hidden in deleted view
                   </div>
                 )}
                 
-                {/* New Folder Button - Always visible for drag & drop */}
+                {/* New Folder Button */}
                 <button
                   className="flex items-center gap-2 w-full p-2 text-sm hover:bg-muted/50 rounded-lg transition-colors border-2 border-dashed border-muted-foreground/30 hover:border-muted-foreground/50"
                   onClick={() => setShowCreateFolderDialog(true)}
@@ -1385,7 +1405,7 @@ function BookmarksPage() {
                     
                     {/* Drag and drop area */}
                     <div
-                      onDragOver={handleDragOver}
+                      onDragOver={handleFileDragOver}
                       onDragLeave={handleDragLeave}
                       onDrop={handleDrop}
                       className={`
@@ -1542,13 +1562,87 @@ function BookmarksPage() {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-auto p-4 min-h-0">
-          {isLoading ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <div className="flex-1 overflow-auto min-h-0">
+          {/* Deleted Folders Section */}
+          {showDeleted && deletedFolders.length > 0 && (
+            <div className="p-4 border-b border-border bg-muted/20">
+              <div className="mb-3">
+                <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Folder className="h-4 w-4" />
+                  Deleted Folders ({deletedFolders.length})
+                </h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {deletedFolders.map((folder) => (
+                  <div
+                    key={folder.id}
+                    className="flex items-center justify-between p-3 bg-card border border-red-200 dark:border-red-800 rounded-lg shadow-sm"
+                  >
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <Folder className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <span className="text-sm font-medium text-red-800 dark:text-red-200 truncate block">
+                          {folder.name}
+                        </span>
+                        {folder.description && (
+                          <span className="text-xs text-red-600 dark:text-red-400 truncate block">
+                            {folder.description}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-1 flex-shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 hover:bg-blue-100 hover:text-blue-600"
+                        onClick={async () => {
+                          try {
+                            await flow.bookmarks.collections.restore(folder.id);
+                            await loadFolders();
+                            await loadDeletedFolders();
+                            toast.success('Folder restored');
+                          } catch (error) {
+                            console.error('Failed to restore folder:', error);
+                            toast.error('Failed to restore folder');
+                          }
+                        }}
+                        title="Restore folder"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 hover:bg-red-100 hover:text-red-600"
+                        onClick={async () => {
+                          try {
+                            await flow.bookmarks.collections.permanentlyDelete(folder.id);
+                            await loadDeletedFolders();
+                            toast.success('Folder permanently deleted');
+                          } catch (error) {
+                            console.error('Failed to permanently delete folder:', error);
+                            toast.error('Failed to permanently delete folder');
+                          }
+                        }}
+                        title="Delete permanently"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-          ) : filteredBookmarks.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center px-4">
+          )}
+
+          <div className="p-4">
+            {isLoading ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : filteredBookmarks.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center px-4">
               <div className="max-w-md">
                 {/* Large Icon with gradient background */}
                 <div className="relative mb-6 mx-auto w-fit">
@@ -1567,7 +1661,7 @@ function BookmarksPage() {
                 {/* Title and Description */}
                 <h3 className="text-2xl font-semibold mb-3">
                   {showDeleted 
-                    ? 'No deleted bookmarks' 
+                    ? (deletedFolders.length > 0 ? 'No deleted bookmarks' : 'Trash is empty')
                     : searchQuery 
                       ? 'No bookmarks found' 
                       : selectedFolder
@@ -1576,7 +1670,9 @@ function BookmarksPage() {
                 </h3>
                 <p className="text-muted-foreground mb-8 text-base">
                   {showDeleted
-                    ? 'Your trash is empty. Deleted bookmarks will appear here.'
+                    ? (deletedFolders.length > 0 
+                        ? 'No deleted bookmarks found, but there are deleted folders above.' 
+                        : 'Your trash is empty. Deleted bookmarks and folders will appear here.')
                     : searchQuery 
                       ? `No bookmarks match "${searchQuery}". Try a different search term.`
                       : selectedFolder
@@ -1657,9 +1753,7 @@ function BookmarksPage() {
                 )}
               </div>
             </div>
-          ) : (
-            <div className="p-4">
-              {viewMode === 'list' ? (
+          ) : viewMode === 'list' ? (
                 <div className="space-y-1">
                   {filteredBookmarks.map((bookmark) => (
                     <BookmarkListItem key={bookmark.id} bookmark={bookmark} />
@@ -1849,9 +1943,8 @@ function BookmarksPage() {
                 </div>
               )}
             </div>
-          )}
+          </div>
         </div>
-      </div>
 
       {/* Create Folder Dialog */}
       <Dialog open={showCreateFolderDialog} onOpenChange={setShowCreateFolderDialog}>
