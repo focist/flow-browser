@@ -45,6 +45,23 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { Bookmark, BookmarkCollection, BookmarkFilter, ImportStats } from "~/types/bookmarks";
+import {
+  DndContext,
+  pointerWithin,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragOverlay,
+  DragStartEvent,
+  DragEndEvent,
+  useDraggable,
+  useDroppable,
+} from '@dnd-kit/core';
+import {
+  sortableKeyboardCoordinates,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 type ViewMode = 'card' | 'list' | 'grid';
 type SortBy = 'dateAdded' | 'title' | 'visitCount' | 'lastVisited';
@@ -112,9 +129,23 @@ function FolderItem({
   onSelect: () => void;
   folderInfo: any;
 }) {
+  const droppableId = `folder-${folder.id}`;
+  const { isOver, setNodeRef } = useDroppable({
+    id: droppableId,
+    data: {
+      type: 'folder',
+      folderId: folder.id,
+      folderName: folder.name
+    }
+  });
+
   return (
-    <div className="transition-colors rounded-lg">
-    
+    <div 
+      ref={setNodeRef}
+      className={`transition-colors rounded-lg ${
+        isOver ? 'bg-primary/10 border border-primary/20' : ''
+      }`}
+    >
       <FolderContextMenu
         folder={folder}
         onCreateChildFolder={onCreateChildFolder}
@@ -334,7 +365,17 @@ function BookmarksPage() {
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
   const [editingFolderName, setEditingFolderName] = useState('');
 
+  // Drag and drop state
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [draggedBookmark, setDraggedBookmark] = useState<Bookmark | null>(null);
 
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const loadBookmarks = async () => {
     console.log('Loading bookmarks with filter:', filter);
@@ -804,6 +845,40 @@ function BookmarksPage() {
     }
   };
 
+  // Drag event handlers
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    setActiveId(active.id as string);
+    const bookmark = filteredBookmarks.find(b => b.id === active.id);
+    if (bookmark) {
+      setDraggedBookmark(bookmark);
+    }
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+    setDraggedBookmark(null);
+
+    if (!over) return;
+
+    const bookmarkId = active.id as string;
+    const overId = over.id as string;
+
+    // Handle dropping on folder
+    if (overId.startsWith('folder-')) {
+      const folderId = overId.replace('folder-', '');
+      try {
+        await flow.bookmarks.moveToCollection(bookmarkId, selectedFolder, folderId);
+        toast.success('Bookmark moved to folder');
+        await loadBookmarks();
+        await loadFolders();
+      } catch (error) {
+        console.error('Failed to move bookmark:', error);
+        toast.error('Failed to move bookmark');
+      }
+    }
+  };
 
   const handleConfirmRenameFolder = async () => {
     if (!folderToRename || !renameFolderName.trim()) {
@@ -874,15 +949,44 @@ function BookmarksPage() {
     }
   };
 
-  // Bookmark Card Component
+  // Draggable Bookmark Card Component
   const BookmarkCard = ({ bookmark }: { bookmark: Bookmark }) => {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      isDragging,
+    } = useDraggable({ 
+      id: bookmark.id,
+      data: { 
+        type: 'bookmark',
+        bookmark 
+      }
+    });
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+    };
+
+    const getDragOpacity = () => {
+      if (!isDragging) return '';
+      return 'opacity-70';
+    };
     return (
-      <BookmarkContextMenu bookmark={bookmark}>
-        <Card 
-          className={`group hover:shadow-lg transition-all duration-200 cursor-pointer relative h-[160px] flex flex-col select-none ${
-            recentlyDeletedIds.has(bookmark.id) ? 'opacity-60' : ''
-          }`}
-        >
+      <div
+        ref={setNodeRef}
+        style={style}
+        className={`cursor-grab ${isDragging ? 'cursor-grabbing' : ''} ${getDragOpacity()}`}
+        {...listeners}
+        {...attributes}
+      >
+        <BookmarkContextMenu bookmark={bookmark}>
+          <Card 
+            className={`group hover:shadow-lg transition-all duration-200 relative h-[160px] flex flex-col select-none ${
+              recentlyDeletedIds.has(bookmark.id) ? 'opacity-60' : ''
+            } ${isDragging ? 'shadow-lg' : ''}`}
+          >
             <CardContent className="px-3 pt-3 pb-12 flex-1 flex flex-col">
               <div className="flex-1 flex flex-col">
                 <div className="flex items-center gap-2 mb-2">
@@ -1071,6 +1175,7 @@ function BookmarksPage() {
             </CardContent>
           </Card>
         </BookmarkContextMenu>
+      </div>
     );
   };
 
@@ -1247,6 +1352,12 @@ function BookmarksPage() {
   );
 
   return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={pointerWithin}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
     <div className="h-screen bg-background flex">
       {/* Sidebar */}
       <div className="w-64 border-r border-border bg-card flex flex-col">
@@ -2388,7 +2499,38 @@ function BookmarksPage() {
           onClick={() => setShowInfoPanel(false)}
         />
       )}
+
+      {/* Drag overlay */}
+      <DragOverlay>
+        {activeId && draggedBookmark && (
+          <div className="opacity-80 rotate-3 transform scale-105">
+            <Card className="shadow-2xl border-primary h-[160px] flex flex-col">
+              <CardContent className="px-3 pt-3 pb-12 flex-1 flex flex-col">
+                <div className="flex-1 flex flex-col">
+                  <div className="flex items-center gap-2 mb-2">
+                    {draggedBookmark.favicon && (
+                      <img src={draggedBookmark.favicon} alt="" className="w-4 h-4 rounded-sm" />
+                    )}
+                    <h3 className="font-medium text-sm line-clamp-2 hover:text-primary flex-1">
+                      {draggedBookmark.title}
+                    </h3>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-2 line-clamp-1" title={draggedBookmark.url}>
+                    {formatUrlForDisplay(draggedBookmark.url, 45)}
+                  </p>
+                  <div className="flex-1">
+                    <p className="text-xs text-muted-foreground line-clamp-2">
+                      {draggedBookmark.description || ''}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </DragOverlay>
     </div>
+    </DndContext>
   );
 }
 
