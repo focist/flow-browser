@@ -347,7 +347,7 @@ function BookmarksPage() {
   const [selectedBookmarks, setSelectedBookmarks] = useState<Set<string>>(new Set());
   const [lastClickedBookmarkId, setLastClickedBookmarkId] = useState<string | null>(null);
   const [lastAction, setLastAction] = useState<'select' | 'deselect' | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [filter, setFilter] = useState<BookmarkFilter>({});
   const [showDeleted, setShowDeleted] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
@@ -360,6 +360,8 @@ function BookmarksPage() {
   const [folders, setFolders] = useState<BookmarkCollection[]>([]);
   const [deletedFolders, setDeletedFolders] = useState<BookmarkCollection[]>([]);
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+  const [activeView, setActiveView] = useState<'all' | 'recent' | 'popular' | 'deleted'>('all');
+  const [minVisitCount, setMinVisitCount] = useState(3);
   const [showCreateFolderDialog, setShowCreateFolderDialog] = useState(false);
   const [parentFolder, setParentFolder] = useState<BookmarkCollection | null>(null);
   const [recentlyDeletedIds, setRecentlyDeletedIds] = useState<Set<string>>(new Set());
@@ -389,7 +391,6 @@ function BookmarksPage() {
 
   const loadBookmarks = async () => {
     console.log('Loading bookmarks with filter:', filter);
-    setIsLoading(true);
     try {
       const result = await flow.bookmarks.getAll(filter);
       console.log('Loaded bookmarks:', result);
@@ -398,14 +399,11 @@ function BookmarksPage() {
       console.error('Failed to load bookmarks:', error);
       toast.error('Failed to load bookmarks');
       setBookmarks([]); // Set empty array on error
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const loadDeletedBookmarks = async () => {
     console.log('Loading deleted bookmarks');
-    setIsLoading(true);
     try {
       const result = await flow.bookmarks.getAll({ onlyDeleted: true });
       console.log('Loaded deleted bookmarks:', result);
@@ -413,8 +411,6 @@ function BookmarksPage() {
     } catch (error) {
       console.error('Failed to load deleted bookmarks:', error);
       toast.error('Failed to load deleted bookmarks');
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -638,6 +634,12 @@ function BookmarksPage() {
   const filteredBookmarks = useMemo(() => {
     let filtered = showDeleted ? deletedBookmarks : bookmarks;
 
+    // Apply view-specific filters
+    if (activeView === 'popular') {
+      // Filter by minimum visit count for Most Visited view
+      filtered = filtered.filter(bookmark => (bookmark.visitCount || 0) >= minVisitCount);
+    }
+    
     // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -667,7 +669,7 @@ function BookmarksPage() {
     });
 
     return filtered;
-  }, [bookmarks, deletedBookmarks, showDeleted, searchQuery, sortBy]);
+  }, [bookmarks, deletedBookmarks, showDeleted, searchQuery, sortBy, activeView, minVisitCount]);
 
   const handleDeleteSelected = async () => {
     if (selectedBookmarks.size === 0) return;
@@ -909,6 +911,9 @@ function BookmarksPage() {
         finalSelection = selectedBookmarks;
       }
 
+      // Change cursor to grabbing during drag
+      document.body.style.cursor = 'grabbing';
+      
       // Trigger collect animation if we have multiple items selected
       if (finalSelection.size > 1) {
         setIsCollecting(true);
@@ -955,6 +960,9 @@ function BookmarksPage() {
     setCollectAnimationComplete(false);
     setCollectingBookmarks([]);
     setDragPosition(null);
+    
+    // Reset cursor
+    document.body.style.cursor = '';
 
     if (!over) return;
 
@@ -1927,10 +1935,11 @@ function BookmarksPage() {
               <div className="text-xs font-medium text-muted-foreground mb-2">QUICK FILTERS</div>
               <div className="space-y-1">
                 <button 
-                  className={`flex items-center gap-2 w-full p-2 text-sm hover:bg-muted/50 rounded-lg transition-colors ${!showDeleted && !selectedFolder ? 'bg-muted/50' : ''}`}
+                  className={`flex items-center gap-2 w-full p-2 text-sm hover:bg-muted/50 rounded-lg transition-colors ${!showDeleted && !selectedFolder && activeView === 'all' ? 'bg-muted/50' : ''}`}
                   onClick={() => {
                     setShowDeleted(false);
                     setSelectedFolder(null);
+                    setActiveView('all');
                     setFilter({});
                   }}
                 >
@@ -1944,11 +1953,12 @@ function BookmarksPage() {
                 </button>
                 
                 <button 
-                  className="flex items-center gap-2 w-full p-2 text-sm hover:bg-muted/50 rounded-lg transition-colors"
+                  className={`flex items-center gap-2 w-full p-2 text-sm hover:bg-muted/50 rounded-lg transition-colors ${activeView === 'recent' ? 'bg-muted/50' : ''}`}
                   onClick={() => {
                     console.log('Recently Added clicked');
                     setShowDeleted(false);
                     setSelectedFolder(null);
+                    setActiveView('recent');
                     localStorage.removeItem('bookmarks-selected-folder');
                     setFilter({});
                     setSortBy('dateAdded');
@@ -1958,26 +1968,42 @@ function BookmarksPage() {
                   Recently Added
                 </button>
                 
-                <button 
-                  className="flex items-center gap-2 w-full p-2 text-sm hover:bg-muted/50 rounded-lg transition-colors"
-                  onClick={() => {
-                    console.log('Most Visited clicked');
-                    setShowDeleted(false);
-                    setSelectedFolder(null);
-                    localStorage.removeItem('bookmarks-selected-folder');
-                    setFilter({});
-                    setSortBy('visitCount');
-                  }}
-                >
-                  <Star className="h-4 w-4" />
-                  Most Visited
-                </button>
+                <div className={`flex items-center justify-between w-full p-2 text-sm hover:bg-muted/50 rounded-lg transition-colors ${activeView === 'popular' ? 'bg-muted/50' : ''}`}>
+                  <button 
+                    className="flex items-center gap-2 flex-1"
+                    onClick={() => {
+                      console.log('Most Visited clicked');
+                      setShowDeleted(false);
+                      setSelectedFolder(null);
+                      setActiveView('popular');
+                      localStorage.removeItem('bookmarks-selected-folder');
+                      setFilter({});
+                      setSortBy('visitCount');
+                    }}
+                  >
+                    <Star className="h-4 w-4" />
+                    Most Visited
+                  </button>
+                  
+                  {activeView === 'popular' && (
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={minVisitCount}
+                      onChange={(e) => setMinVisitCount(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="w-10 px-1 py-0.5 text-xs border rounded ml-2"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  )}
+                </div>
 
                 <button 
                   className={`flex items-center gap-2 w-full p-2 text-sm hover:bg-muted/50 rounded-lg transition-colors ${showDeleted ? 'bg-muted/50' : ''}`}
                   onClick={() => {
                     setShowDeleted(true);
                     setSelectedFolder(null);
+                    setActiveView('deleted');
                     setFilter({});
                   }}
                 >
@@ -2008,48 +2034,43 @@ function BookmarksPage() {
               </div>
               
               <div className="space-y-1">
-                {!showDeleted ? (
-                  // Show regular folders when not viewing deleted items
-                  folders.length > 0 ? (
-                    folders.map((folder) => {
-                      const folderInfo = getFolderDisplayInfo(folder);
-                      return (
-                        <FolderItem
-                          key={folder.id}
-                          folder={folder}
-                          folderInfo={folderInfo}
-                          isSelected={selectedFolder === folder.id}
-                          onSelect={() => {
-                            if (selectedFolder === folder.id && !showDeleted) {
-                              // Deselect folder
-                              setSelectedFolder(null);
-                              setFilter({});
-                              localStorage.removeItem('bookmarks-selected-folder');
-                            } else {
-                              // Select folder
-                              setSelectedFolder(folder.id);
-                              setFilter({ collectionId: folder.id });
-                              setShowDeleted(false);
-                              localStorage.setItem('bookmarks-selected-folder', folder.id);
-                            }
-                          }}
-                          onCreateChildFolder={(parentFolder) => {
-                            setParentFolder(parentFolder);
-                            setShowCreateFolderDialog(true);
-                          }}
-                          onRenameFolder={handleRenameFolder}
-                          onDeleteFolder={handleDeleteFolder}
-                        />
-                      );
-                    })
-                  ) : (
-                    <div className="text-xs text-muted-foreground italic">
-                      No folders yet
-                    </div>
-                  )
+                {folders.length > 0 ? (
+                  folders.map((folder) => {
+                    const folderInfo = getFolderDisplayInfo(folder);
+                    return (
+                      <FolderItem
+                        key={folder.id}
+                        folder={folder}
+                        folderInfo={folderInfo}
+                        isSelected={selectedFolder === folder.id}
+                        onSelect={() => {
+                          if (selectedFolder === folder.id && !showDeleted) {
+                            // Deselect folder
+                            setSelectedFolder(null);
+                            setActiveView('all');
+                            setFilter({});
+                            localStorage.removeItem('bookmarks-selected-folder');
+                          } else {
+                            // Select folder
+                            setSelectedFolder(folder.id);
+                            setActiveView('all');
+                            setFilter({ collectionId: folder.id });
+                            setShowDeleted(false);
+                            localStorage.setItem('bookmarks-selected-folder', folder.id);
+                          }
+                        }}
+                        onCreateChildFolder={(parentFolder) => {
+                          setParentFolder(parentFolder);
+                          setShowCreateFolderDialog(true);
+                        }}
+                        onRenameFolder={handleRenameFolder}
+                        onDeleteFolder={handleDeleteFolder}
+                      />
+                    );
+                  })
                 ) : (
                   <div className="text-xs text-muted-foreground italic">
-                    Folders hidden in deleted view
+                    No folders yet
                   </div>
                 )}
                 
@@ -2097,56 +2118,18 @@ function BookmarksPage() {
         <div className="border-b border-border bg-card">
           <div className="flex items-center justify-between p-4">
             <div>
-              {/* Breadcrumb Navigation */}
-              {selectedFolder && (() => {
-                const currentFolder = folders.find(f => f.id === selectedFolder);
-                const breadcrumbPath: BookmarkCollection[] = [];
-                
-                // Build path from current folder to root
-                let folder = currentFolder;
-                while (folder) {
-                  breadcrumbPath.unshift(folder);
-                  folder = folder.parentId ? folders.find(f => f.id === folder!.parentId) : undefined;
-                }
-                
-                return (
-                  <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
-                    <button 
-                      onClick={() => {
-                        setSelectedFolder(null);
-                        setFilter({});
-                        setShowDeleted(false); // Switch away from deleted view
-                      }}
-                      className="hover:text-foreground transition-colors"
-                    >
-                      Bookmarks
-                    </button>
-                    {breadcrumbPath.map((folder, index) => (
-                      <React.Fragment key={folder.id}>
-                        <ChevronRight className="h-3 w-3" />
-                        {index === breadcrumbPath.length - 1 ? (
-                          <span className="text-foreground">{folder.name}</span>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              setSelectedFolder(folder.id);
-                              setFilter({ collectionId: folder.id });
-                              setShowDeleted(false); // Switch away from deleted view
-                            }}
-                            className="hover:text-foreground transition-colors"
-                          >
-                            {folder.name}
-                          </button>
-                        )}
-                      </React.Fragment>
-                    ))}
-                  </div>
-                );
-              })()}
               {selectedFolder && !showDeleted ? (
                 (() => {
                   const currentFolder = folders.find(f => f.id === selectedFolder);
                   if (!currentFolder) return null;
+                  
+                  // Build breadcrumb path
+                  const breadcrumbPath: BookmarkCollection[] = [];
+                  let folder: BookmarkCollection | undefined = currentFolder;
+                  while (folder) {
+                    breadcrumbPath.unshift(folder);
+                    folder = folder.parentId ? folders.find(f => f.id === folder.parentId) : undefined;
+                  }
                   
                   return (
                     <>
@@ -2180,13 +2163,44 @@ function BookmarksPage() {
                       ) : (
                         <div className="flex items-center gap-2">
                           <Folder className="h-6 w-6 text-muted-foreground" />
-                          <h1 
-                            className="text-xl font-semibold cursor-text select-text flex-1"
-                            onClick={() => handleStartInlineRename(currentFolder)}
-                            title="Click to rename folder"
-                          >
-                            {currentFolder.name}
-                          </h1>
+                          <div className="flex items-center gap-1">
+                            <button 
+                              onClick={() => {
+                                setSelectedFolder(null);
+                                setFilter({});
+                                setShowDeleted(false);
+                                localStorage.removeItem('bookmarks-selected-folder');
+                              }}
+                              className="text-lg font-medium text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                              Bookmarks
+                            </button>
+                            {breadcrumbPath.map((folder, index) => (
+                              <React.Fragment key={folder.id}>
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                {index === breadcrumbPath.length - 1 ? (
+                                  <h1 
+                                    className="text-xl font-semibold cursor-text select-text"
+                                    onClick={() => handleStartInlineRename(folder)}
+                                    title="Click to rename folder"
+                                  >
+                                    {folder.name}
+                                  </h1>
+                                ) : (
+                                  <button
+                                    onClick={() => {
+                                      setSelectedFolder(folder.id);
+                                      setFilter({ collectionId: folder.id });
+                                      localStorage.setItem('bookmarks-selected-folder', folder.id);
+                                    }}
+                                    className="text-lg font-medium text-muted-foreground hover:text-foreground transition-colors"
+                                  >
+                                    {folder.name}
+                                  </button>
+                                )}
+                              </React.Fragment>
+                            ))}
+                          </div>
                         </div>
                       )}
                       <p className="text-sm text-muted-foreground">
@@ -2198,7 +2212,14 @@ function BookmarksPage() {
               ) : (
                 <>
                   <h1 className="text-xl font-semibold">
-                    {showDeleted ? 'Deleted Bookmarks' : 'Bookmarks'}
+                    {showDeleted 
+                      ? 'Deleted Bookmarks'
+                      : activeView === 'recent' 
+                        ? 'Recently Added'
+                        : activeView === 'popular'
+                          ? 'Most Visited'
+                          : 'Bookmarks'
+                    }
                   </h1>
                   <p className="text-sm text-muted-foreground">
                     {filteredBookmarks.length} {showDeleted ? 'deleted ' : ''}bookmarks
@@ -2483,11 +2504,7 @@ function BookmarksPage() {
           )}
 
           <div className="p-4">
-            {isLoading ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            ) : filteredBookmarks.length === 0 ? (
+            {filteredBookmarks.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center px-4">
               <div className="max-w-md">
                 {/* Large Icon with gradient background */}
