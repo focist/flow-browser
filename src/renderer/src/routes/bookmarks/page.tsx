@@ -1386,20 +1386,14 @@ function BookmarksPage() {
     // But ONLY after a delay (when collectAnimationComplete becomes true)
     const shouldCollect = isCollecting && collectAnimationComplete && isSelected && isMultiDrag && !isDraggedItem && !isDragging;
     
-    // DEBUG: Add console logs to see what's happening
-    if (isSelected && activeId) {
-      console.log(`ListItem ${bookmark.id}: isDragging=${isDragging}, shouldCollect=${shouldCollect}, isCollecting=${isCollecting}, collectAnimationComplete=${collectAnimationComplete}`);
-    }
     
     let finalTransform: string;
-    if (isDragging) {
-      // FORCE placeholder to stay normal size - ignore dnd-kit transform completely
+    if (isDragging || (isSelected && isMultiDrag)) {
+      // ALL placeholders (dragged item AND other selected items) stay in place
+      // No transforms, no animations for any placeholders - floating overlay handles animation
       finalTransform = 'none';
-    } else if (shouldCollect) {
-      // Other selected items animate toward dragged item during collect phase
-      finalTransform = 'scale(0.6) translateX(-30px) translateY(-30px)';
     } else {
-      // Normal positioning
+      // Normal positioning for non-selected items only
       finalTransform = CSS.Transform.toString(transform) || '';
     }
     
@@ -1449,6 +1443,7 @@ function BookmarksPage() {
           <div 
             ref={setNodeRef}
             style={style}
+            data-bookmark-id={bookmark.id}
             className={`group flex items-center gap-3 p-3 pl-10 rounded-lg hover:bg-muted/50 transition-colors select-none cursor-grab ${isDragging ? 'cursor-grabbing' : ''} ${
               recentlyDeletedIds.has(bookmark.id) ? 'opacity-60' : ''
             } ${isDragging ? 'shadow-lg' : ''} ${isSelected ? 'ring-2 ring-primary' : ''}`}
@@ -1651,20 +1646,14 @@ function BookmarksPage() {
     // But ONLY after a delay (when collectAnimationComplete becomes true)
     const shouldCollect = isCollecting && collectAnimationComplete && isSelected && isMultiDrag && !isDraggedItem && !isDragging;
     
-    // DEBUG: Add console logs to see what's happening
-    if (isSelected && activeId) {
-      console.log(`GridItem ${bookmark.id}: isDragging=${isDragging}, shouldCollect=${shouldCollect}, isCollecting=${isCollecting}, collectAnimationComplete=${collectAnimationComplete}`);
-    }
     
     let finalTransform: string;
-    if (isDragging) {
-      // FORCE placeholder to stay normal size - ignore dnd-kit transform completely
+    if (isDragging || (isSelected && isMultiDrag)) {
+      // ALL placeholders (dragged item AND other selected items) stay in place
+      // No transforms, no animations for any placeholders - floating overlay handles animation
       finalTransform = 'none';
-    } else if (shouldCollect) {
-      // Other selected items animate toward dragged item during collect phase
-      finalTransform = 'scale(0.6) translateX(-40px) translateY(-40px)';
     } else {
-      // Normal positioning
+      // Normal positioning for non-selected items only
       finalTransform = CSS.Transform.toString(transform) || '';
     }
     
@@ -1714,6 +1703,7 @@ function BookmarksPage() {
           <div 
             ref={setNodeRef}
             style={style}
+            data-bookmark-id={bookmark.id}
             className={`group aspect-square bg-card border border-border rounded-lg p-3 hover:shadow-lg transition-all flex flex-col relative select-none cursor-grab ${isDragging ? 'cursor-grabbing' : ''} ${
               recentlyDeletedIds.has(bookmark.id) ? 'opacity-60' : ''
             } ${isDragging ? 'shadow-lg' : ''} ${isSelected ? 'ring-2 ring-primary' : ''}`}
@@ -2624,10 +2614,9 @@ function BookmarksPage() {
                 </div>
               ) : viewMode === 'card' ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {filteredBookmarks.map((bookmark) => {
-                    console.log('🎴 Rendering BookmarkCard for:', bookmark.id, bookmark.title);
-                    return <BookmarkCard key={bookmark.id} bookmark={bookmark} />;
-                  })}
+                  {filteredBookmarks.map((bookmark) => (
+                    <BookmarkCard key={bookmark.id} bookmark={bookmark} />
+                  ))}
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
@@ -2955,25 +2944,18 @@ function BookmarksPage() {
       )}
 
       {/* Drag overlay */}
-      <DragOverlay>
+      <DragOverlay dropAnimation={null}>
         {activeId && draggedBookmark && (
-          <div className="opacity-80 rotate-3 transform scale-105">
-            {selectedBookmarks.size > 1 ? (
-              // Multi-item drag overlay
-              <div className="group bg-card border-2 border-primary rounded-lg p-4 shadow-2xl w-64 flex flex-col items-center justify-center text-center">
-                <div className="bg-primary text-primary-foreground rounded-full w-12 h-12 flex items-center justify-center text-lg font-bold mb-2">
-                  {selectedBookmarks.size}
-                </div>
-                <h3 className="font-medium text-sm mb-1">
-                  {selectedBookmarks.size} bookmarks selected
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                  Drop on a folder to move all
-                </p>
-              </div>
-            ) : viewMode === 'list' ? (
-              <div className="group bg-card border-2 border-primary rounded-lg p-3 shadow-2xl w-[600px] hover:bg-muted/50 transition-colors">
-                <div className="flex items-center gap-3">
+          <div className="pointer-events-none opacity-90 scale-105 shadow-2xl"
+               style={{ transform: 'rotate(3deg)' }}>
+            {viewMode === 'list' ? (
+              <div className="group bg-card border-2 border-primary rounded-lg p-3 pl-10 shadow-2xl hover:bg-muted/50 transition-colors relative" style={{ width: 'calc(100vw - 320px)' }}>
+                {selectedBookmarks.size > 1 && (
+                  <div className="absolute -top-2 -right-2 bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold z-10">
+                    {selectedBookmarks.size}
+                  </div>
+                )}
+                <div className="flex items-center gap-2 flex-1 min-w-0">
                   {draggedBookmark.favicon && (
                     <img src={draggedBookmark.favicon} alt="" className="w-4 h-4 rounded-sm flex-shrink-0" />
                   )}
@@ -3019,6 +3001,11 @@ function BookmarksPage() {
               </div>
             ) : viewMode === 'grid' ? (
               <div className="group aspect-square bg-card border-2 border-primary rounded-lg p-3 shadow-2xl flex flex-col relative w-[200px] h-[200px]">
+                {selectedBookmarks.size > 1 && (
+                  <div className="absolute -top-2 -right-2 bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold z-10">
+                    {selectedBookmarks.size}
+                  </div>
+                )}
                 <div className="flex items-center mb-2">
                   {draggedBookmark.favicon && (
                     <img src={draggedBookmark.favicon} alt="" className="w-6 h-6 rounded" />
@@ -3068,7 +3055,12 @@ function BookmarksPage() {
                 </div>
               </div>
             ) : (
-              <Card className="shadow-2xl border-2 border-primary h-[160px] flex flex-col w-64">
+              <Card className="shadow-2xl border-2 border-primary h-[160px] flex flex-col w-64 relative">
+                {selectedBookmarks.size > 1 && (
+                  <div className="absolute -top-2 -right-2 bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold z-10">
+                    {selectedBookmarks.size}
+                  </div>
+                )}
                 <CardContent className="px-3 pt-3 pb-12 flex-1 flex flex-col">
                   <div className="flex-1 flex flex-col">
                     <div className="flex items-center gap-2 mb-2">
