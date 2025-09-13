@@ -772,8 +772,8 @@ Labels: ${bookmark.labels?.map(l => l.label).join(', ') || 'none'}
           }
         }
 
-        // If there are remaining labels or no auto-apply happened, show the panel
-        if (remaining.length > 0 || autoApplied.length === 0) {
+        // Always show the panel when there are any labels (remaining or auto-applied)
+        if (remaining.length > 0 || autoApplied.length > 0) {
           const updatedAnalysis = { ...result.analysis, labels: remaining };
           
           toast.success(`Analysis complete!`, {
@@ -785,13 +785,6 @@ Labels: ${bookmark.labels?.map(l => l.label).join(', ') || 'none'}
           });
           
           openReviewPanel(bookmark, updatedAnalysis, autoApplied);
-        } else {
-          // All labels were auto-applied
-          toast.success(`Analysis complete!`, {
-            id: toastId,
-            description: `${autoApplied.length} label${autoApplied.length === 1 ? '' : 's'} auto-applied`,
-            duration: 3000
-          });
         }
       } else {
         // No results toast
