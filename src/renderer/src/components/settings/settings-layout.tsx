@@ -8,9 +8,10 @@ import { ProfilesSettings } from "@/components/settings/sections/profiles/sectio
 import { SpacesSettings } from "@/components/settings/sections/spaces/section";
 import { ExternalAppsSettings } from "@/components/settings/sections/external-apps/section";
 import { ShortcutsSettings } from "@/components/settings/sections/shortcuts/section";
+import { AISettings } from "@/components/settings/sections/ai/section";
 import { SettingsProvider } from "@/components/providers/settings-provider";
 import { AppUpdatesProvider } from "@/components/providers/app-updates-provider";
-import { Globe, DockIcon, UsersIcon, OrbitIcon, BlocksIcon, Info, KeyboardIcon } from "lucide-react";
+import { Globe, DockIcon, UsersIcon, OrbitIcon, BlocksIcon, Info, KeyboardIcon, Brain } from "lucide-react";
 import { ShortcutsProvider } from "@/components/providers/shortcuts-provider";
 
 export function SettingsLayout() {
@@ -23,6 +24,7 @@ export function SettingsLayout() {
     { id: "icons", label: "Icon", icon: <DockIcon className="h-4 w-4 mr-2" /> },
     { id: "profiles", label: "Profiles", icon: <UsersIcon className="h-4 w-4 mr-2" /> },
     { id: "spaces", label: "Spaces", icon: <OrbitIcon className="h-4 w-4 mr-2" /> },
+    { id: "ai", label: "AI & Automation", icon: <Brain className="h-4 w-4 mr-2" /> },
     { id: "external-apps", label: "External Apps", icon: <BlocksIcon className="h-4 w-4 mr-2" /> },
     { id: "shortcuts", label: "Shortcuts", icon: <KeyboardIcon className="h-4 w-4 mr-2" /> },
     { id: "about", label: "About", icon: <Info className="h-4 w-4 mr-2" /> }
@@ -52,6 +54,8 @@ export function SettingsLayout() {
         return <ProfilesSettings navigateToSpaces={navigateToSpaces} navigateToSpace={navigateToSpace} />;
       case "spaces":
         return <SpacesSettings initialSelectedProfile={selectedProfileId} initialSelectedSpace={selectedSpaceId} />;
+      case "ai":
+        return <AISettings />;
       case "external-apps":
         return <ExternalAppsSettings />;
       case "shortcuts":

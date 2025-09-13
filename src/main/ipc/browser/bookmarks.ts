@@ -22,6 +22,7 @@ import {
   moveBookmarkToCollection,
   getBookmarksByUrl,
   importChromeBookmarks,
+  addAILabels,
   type Bookmark,
   type BookmarkCollection,
   type CreateBookmarkInput,
@@ -134,4 +135,9 @@ ipcMain.handle("bookmarks:importChrome", async (_, htmlContent: string, profileI
 // Drag & Drop operations
 ipcMain.handle("bookmarks:moveToCollection", async (_, bookmarkId: string, fromCollectionId: string | null, toCollectionId: string): Promise<void> => {
   return await moveBookmarkToCollection(bookmarkId, fromCollectionId, toCollectionId);
+});
+
+// AI Labels operations
+ipcMain.handle("bookmarks:addAILabels", async (_, bookmarkId: string, aiLabels: Array<{label: string; confidence: number; category: string}>): Promise<Bookmark | null> => {
+  return await addAILabels(bookmarkId, aiLabels);
 });

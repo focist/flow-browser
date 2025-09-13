@@ -80,9 +80,10 @@ function App() {
       <QueryParamProvider adapter={WindowHistoryAdapter}>
         <PlatformProvider>
           <Routes />
-          <Toaster richColors />
         </PlatformProvider>
       </QueryParamProvider>
+      
+      <Toaster />
     </>
   );
 }

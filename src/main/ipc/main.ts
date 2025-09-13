@@ -24,5 +24,8 @@ import "@/ipc/app/icons";
 import "@/ipc/app/open-external";
 import "@/ipc/app/onboarding";
 
+// AI Services
+import "@/ipc/ai";
+
 // Special
 import "@/ipc/listeners-manager";

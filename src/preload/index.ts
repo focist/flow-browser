@@ -37,6 +37,7 @@ import { FlowActionsAPI } from "~/flow/interfaces/app/actions";
 import { FlowShortcutsAPI, ShortcutsData } from "~/flow/interfaces/app/shortcuts";
 import { FlowBookmarksAPI } from "~/flow/interfaces/browser/bookmarks";
 import { CreateBookmarkInput, UpdateBookmarkInput, BookmarkFilter } from "~/types/bookmarks";
+import { AIFlowInterface } from "~/flow/interfaces/ai";
 
 // API CHECKS //
 function isProtocol(protocol: string) {
@@ -621,6 +622,9 @@ const bookmarksAPI: FlowBookmarksAPI = {
   moveToCollection: async (bookmarkId: string, fromCollectionId: string | null, toCollectionId: string) => {
     return ipcRenderer.invoke("bookmarks:moveToCollection", bookmarkId, fromCollectionId, toCollectionId);
   },
+  addAILabels: async (bookmarkId: string, aiLabels: Array<{label: string; confidence: number; category: string}>) => {
+    return ipcRenderer.invoke("bookmarks:addAILabels", bookmarkId, aiLabels);
+  },
   collections: {
     create: async (input: {
       name: string;
@@ -666,6 +670,37 @@ const bookmarksAPI: FlowBookmarksAPI = {
   }
 };
 
+// AI API //
+const aiAPI: AIFlowInterface = {
+  'ai:getSettings': async () => {
+    return ipcRenderer.invoke('ai:getSettings');
+  },
+  'ai:updateSettings': async (settings) => {
+    return ipcRenderer.invoke('ai:updateSettings', settings);
+  },
+  'ai:isEnabled': async () => {
+    return ipcRenderer.invoke('ai:isEnabled');
+  },
+  'ai:analyzeBookmark': async (request) => {
+    return ipcRenderer.invoke('ai:analyzeBookmark', request);
+  },
+  'ai:generateDescription': async (request) => {
+    return ipcRenderer.invoke('ai:generateDescription', request);
+  },
+  'ai:fetchPageContent': async (url, options) => {
+    return ipcRenderer.invoke('ai:fetchPageContent', url, options);
+  },
+  'ai:extractBasicInfo': async (url, title) => {
+    return ipcRenderer.invoke('ai:extractBasicInfo', url, title);
+  },
+  'ai:findDuplicates': async (request, existingBookmarks) => {
+    return ipcRenderer.invoke('ai:findDuplicates', request, existingBookmarks);
+  },
+  'ai:listModels': async () => {
+    return ipcRenderer.invoke('ai:listModels');
+  }
+};
+
 // EXPOSE FLOW API //
 const flowAPI: typeof flow = {
   // App APIs
@@ -706,6 +741,9 @@ const flowAPI: typeof flow = {
   settings: wrapAPI(settingsAPI, "settings"),
   icons: wrapAPI(iconsAPI, "settings"),
   openExternal: wrapAPI(openExternalAPI, "settings"),
-  onboarding: wrapAPI(onboardingAPI, "settings")
+  onboarding: wrapAPI(onboardingAPI, "settings"),
+
+  // AI APIs
+  ai: wrapAPI(aiAPI, "app")
 };
 contextBridge.exposeInMainWorld("flow", flowAPI);

@@ -150,6 +150,29 @@ async function initDatabase() {
       console.log("BOOKMARKS: Created collection_items table");
     }
 
+    // Snooze system tables
+    const hasSnoozedItemsTable = await db.schema.hasTable("snoozed_items");
+    if (!hasSnoozedItemsTable) {
+      await db.schema.createTable("snoozed_items", (table) => {
+        table.string("id").primary();
+        table.string("itemType").notNullable(); // 'bookmark' | 'tab'
+        table.string("itemId").notNullable(); // bookmarkId or tabId
+        table.string("profileId").notNullable().index();
+        table.string("spaceId").notNullable().index(); // Original space where item should wake up
+        table.timestamp("snoozeUntil").notNullable().index(); // When item should wake up
+        table.string("snoozeType").notNullable(); // 'later_today' | 'tomorrow' | 'next_week' | 'custom'
+        table.string("snoozeLabel"); // Human-readable label like "Later today", "Tomorrow 9 AM"
+        table.json("originalData"); // Store original bookmark/tab data for restoration
+        table.timestamp("snoozedAt").notNullable();
+        table.string("snoozedFromSpaceId"); // Space where snooze action was initiated
+        table.boolean("notificationSent").defaultTo(false);
+        table.timestamp("wakeUpNotifiedAt"); // When wake-up notification was sent
+        table.index(["itemType", "itemId"]);
+        table.index(["snoozeUntil", "notificationSent"]);
+      });
+      console.log("BOOKMARKS: Created snoozed_items table");
+    }
+
     resolveDatabaseInitialized();
     console.log("BOOKMARKS: Database initialized successfully");
   } catch (err) {
@@ -296,6 +319,29 @@ export async function updateBookmark(id: string, input: UpdateBookmarkInput): Pr
           source: 'user' as const,
           category: null,
           confidence: null
+        }));
+        await trx("bookmark_labels").insert(labelRecords);
+      }
+    }
+    
+    // Handle adding labels without replacing existing ones (for AI labels)
+    if (input.addLabels !== undefined && input.addLabels.length > 0) {
+      // Get existing labels to avoid duplicates
+      const existingLabels = await trx("bookmark_labels").where({ bookmarkId: id }).select('label');
+      const existingLabelNames = existingLabels.map(l => l.label);
+      
+      // Filter out labels that already exist
+      const newLabels = input.addLabels.filter(newLabel => 
+        !existingLabelNames.includes(newLabel.label)
+      );
+      
+      if (newLabels.length > 0) {
+        const labelRecords = newLabels.map(label => ({
+          bookmarkId: id,
+          label: label.label,
+          source: label.source,
+          category: label.category || null,
+          confidence: label.confidence || null
         }));
         await trx("bookmark_labels").insert(labelRecords);
       }
@@ -894,5 +940,43 @@ function parseChromeBookmarkHtml(htmlContent: string): ParsedBookmark[] {
   }
   
   return bookmarks;
+}
+
+export async function addAILabels(bookmarkId: string, aiLabels: Array<{label: string; confidence: number; category: string}>): Promise<Bookmark | null> {
+  await whenDatabaseInitialized;
+  
+  return await db.transaction(async (trx) => {
+    const exists = await trx("bookmarks").where({ id: bookmarkId }).first();
+    if (!exists) return null;
+    
+    // Remove existing AI labels for this bookmark
+    await trx("bookmark_labels").where({ bookmarkId, source: 'ai' }).delete();
+    
+    // Add new AI labels
+    if (aiLabels.length > 0) {
+      const labelRecords = aiLabels.map(aiLabel => ({
+        bookmarkId,
+        label: aiLabel.label,
+        source: 'ai' as const,
+        category: aiLabel.category,
+        confidence: aiLabel.confidence
+      }));
+      await trx("bookmark_labels").insert(labelRecords);
+    }
+    
+    // Return updated bookmark with all labels
+    const result = await trx("bookmarks").where({ id: bookmarkId }).first();
+    const labels = await trx("bookmark_labels").where({ bookmarkId });
+    
+    return {
+      ...result,
+      labels: labels.map((l: any) => ({
+        label: l.label,
+        source: l.source,
+        confidence: l.confidence,
+        category: l.category
+      }))
+    };
+  });
 }
 

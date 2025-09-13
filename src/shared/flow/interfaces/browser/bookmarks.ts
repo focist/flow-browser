@@ -13,6 +13,7 @@ export interface FlowBookmarksAPI {
   restore(id: string): Promise<boolean>;
   permanentlyDelete(id: string): Promise<boolean>;
   moveToCollection(bookmarkId: string, fromCollectionId: string | null, toCollectionId: string): Promise<void>;
+  addAILabels(bookmarkId: string, aiLabels: Array<{label: string; confidence: number; category: string}>): Promise<Bookmark | null>;
   
   collections: {
     create(input: {

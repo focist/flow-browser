@@ -57,6 +57,7 @@ export interface UpdateBookmarkInput {
   favicon?: string;
   isGlobal?: boolean;
   labels?: string[];
+  addLabels?: BookmarkLabel[]; // Add new labels without replacing existing ones
 }
 
 export interface UpdateCollectionInput {
