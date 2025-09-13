@@ -87,17 +87,24 @@ interface PendingLabelItemProps {
   onApply: () => void;
   onReject: () => void;
   isApplying?: boolean;
+  isUndoneAutoApplied?: boolean;
 }
 
 const PendingLabelItem: React.FC<PendingLabelItemProps> = ({
   label,
   onApply,
   onReject,
-  isApplying = false
+  isApplying = false,
+  isUndoneAutoApplied = false
 }) => {
+  
   return (
     <motion.div 
-      className="flex items-center justify-between p-3 border rounded-lg bg-card border-l-4 border-l-orange-400"
+      className={`flex items-center justify-between p-3 border rounded-lg bg-card border-l-4 ${
+        isUndoneAutoApplied 
+          ? 'border-l-blue-400 bg-blue-50/30 dark:bg-blue-950/20' 
+          : 'border-l-orange-400'
+      }`}
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 20 }}
@@ -105,12 +112,25 @@ const PendingLabelItem: React.FC<PendingLabelItemProps> = ({
     >
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
-          <Zap className="h-3.5 w-3.5 text-orange-500" />
+          {isUndoneAutoApplied ? (
+            <div className="flex items-center gap-1">
+              <RotateCcw className="h-3.5 w-3.5 text-blue-500" />
+              <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200">
+                Undone
+              </span>
+            </div>
+          ) : (
+            <Zap className="h-3.5 w-3.5 text-orange-500" />
+          )}
           <span className="font-medium text-sm truncate">{label.label}</span>
           <ConfidenceIndicator confidence={label.confidence} />
         </div>
         {label.category && (
-          <Badge variant="outline" className="text-xs">
+          <Badge variant="outline" className={`text-xs ${
+            isUndoneAutoApplied 
+              ? 'border-blue-300 text-blue-700 dark:border-blue-600 dark:text-blue-300'
+              : ''
+          }`}>
             {label.category}
           </Badge>
         )}
@@ -122,7 +142,7 @@ const PendingLabelItem: React.FC<PendingLabelItemProps> = ({
           className="h-7 w-7 p-0 bg-green-100 hover:bg-green-200 text-green-700"
           onClick={onApply}
           disabled={isApplying}
-          title="Apply label"
+          title={isUndoneAutoApplied ? "Re-apply auto-applied label" : "Apply label"}
         >
           <Check className="h-3.5 w-3.5" />
         </Button>
@@ -132,7 +152,7 @@ const PendingLabelItem: React.FC<PendingLabelItemProps> = ({
           className="h-7 w-7 p-0 bg-red-100 hover:bg-red-200 text-red-700"
           onClick={onReject}
           disabled={isApplying}
-          title="Reject label"
+          title={isUndoneAutoApplied ? "Permanently reject" : "Reject label"}
         >
           <X className="h-3.5 w-3.5" />
         </Button>
@@ -218,17 +238,17 @@ const AutoAppliedLabelItem: React.FC<AutoAppliedLabelItemProps> = ({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
           <div className="flex items-center gap-1.5">
-            <Sparkles className={`h-3.5 w-3.5 ${
-              isUndone 
-                ? 'text-gray-500 dark:text-gray-400' 
-                : 'text-blue-600 dark:text-blue-400'
-            }`} />
+            {isUndone ? (
+              <RotateCcw className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
+            ) : (
+              <Sparkles className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+            )}
             <span className={`font-medium text-sm truncate ${
               isUndone 
-                ? 'text-gray-600 dark:text-gray-400' 
+                ? 'text-gray-600 dark:text-gray-400 line-through' 
                 : 'text-blue-900 dark:text-blue-100'
             }`}>
-              {label.label} {isUndone && '(Removed)'}
+              {label.label}
             </span>
           </div>
           <div className="flex items-center gap-1.5 ml-auto">
@@ -337,6 +357,8 @@ export const AIReviewPanel: React.FC<AIReviewPanelProps> = ({
   onApplyAllAndContinue
 }) => {
   const [labelStates, setLabelStates] = useState<LabelReviewState[]>([]);
+  const [undoneAutoAppliedLabels, setUndoneAutoAppliedLabels] = useState<BookmarkLabel[]>([]);
+  const [undoneAutoAppliedIds, setUndoneAutoAppliedIds] = useState<Set<string>>(new Set());
 
   // Initialize label states when analysis changes
   useEffect(() => {
@@ -351,10 +373,25 @@ export const AIReviewPanel: React.FC<AIReviewPanelProps> = ({
     } else {
       setLabelStates([]);
     }
+    // Clear undone auto-applied labels when analysis changes
+    setUndoneAutoAppliedLabels([]);
+    setUndoneAutoAppliedIds(new Set());
   }, [analysis]);
 
   const pendingLabels = labelStates.filter(state => state.status === 'pending');
   const acceptedLabels = labelStates.filter(state => state.status === 'accepted');
+  
+  // Combine pending AI suggestions with undone auto-applied labels
+  const allPendingLabels = [
+    ...pendingLabels,
+    ...undoneAutoAppliedLabels.map((label, index) => ({
+      id: `undone-auto-${label.label}-${label.category}-${index}`,
+      label,
+      status: 'pending' as const,
+      timestamp: new Date(),
+      isUndoneAutoApplied: true
+    }))
+  ];
 
   const handleApplyLabel = (label: BookmarkLabel) => {
     setLabelStates(prev => prev.map(state => 
@@ -399,6 +436,48 @@ export const AIReviewPanel: React.FC<AIReviewPanelProps> = ({
         : state
     ));
     onClearAccepted();
+  };
+
+  const handleRemoveAutoApplied = (label: BookmarkLabel) => {
+    const labelId = `${label.label}-${label.category}`;
+    
+    // Only add to undone list if not already there (prevent duplicates)
+    if (!undoneAutoAppliedIds.has(labelId)) {
+      setUndoneAutoAppliedLabels(prev => [...prev, label]);
+      setUndoneAutoAppliedIds(prev => new Set(prev).add(labelId));
+    }
+    
+    // Call the parent's onRemoveAutoApplied to handle the actual removal
+    onRemoveAutoApplied?.(label);
+  };
+
+  const handleReapplyUndoneAutoApplied = (label: BookmarkLabel) => {
+    const labelId = `${label.label}-${label.category}`;
+    
+    // Remove from undone list and re-apply
+    setUndoneAutoAppliedLabels(prev => prev.filter(l => 
+      !(l.label === label.label && l.category === label.category)
+    ));
+    setUndoneAutoAppliedIds(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(labelId);
+      return newSet;
+    });
+    onReApplyAutoApplied?.(label);
+  };
+
+  const handleRejectUndoneAutoApplied = (label: BookmarkLabel) => {
+    const labelId = `${label.label}-${label.category}`;
+    
+    // Just remove from undone list (permanently reject)
+    setUndoneAutoAppliedLabels(prev => prev.filter(l => 
+      !(l.label === label.label && l.category === label.category)
+    ));
+    setUndoneAutoAppliedIds(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(labelId);
+      return newSet;
+    });
   };
 
   if (!isOpen) return null;
@@ -475,111 +554,143 @@ export const AIReviewPanel: React.FC<AIReviewPanelProps> = ({
               </div>
             ) : (
               <div className="flex flex-col h-full">
-                {/* Existing Labels Section - Only show if there are existing labels */}
-                {bookmark?.labels && bookmark.labels.length > 0 && (
-                  <div className="flex-shrink-0">
-                    <div className="sticky top-0 bg-background border-b px-4 py-2 flex items-center gap-2">
-                      <Tag className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                      <h4 className="font-medium text-sm">
-                        Existing Labels ({bookmark.labels.length})
-                      </h4>
-                    </div>
-                    
-                    <div className="p-4 pb-2">
-                      <div className="space-y-1.5 max-h-32 overflow-y-auto">
-                        <AnimatePresence mode="popLayout">
-                          {bookmark.labels.map((label, index) => (
-                            <ExistingLabelItem
-                              key={`existing-${label.label}-${label.source}-${index}`}
-                              label={label}
-                            />
-                          ))}
-                        </AnimatePresence>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Auto-Applied Section - Only show if there are auto-applied labels */}
-                {autoAppliedLabels.length > 0 && (
-                  <div className="flex-shrink-0">
-                    <div className="sticky top-0 bg-background border-b px-4 py-2 flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                      <h4 className="font-medium text-sm">
-                        Auto-Applied ({autoAppliedLabels.length})
-                      </h4>
-                    </div>
-                    
-                    <div className="p-4 pb-2">
-                      <div className="space-y-2 max-h-40 overflow-y-auto">
-                        <AnimatePresence mode="popLayout">
-                          {autoAppliedLabels.map((label, index) => (
-                            <AutoAppliedLabelItem
-                              key={`auto-${label.label}-${label.category}-${index}`}
-                              label={label}
-                              onRemove={() => onRemoveAutoApplied?.(label)}
-                              onReApply={() => onReApplyAutoApplied?.(label)}
-                              isApplying={isApplying}
-                            />
-                          ))}
-                        </AnimatePresence>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Pending Section */}
-                <div className="flex-1 min-h-0">
-                  <div className="sticky top-0 bg-background border-b px-4 py-2 flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-orange-500" />
+                {/* Existing Labels Section */}
+                <div className="flex-1 flex flex-col min-h-0" style={{ height: '30%' }}>
+                  <div className="flex-shrink-0 bg-background border-b px-4 py-2 flex items-center gap-2">
+                    <Tag className="h-4 w-4 text-gray-600 dark:text-gray-400" />
                     <h4 className="font-medium text-sm">
-                      New AI Suggestions ({pendingLabels.length})
+                      Existing Labels ({bookmark?.labels?.length || 0})
                     </h4>
                   </div>
                   
-                  <div className="p-4 pb-2">
-                    {pendingLabels.length === 0 ? (
-                      <div className="text-center py-6">
-                        <div className="text-xs text-muted-foreground">
-                          No new AI suggestions (existing labels preserved)
+                  <div className="flex-1 overflow-y-auto">
+                    {bookmark?.labels && bookmark.labels.length > 0 ? (
+                      <div className="p-4 pb-2">
+                        <div className="space-y-1.5">
+                          <AnimatePresence mode="popLayout">
+                            {bookmark.labels.map((label, index) => (
+                              <ExistingLabelItem
+                                key={`existing-${label.label}-${label.source}-${index}`}
+                                label={label}
+                              />
+                            ))}
+                          </AnimatePresence>
                         </div>
                       </div>
                     ) : (
-                      <div className="space-y-2 max-h-60 overflow-y-auto">
-                        <AnimatePresence mode="popLayout">
-                          {pendingLabels.map((state) => (
-                            <PendingLabelItem
-                              key={state.id}
-                              label={state.label}
-                              onApply={() => handleApplyLabel(state.label)}
-                              onReject={() => handleRejectLabel(state.label)}
-                              isApplying={isApplying}
-                            />
-                          ))}
-                        </AnimatePresence>
+                      <div className="flex items-center justify-center h-full">
+                        <div className="text-xs text-muted-foreground">
+                          No existing labels
+                        </div>
                       </div>
                     )}
                   </div>
                 </div>
 
-                {/* Accepted Section */}
-                <div className="flex-1 min-h-0">
-                  <div className="sticky top-0 bg-background border-b px-4 py-2 flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                {/* Auto-Applied Section */}
+                <div className="flex-1 flex flex-col min-h-0" style={{ height: '30%' }}>
+                  <div className="flex-shrink-0 bg-background border-b px-4 py-2 flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                     <h4 className="font-medium text-sm">
-                      Applied Labels ({acceptedLabels.length})
+                      Auto-Applied ({autoAppliedLabels.length})
                     </h4>
                   </div>
                   
-                  <div className="p-4 pb-2">
-                    {acceptedLabels.length === 0 ? (
-                      <div className="text-center py-6">
-                        <div className="text-xs text-muted-foreground">
-                          No labels applied yet
+                  <div className="flex-1 overflow-y-auto">
+                    {autoAppliedLabels.length > 0 ? (
+                      <div className="p-4 pb-2">
+                        <div className="space-y-2">
+                          <AnimatePresence mode="popLayout">
+                            {autoAppliedLabels.map((label, index) => {
+                              const labelId = `${label.label}-${label.category}`;
+                              const isUndone = undoneAutoAppliedIds.has(labelId);
+                              return (
+                                <AutoAppliedLabelItem
+                                  key={`auto-${label.label}-${label.category}-${index}`}
+                                  label={{ ...label, isUndone }}
+                                  onRemove={() => handleRemoveAutoApplied(label)}
+                                  onReApply={() => onReApplyAutoApplied?.(label)}
+                                  isApplying={isApplying}
+                                />
+                              );
+                            })}
+                          </AnimatePresence>
                         </div>
                       </div>
                     ) : (
-                      <div className="space-y-2 max-h-60 overflow-y-auto">
+                      <div className="flex items-center justify-center h-full">
+                        <div className="text-xs text-muted-foreground">
+                          No auto-applied labels
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* New AI Suggestions Section */}
+                <div className="flex-1 flex flex-col min-h-0" style={{ height: '30%' }}>
+                  <div className="flex-shrink-0 bg-background border-b px-4 py-2 flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-orange-500" />
+                    <h4 className="font-medium text-sm">
+                      New AI Suggestions ({allPendingLabels.length})
+                    </h4>
+                  </div>
+                  
+                  <div className="flex-1 overflow-y-auto">
+                    {allPendingLabels.length === 0 ? (
+                      <div className="flex items-center justify-center h-full">
+                        <div className="text-xs text-muted-foreground">
+                          No new AI suggestions
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-4 pb-2">
+                        <div className="space-y-2">
+                          <AnimatePresence mode="popLayout">
+                            {allPendingLabels.map((state) => {
+                              const isUndoneAutoApplied = (state as any).isUndoneAutoApplied;
+                              return (
+                                <PendingLabelItem
+                                  key={state.id}
+                                  label={state.label}
+                                  isUndoneAutoApplied={isUndoneAutoApplied}
+                                  onApply={() => {
+                                    if (isUndoneAutoApplied) {
+                                      handleReapplyUndoneAutoApplied(state.label);
+                                    } else {
+                                      handleApplyLabel(state.label);
+                                    }
+                                  }}
+                                  onReject={() => {
+                                    if (isUndoneAutoApplied) {
+                                      handleRejectUndoneAutoApplied(state.label);
+                                    } else {
+                                      handleRejectLabel(state.label);
+                                    }
+                                  }}
+                                  isApplying={isApplying}
+                                />
+                              );
+                            })}
+                          </AnimatePresence>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Applied Labels Section - Keep this for the existing workflow */}
+                {acceptedLabels.length > 0 && (
+                  <div className="flex-shrink-0 border-t">
+                    <div className="bg-background px-4 py-2 flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      <h4 className="font-medium text-sm">
+                        Applied Labels ({acceptedLabels.length})
+                      </h4>
+                    </div>
+                    
+                    <div className="p-4 pb-2 max-h-32 overflow-y-auto">
+                      <div className="space-y-2">
                         <AnimatePresence mode="popLayout">
                           {acceptedLabels.map((state) => (
                             <AcceptedLabelItem
@@ -591,9 +702,9 @@ export const AIReviewPanel: React.FC<AIReviewPanelProps> = ({
                           ))}
                         </AnimatePresence>
                       </div>
-                    )}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Analysis Details */}
                 {analysis.suggestedDescription && (
@@ -619,7 +730,7 @@ export const AIReviewPanel: React.FC<AIReviewPanelProps> = ({
                       variant="default"
                       size="sm"
                       onClick={onApplyAllAndContinue}
-                      disabled={isApplying || pendingLabels.length === 0}
+                      disabled={isApplying || allPendingLabels.length === 0}
                       className="text-xs"
                     >
                       <Check className="h-3 w-3 mr-1" />
@@ -641,7 +752,7 @@ export const AIReviewPanel: React.FC<AIReviewPanelProps> = ({
                       variant="ghost"
                       size="sm"
                       onClick={handleApplyAll}
-                      disabled={isApplying || pendingLabels.length === 0}
+                      disabled={isApplying || allPendingLabels.length === 0}
                       className="text-xs"
                     >
                       Apply All
