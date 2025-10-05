@@ -153,7 +153,7 @@ export const useAIAnalysis = (onBookmarkUpdated?: () => void) => {
   }, []);
 
   // Analyze a single bookmark
-  const analyzeBookmark = useCallback(async (bookmark: Bookmark) => {
+  const analyzeBookmark = useCallback(async (bookmark: Bookmark, options?: { suppressToast?: boolean }) => {
     if (!state.isAIEnabled) {
       toast.error('AI analysis is not enabled');
       return null;
@@ -243,24 +243,27 @@ Labels: ${bookmark.labels?.map(l => l.label).join(', ') || 'none'}
           pendingAnalyses: new Map(prev.pendingAnalyses.set(bookmark.id, pendingAnalysis))
         }));
 
-        if (analysisResult.data.labels.length === 0) {
-          toast.error(`No AI labels found for "${bookmark.title}" - content may be too generic or confidence too low`, {
-            duration: 10000,
-            dismissible: true
-          });
-        } else {
-          // Return labels for user confirmation instead of auto-applying
-          toast.success(`Found ${analysisResult.data.labels.length} AI labels for "${bookmark.title}" - review to apply`, {
-            duration: 5000,
-            dismissible: true,
-            // Custom yellow styling to match AI button (was default green)
-            className: 'bg-yellow-50 border-yellow-200 text-yellow-800',
-            style: {
-              backgroundColor: '#fefce8',
-              borderColor: '#fef3c7',
-              color: '#92400e'
-            }
-          });
+        // Only show individual toasts if not suppressed (e.g., during bulk analysis)
+        if (!options?.suppressToast) {
+          if (analysisResult.data.labels.length === 0) {
+            toast.error(`No AI labels found for "${bookmark.title}" - content may be too generic or confidence too low`, {
+              duration: 10000,
+              dismissible: true
+            });
+          } else {
+            // Return labels for user confirmation instead of auto-applying
+            toast.success(`Found ${analysisResult.data.labels.length} AI labels for "${bookmark.title}" - review to apply`, {
+              duration: 5000,
+              dismissible: true,
+              // Custom yellow styling to match AI button (was default green)
+              className: 'bg-yellow-50 border-yellow-200 text-yellow-800',
+              style: {
+                backgroundColor: '#fefce8',
+                borderColor: '#fef3c7',
+                color: '#92400e'
+              }
+            });
+          }
         }
         return pendingAnalysis;
       } else {
@@ -351,7 +354,8 @@ Labels: ${bookmark.labels?.map(l => l.label).join(', ') || 'none'}
         const batchResults = await Promise.allSettled(
           batch.map(async (bookmark) => {
             try {
-              const result = await analyzeBookmark(bookmark);
+              // Suppress individual toasts during batch analysis - progress toast provides feedback
+              const result = await analyzeBookmark(bookmark, { suppressToast: true });
               return { bookmark, analysis: result?.analysis || null };
             } catch (error) {
               console.error(`Failed to analyze bookmark ${bookmark.title}:`, error);
@@ -717,8 +721,9 @@ Labels: ${bookmark.labels?.map(l => l.label).join(', ') || 'none'}
     
     try {
       console.log('🚀 Starting AI analysis with settings:', state.aiSettings);
-      const result = await analyzeBookmark(bookmark);
-      
+      // Suppress inner toast since we have our own loading toast
+      const result = await analyzeBookmark(bookmark, { suppressToast: true });
+
       if (result?.analysis) {
         console.log('🔬 AI Analysis completed - checking for auto-apply...');
         console.log('📊 Analysis result:', result.analysis);

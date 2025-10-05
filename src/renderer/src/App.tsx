@@ -83,7 +83,11 @@ function App() {
         </PlatformProvider>
       </QueryParamProvider>
       
-      <Toaster />
+      <Toaster
+        style={{
+          zIndex: 60
+        }}
+      />
     </>
   );
 }

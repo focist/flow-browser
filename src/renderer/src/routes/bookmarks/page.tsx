@@ -48,6 +48,7 @@ import { toast } from "sonner";
 import { Bookmark, BookmarkCollection, BookmarkFilter, ImportStats } from "~/types/bookmarks";
 import { useAIAnalysis } from "../../hooks/use-ai-analysis";
 import { AIReviewPanel } from "../../components/ai/ai-review-panel";
+import { AILabelingDashboard } from "../../components/ai/ai-labeling-dashboard";
 // Removed AI card components - using auto-apply with toast undo instead
 import {
   DndContext,
@@ -385,7 +386,15 @@ function BookmarksPage() {
   const [collectAnimationComplete, setCollectAnimationComplete] = useState(false);
   const [collectingBookmarks, setCollectingBookmarks] = useState<Bookmark[]>([]);
   const [dragPosition, setDragPosition] = useState<{ x: number; y: number } | null>(null);
-  
+
+  // AI Dashboard state
+  const [showDashboard, setShowDashboard] = useState(false);
+  const [dashboardBookmarks, setDashboardBookmarks] = useState<Array<{
+    bookmark: Bookmark;
+    analysis: any;
+    autoAppliedLabels?: any[];
+  }>>([]);
+
   // Label filter state
   const [activeLabelFilter, setActiveLabelFilter] = useState<string | null>(null);
 
@@ -2493,15 +2502,59 @@ function BookmarksPage() {
                 </span>
                 <div className="flex gap-1">
                   {aiAnalysis.isAIEnabled && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       className="h-7 px-2 text-yellow-600 hover:text-yellow-700"
-                      onClick={() => {
-                        const selectedBookmarksArray = filteredBookmarks.filter(b => 
+                      onClick={async () => {
+                        const selectedBookmarksArray = filteredBookmarks.filter(b =>
                           selectedBookmarks.has(b.id)
                         );
-                        aiAnalysis.analyzeBookmarks(selectedBookmarksArray);
+
+                        // Open dashboard immediately with empty state
+                        setDashboardBookmarks([]);
+                        setShowDashboard(true);
+
+                        // Analyze bookmarks in background
+                        const total = selectedBookmarksArray.length;
+                        let remaining = total;
+                        const toastId = toast.loading(`Analyzing ${remaining} bookmarks...`);
+
+                        try {
+                          const analyzedBookmarks = [];
+                          for (let i = 0; i < selectedBookmarksArray.length; i++) {
+                            const bookmark = selectedBookmarksArray[i];
+                            // Suppress individual toasts during bulk analysis - dashboard provides feedback
+                            const result = await aiAnalysis.analyzeBookmark(bookmark, { suppressToast: true });
+                            if (result) {
+                              const analyzed = {
+                                bookmark,
+                                analysis: result.analysis,
+                                autoAppliedLabels: []
+                              };
+                              analyzedBookmarks.push(analyzed);
+                              // Update dashboard incrementally as each bookmark is analyzed
+                              setDashboardBookmarks([...analyzedBookmarks]);
+                              // Update toast with countdown
+                              remaining--;
+                              if (remaining > 0) {
+                                toast.loading(`Analyzing ${remaining} bookmarks...`, { id: toastId });
+                              }
+                            }
+                          }
+
+                          toast.success('Analysis complete', {
+                            id: toastId,
+                            description: `${analyzedBookmarks.length} bookmarks analyzed`,
+                            duration: 2000
+                          });
+                        } catch (error) {
+                          toast.error('Analysis failed', {
+                            id: toastId,
+                            description: error instanceof Error ? error.message : 'Unknown error',
+                            duration: 5000
+                          });
+                        }
                       }}
                       disabled={aiAnalysis.isAnalyzing}
                     >
@@ -3454,6 +3507,15 @@ function BookmarksPage() {
       onNext={aiAnalysis.goToNextInBulkReview}
       onSkip={aiAnalysis.skipCurrentInBulkReview}
       onApplyAllAndContinue={aiAnalysis.applyAllAndContinue}
+    />
+
+    {/* AI Labeling Dashboard */}
+    <AILabelingDashboard
+      bookmarks={dashboardBookmarks}
+      isOpen={showDashboard}
+      onClose={() => setShowDashboard(false)}
+      onBookmarkUpdated={loadBookmarks}
+      isAnalyzing={aiAnalysis.isAnalyzing}
     />
 
     </>
