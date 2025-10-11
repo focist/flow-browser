@@ -3,8 +3,9 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { ScrollArea } from '../ui/scroll-area';
 import { motion, AnimatePresence } from 'motion/react';
-import { Check, X, Tag, Sparkles, TrendingUp } from 'lucide-react';
+import { Check, Tag, Sparkles, TrendingUp } from 'lucide-react';
 import type { LabelPattern, CategoryPattern } from '../../hooks/use-pattern-detection';
+import { getCategoryStyles } from '../../lib/label-styles';
 
 interface LabelSuggestionsColumnProps {
   labelPatterns: LabelPattern[];
@@ -13,20 +14,27 @@ interface LabelSuggestionsColumnProps {
   onApplyCategory: (category: CategoryPattern) => void;
   isProcessing: boolean;
   selectedBookmarkCount: number;
+  onPatternHover?: (patternId: string | null) => void;
+  hoveredBookmarkId?: string | null;
 }
 
 interface PatternItemProps {
   pattern: LabelPattern;
   onApply: () => void;
   isProcessing: boolean;
+  onHover?: (patternId: string | null) => void;
+  isHighlighted?: boolean;
+  isDimmed?: boolean;
 }
 
-const PatternItem: React.FC<PatternItemProps> = ({ pattern, onApply, isProcessing }) => {
+const PatternItem: React.FC<PatternItemProps> = ({ pattern, onApply, isProcessing, onHover, isHighlighted = false, isDimmed = false }) => {
   const confidenceColor = {
     high: 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-200 dark:border-emerald-800',
     medium: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-800',
     low: 'bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700'
   };
+
+  const patternId = `${pattern.label}::${pattern.category}`;
 
   return (
     <motion.div
@@ -34,20 +42,26 @@ const PatternItem: React.FC<PatternItemProps> = ({ pattern, onApply, isProcessin
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
-      className="p-3 border rounded-lg bg-card hover:bg-accent/30 transition-colors"
+      className={`p-3 border rounded-lg bg-card hover:bg-accent/30 transition-all duration-200 overflow-hidden ${
+        isHighlighted ? 'ring-2 ring-blue-500/50 bg-blue-50 dark:bg-blue-950/20' : ''
+      } ${
+        isDimmed ? 'opacity-40' : 'opacity-100'
+      }`}
+      onMouseEnter={() => onHover?.(patternId)}
+      onMouseLeave={() => onHover?.(null)}
+      onFocus={() => onHover?.(patternId)}
+      onBlur={() => onHover?.(null)}
+      tabIndex={0}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1 min-w-0">
             <Tag className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-            <span className="font-medium text-sm truncate">{pattern.label}</span>
+            <span className="font-medium text-sm truncate min-w-0">{pattern.label}</span>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-xs h-5">
+            <Badge variant="outline" className={`text-xs h-5 flex-shrink-0 ${getCategoryStyles(pattern.category)}`}>
               {pattern.category}
-            </Badge>
-            <Badge variant="outline" className={`text-xs h-5 ${confidenceColor[pattern.confidenceLevel]}`}>
-              {Math.round(pattern.avgConfidence * 100)}%
             </Badge>
           </div>
         </div>
@@ -81,6 +95,8 @@ interface CategorySectionProps {
   isProcessing: boolean;
   expanded: boolean;
   onToggleExpanded: () => void;
+  onPatternHover?: (patternId: string | null) => void;
+  hoveredBookmarkId?: string | null;
 }
 
 const CategorySection: React.FC<CategorySectionProps> = ({
@@ -89,7 +105,9 @@ const CategorySection: React.FC<CategorySectionProps> = ({
   onApplyCategory,
   isProcessing,
   expanded,
-  onToggleExpanded
+  onToggleExpanded,
+  onPatternHover,
+  hoveredBookmarkId
 }) => {
   const categoryIcons = {
     topic: '🏷️',
@@ -157,14 +175,23 @@ const CategorySection: React.FC<CategorySectionProps> = ({
             transition={{ duration: 0.2 }}
             className="space-y-2 pl-2"
           >
-            {category.labels.map((pattern) => (
-              <PatternItem
-                key={`${pattern.label}-${pattern.category}`}
-                pattern={pattern}
-                onApply={() => onApplyPattern(pattern)}
-                isProcessing={isProcessing}
-              />
-            ))}
+            {category.labels.map((pattern) => {
+              const patternId = `${pattern.label}::${pattern.category}`;
+              const isHighlighted = hoveredBookmarkId && pattern.bookmarkIds.includes(hoveredBookmarkId);
+              const isDimmed = hoveredBookmarkId && !pattern.bookmarkIds.includes(hoveredBookmarkId);
+
+              return (
+                <PatternItem
+                  key={patternId}
+                  pattern={pattern}
+                  onApply={() => onApplyPattern(pattern)}
+                  isProcessing={isProcessing}
+                  onHover={onPatternHover}
+                  isHighlighted={!!isHighlighted}
+                  isDimmed={!!isDimmed}
+                />
+              );
+            })}
           </motion.div>
         )}
       </AnimatePresence>
@@ -178,7 +205,9 @@ export const LabelSuggestionsColumn: React.FC<LabelSuggestionsColumnProps> = ({
   onApplyPattern,
   onApplyCategory,
   isProcessing,
-  selectedBookmarkCount
+  selectedBookmarkCount,
+  onPatternHover,
+  hoveredBookmarkId
 }) => {
   const [expandedCategories, setExpandedCategories] = React.useState({
     topic: true,
@@ -222,14 +251,23 @@ export const LabelSuggestionsColumn: React.FC<LabelSuggestionsColumnProps> = ({
                 <h3 className="font-medium text-sm">Top Patterns</h3>
               </div>
               <div className="space-y-2">
-                {topPatterns.map((pattern) => (
-                  <PatternItem
-                    key={`${pattern.label}-${pattern.category}`}
-                    pattern={pattern}
-                    onApply={() => onApplyPattern(pattern)}
-                    isProcessing={isProcessing}
-                  />
-                ))}
+                {topPatterns.map((pattern) => {
+                  const patternId = `${pattern.label}::${pattern.category}`;
+                  const isHighlighted = hoveredBookmarkId && pattern.bookmarkIds.includes(hoveredBookmarkId);
+                  const isDimmed = hoveredBookmarkId && !pattern.bookmarkIds.includes(hoveredBookmarkId);
+
+                  return (
+                    <PatternItem
+                      key={patternId}
+                      pattern={pattern}
+                      onApply={() => onApplyPattern(pattern)}
+                      isProcessing={isProcessing}
+                      onHover={onPatternHover}
+                      isHighlighted={!!isHighlighted}
+                      isDimmed={!!isDimmed}
+                    />
+                  );
+                })}
               </div>
             </div>
           )}
@@ -249,6 +287,8 @@ export const LabelSuggestionsColumn: React.FC<LabelSuggestionsColumnProps> = ({
                       isProcessing={isProcessing}
                       expanded={expandedCategories[category.category as keyof typeof expandedCategories]}
                       onToggleExpanded={() => toggleCategory(category.category as 'topic' | 'type' | 'priority')}
+                      onPatternHover={onPatternHover}
+                      hoveredBookmarkId={hoveredBookmarkId}
                     />
                   ))}
                 </div>

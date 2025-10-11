@@ -5,6 +5,7 @@ import { ScrollArea } from '../ui/scroll-area';
 import { motion, AnimatePresence } from 'motion/react';
 import { CheckCircle2, AlertCircle, Clock, Zap, Sparkles, Loader2 } from 'lucide-react';
 import type { DashboardBookmark } from '../../hooks/use-dashboard-state';
+import { getCategoryStyles } from '../../lib/label-styles';
 
 interface BookmarkOverviewColumnProps {
   bookmarks: DashboardBookmark[];
@@ -14,6 +15,8 @@ interface BookmarkOverviewColumnProps {
   onClearSelection: () => void;
   getConfidenceLevel: (confidence: number) => 'high' | 'medium' | 'low';
   isAnalyzing?: boolean;
+  hoveredPatternId?: string | null;
+  onBookmarkHover?: (bookmarkId: string | null) => void;
 }
 
 interface BookmarkGroupProps {
@@ -26,13 +29,18 @@ interface BookmarkGroupProps {
   onToggleSelection: (id: string) => void;
   expanded?: boolean;
   onToggleExpanded?: () => void;
+  hoveredPatternId?: string | null;
+  onBookmarkHover?: (bookmarkId: string | null) => void;
 }
 
 const BookmarkItem: React.FC<{
   bookmark: DashboardBookmark;
   isSelected: boolean;
   onToggle: () => void;
-}> = ({ bookmark, isSelected, onToggle }) => {
+  isHighlighted?: boolean;
+  isDimmed?: boolean;
+  onHover?: (bookmarkId: string | null) => void;
+}> = ({ bookmark, isSelected, onToggle, isHighlighted = false, isDimmed = false, onHover }) => {
   const totalLabels = bookmark.remainingLabels.length + bookmark.autoAppliedLabels.length;
   const autoAppliedCount = bookmark.autoAppliedLabels.length;
 
@@ -42,28 +50,50 @@ const BookmarkItem: React.FC<{
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -10 }}
-      className={`flex items-start gap-2 p-2 rounded border cursor-pointer hover:bg-accent/50 transition-colors ${
+      className={`flex items-start gap-2 p-2 rounded border cursor-pointer hover:bg-accent/50 transition-all duration-200 overflow-hidden ${
         isSelected ? 'bg-accent border-primary' : 'bg-card'
+      } ${
+        isHighlighted ? 'ring-2 ring-blue-500/50 bg-blue-50 dark:bg-blue-950/20' : ''
+      } ${
+        isDimmed ? 'opacity-40' : 'opacity-100'
       }`}
       onClick={onToggle}
+      onMouseEnter={() => onHover?.(bookmark.bookmark.id)}
+      onMouseLeave={() => onHover?.(null)}
+      onFocus={() => onHover?.(bookmark.bookmark.id)}
+      onBlur={() => onHover?.(null)}
+      tabIndex={0}
     >
       <Checkbox
         checked={isSelected}
         onCheckedChange={onToggle}
         onClick={(e) => e.stopPropagation()}
-        className="mt-0.5"
+        className="mt-0.5 flex-shrink-0"
       />
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">{bookmark.bookmark.title}</p>
-        <div className="flex items-center gap-1.5 mt-1">
-          {totalLabels > 0 && (
-            <Badge variant="outline" className="text-xs h-5">
-              {totalLabels} label{totalLabels !== 1 ? 's' : ''}
+      <div className="flex-1 min-w-0 overflow-hidden">
+        <p className="text-sm font-medium truncate min-w-0">{bookmark.bookmark.title}</p>
+        <div className="flex flex-wrap items-center gap-1 mt-1 min-w-0 overflow-hidden">
+          {/* Show first 3 labels with color coding and confidence */}
+          {[...bookmark.autoAppliedLabels, ...bookmark.remainingLabels].slice(0, 3).map((label, idx) => (
+            <Badge
+              key={`${label.label}-${label.category}-${idx}`}
+              variant="outline"
+              className={`text-xs h-5 flex-shrink-0 ${getCategoryStyles(label.category)} flex items-center gap-1 min-w-0 max-w-full`}
+            >
+              <span className="truncate min-w-0 max-w-[120px]">{label.label}</span>
+              <span className="opacity-60 flex-shrink-0">{Math.round(label.confidence * 100)}%</span>
+            </Badge>
+          ))}
+          {/* Show "+X more" if there are additional labels */}
+          {totalLabels > 3 && (
+            <Badge variant="outline" className="text-xs h-5 flex-shrink-0">
+              +{totalLabels - 3}
             </Badge>
           )}
+          {/* Show auto-applied indicator */}
           {autoAppliedCount > 0 && (
-            <Badge variant="outline" className="text-xs h-5 bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800">
-              <Sparkles className="h-3 w-3 mr-0.5" />
+            <Badge variant="outline" className="text-xs h-5 flex-shrink-0 bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800">
+              <Sparkles className="h-3 w-3 mr-0.5 flex-shrink-0" />
               {autoAppliedCount} auto
             </Badge>
           )}
@@ -82,7 +112,9 @@ const BookmarkGroup: React.FC<BookmarkGroupProps> = ({
   selectedIds,
   onToggleSelection,
   expanded = true,
-  onToggleExpanded
+  onToggleExpanded,
+  hoveredPatternId,
+  onBookmarkHover
 }) => {
   if (count === 0) return null;
 
@@ -125,14 +157,26 @@ const BookmarkGroup: React.FC<BookmarkGroupProps> = ({
             transition={{ duration: 0.2 }}
             className="space-y-1.5 pl-2"
           >
-            {bookmarks.map((bookmark) => (
-              <BookmarkItem
-                key={bookmark.bookmark.id}
-                bookmark={bookmark}
-                isSelected={selectedIds.has(bookmark.bookmark.id)}
-                onToggle={() => onToggleSelection(bookmark.bookmark.id)}
-              />
-            ))}
+            {bookmarks.map((bookmark) => {
+              // Check if this bookmark should be highlighted
+              const isHighlighted = hoveredPatternId &&
+                [...bookmark.autoAppliedLabels, ...bookmark.remainingLabels].some(
+                  l => `${l.label}::${l.category}` === hoveredPatternId
+                );
+              const isDimmed = hoveredPatternId && !isHighlighted;
+
+              return (
+                <BookmarkItem
+                  key={bookmark.bookmark.id}
+                  bookmark={bookmark}
+                  isSelected={selectedIds.has(bookmark.bookmark.id)}
+                  onToggle={() => onToggleSelection(bookmark.bookmark.id)}
+                  isHighlighted={!!isHighlighted}
+                  isDimmed={!!isDimmed}
+                  onHover={onBookmarkHover}
+                />
+              );
+            })}
           </motion.div>
         )}
       </AnimatePresence>
@@ -147,7 +191,9 @@ export const BookmarkOverviewColumn: React.FC<BookmarkOverviewColumnProps> = ({
   onSelectAll,
   onClearSelection,
   getConfidenceLevel,
-  isAnalyzing = false
+  isAnalyzing = false,
+  hoveredPatternId,
+  onBookmarkHover
 }) => {
   const [expandedGroups, setExpandedGroups] = React.useState({
     high: true,
@@ -226,6 +272,8 @@ export const BookmarkOverviewColumn: React.FC<BookmarkOverviewColumnProps> = ({
             onToggleSelection={onToggleSelection}
             expanded={expandedGroups.high}
             onToggleExpanded={() => toggleGroup('high')}
+            hoveredPatternId={hoveredPatternId}
+            onBookmarkHover={onBookmarkHover}
           />
 
           <BookmarkGroup
@@ -238,6 +286,8 @@ export const BookmarkOverviewColumn: React.FC<BookmarkOverviewColumnProps> = ({
             onToggleSelection={onToggleSelection}
             expanded={expandedGroups.medium}
             onToggleExpanded={() => toggleGroup('medium')}
+            hoveredPatternId={hoveredPatternId}
+            onBookmarkHover={onBookmarkHover}
           />
 
           <BookmarkGroup
@@ -250,6 +300,8 @@ export const BookmarkOverviewColumn: React.FC<BookmarkOverviewColumnProps> = ({
             onToggleSelection={onToggleSelection}
             expanded={expandedGroups.low}
             onToggleExpanded={() => toggleGroup('low')}
+            hoveredPatternId={hoveredPatternId}
+            onBookmarkHover={onBookmarkHover}
           />
 
           <BookmarkGroup
@@ -262,6 +314,8 @@ export const BookmarkOverviewColumn: React.FC<BookmarkOverviewColumnProps> = ({
             onToggleSelection={onToggleSelection}
             expanded={expandedGroups.none}
             onToggleExpanded={() => toggleGroup('none')}
+            hoveredPatternId={hoveredPatternId}
+            onBookmarkHover={onBookmarkHover}
           />
 
           {totalCount === 0 && (

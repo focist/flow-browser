@@ -209,6 +209,24 @@ export const usePatternDetection = (bookmarks: DashboardBookmark[]) => {
       .map(s => s.bookmark);
   }, [bookmarks]);
 
+  // Get pattern by ID (key format: "label::category")
+  const getPatternById = useCallback((patternId: string): LabelPattern | undefined => {
+    return labelPatterns.find(p => `${p.label}::${p.category}` === patternId);
+  }, [labelPatterns]);
+
+  // Get bookmarks affected by a specific pattern
+  const getBookmarksForPattern = useCallback((patternId: string): DashboardBookmark[] => {
+    const pattern = getPatternById(patternId);
+    if (!pattern) return [];
+
+    return bookmarks.filter(b => pattern.bookmarkIds.includes(b.bookmark.id));
+  }, [bookmarks, getPatternById]);
+
+  // Get patterns that would apply to a specific bookmark
+  const getPatternsForBookmark = useCallback((bookmarkId: string): LabelPattern[] => {
+    return labelPatterns.filter(p => p.bookmarkIds.includes(bookmarkId));
+  }, [labelPatterns]);
+
   // Get statistics
   const stats = useMemo(() => {
     const totalLabels = labelPatterns.reduce((sum, p) => sum + p.count, 0);
@@ -244,6 +262,9 @@ export const usePatternDetection = (bookmarks: DashboardBookmark[]) => {
     getPatternsForBookmarks,
     getBookmarksWithLabel,
     findSimilarBookmarks,
+    getPatternById,
+    getBookmarksForPattern,
+    getPatternsForBookmark,
 
     // Stats
     stats

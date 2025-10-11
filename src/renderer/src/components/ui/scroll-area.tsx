@@ -11,6 +11,7 @@ function ScrollArea({ className, children, ...props }: React.ComponentProps<type
       <ScrollAreaPrimitive.Viewport
         data-slot="scroll-area-viewport"
         className="ring-ring/10 dark:ring-ring/20 dark:outline-ring/40 outline-ring/50 h-full w-full rounded-[inherit] transition-[color,box-shadow] focus-visible:ring-4 focus-visible:outline-1"
+        style={{ overflow: 'hidden', maxWidth: '100%' }}
       >
         {children}
       </ScrollAreaPrimitive.Viewport>
