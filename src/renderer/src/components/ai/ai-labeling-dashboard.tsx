@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useCallback } from 'react';
+import React, { useEffect, useMemo, useCallback, useState } from 'react';
 import { X, Sparkles, Check, RefreshCw } from 'lucide-react';
 import { Button } from '../ui/button';
 import { useDashboardState, type DashboardBookmark } from '../../hooks/use-dashboard-state';
@@ -7,7 +7,7 @@ import { useBulkOperations } from '../../hooks/use-bulk-operations';
 import { useAIAnalysis } from '../../hooks/use-ai-analysis';
 import { BookmarkOverviewColumn } from './bookmark-overview-column';
 import { LabelSuggestionsColumn } from './label-suggestions-column';
-import { BulkActionsColumn } from './bulk-actions-column';
+import { ContextPreviewColumn, type PreviewMode } from './context-preview-column';
 import type { Bookmark } from '~/types/bookmarks';
 import type { CategoryAnalysis } from '~/flow/interfaces/ai';
 import { toast } from 'sonner';
@@ -35,6 +35,15 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
   const bulkOps = useBulkOperations(onBookmarkUpdated);
   const aiAnalysis = useAIAnalysis();
 
+  // Hover state management for bidirectional highlighting
+  const [hoveredPatternId, setHoveredPatternId] = useState<string | null>(null);
+  const [hoveredBookmarkId, setHoveredBookmarkId] = useState<string | null>(null);
+  const [hoverClearTimer, setHoverClearTimer] = useState<NodeJS.Timeout | null>(null);
+  const [isColumn3Hovered, setIsColumn3Hovered] = useState(false);
+
+  // Preview column state
+  const [previewMode, setPreviewMode] = useState<PreviewMode>('stats');
+
   // Initialize dashboard with bookmarks
   useEffect(() => {
     if (isOpen && initialBookmarks.length > 0) {
@@ -56,6 +65,117 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
     () => dashboardState.getSelectedBookmarks(),
     [dashboardState.bookmarks, dashboardState.selectedBookmarkIds]
   );
+
+  // Hover handlers - delay clearing hover state to allow mouse movement to column 3
+  const handlePatternHover = useCallback((patternId: string | null) => {
+    // Clear any existing timer
+    if (hoverClearTimer) {
+      clearTimeout(hoverClearTimer);
+      setHoverClearTimer(null);
+    }
+
+    if (patternId) {
+      // Immediately show the preview when hovering
+      setHoveredPatternId(patternId);
+      setPreviewMode('pattern');
+    } else {
+      // Don't clear if user is hovering over column 3
+      if (isColumn3Hovered) {
+        return;
+      }
+
+      // Delay clearing the hover state to allow mouse movement to column 3
+      const timer = setTimeout(() => {
+        setHoveredPatternId(null);
+      }, 1500);
+      setHoverClearTimer(timer);
+    }
+  }, [hoverClearTimer, isColumn3Hovered]);
+
+  const handleBookmarkHover = useCallback((bookmarkId: string | null) => {
+    // Clear any existing timer
+    if (hoverClearTimer) {
+      clearTimeout(hoverClearTimer);
+      setHoverClearTimer(null);
+    }
+
+    if (bookmarkId) {
+      // Immediately show the preview when hovering
+      setHoveredBookmarkId(bookmarkId);
+      setPreviewMode('bookmark');
+    } else {
+      // Don't clear if user is hovering over column 3
+      if (isColumn3Hovered) {
+        return;
+      }
+
+      // Delay clearing the hover state to allow mouse movement to column 3
+      const timer = setTimeout(() => {
+        setHoveredBookmarkId(null);
+      }, 1500);
+      setHoverClearTimer(timer);
+    }
+  }, [hoverClearTimer, isColumn3Hovered]);
+
+  // Handle column 3 hover state changes
+  const handleColumn3Hover = useCallback((isHovered: boolean) => {
+    setIsColumn3Hovered(isHovered);
+
+    // If user leaves column 3, start the clear timer
+    if (!isHovered && (hoveredPatternId || hoveredBookmarkId)) {
+      const timer = setTimeout(() => {
+        setHoveredPatternId(null);
+        setHoveredBookmarkId(null);
+      }, 500); // Short delay when leaving column 3
+      setHoverClearTimer(timer);
+    } else if (isHovered && hoverClearTimer) {
+      // If user enters column 3, cancel any pending clear timer
+      clearTimeout(hoverClearTimer);
+      setHoverClearTimer(null);
+    }
+  }, [hoveredPatternId, hoveredBookmarkId, hoverClearTimer]);
+
+  // Get data for preview column based on hover state
+  const selectedPattern = useMemo(() => {
+    if (!hoveredPatternId) return null;
+    return patterns.getPatternById(hoveredPatternId);
+  }, [hoveredPatternId, patterns]);
+
+  const affectedBookmarks = useMemo(() => {
+    if (!hoveredPatternId) return [];
+    return patterns.getBookmarksForPattern(hoveredPatternId);
+  }, [hoveredPatternId, patterns]);
+
+  const selectedBookmark = useMemo(() => {
+    // If hovering over a specific bookmark, show that one
+    if (hoveredBookmarkId) {
+      return dashboardState.bookmarks.find(b => b.bookmark.id === hoveredBookmarkId);
+    }
+
+    // If exactly one bookmark is selected (and not hovering), show that one
+    if (selectedBookmarks.length === 1) {
+      return selectedBookmarks[0];
+    }
+
+    return null;
+  }, [hoveredBookmarkId, selectedBookmarks, dashboardState.bookmarks]);
+
+  // Update preview mode based on selection state and hover state
+  useEffect(() => {
+    // If something is hovered, the hover handlers already set the preview mode
+    if (hoveredPatternId || hoveredBookmarkId) {
+      return;
+    }
+
+    // Nothing is hovered - determine mode based on selection
+    if (selectedBookmarks.length === 1) {
+      setPreviewMode('bookmark');
+    } else if (selectedBookmarks.length > 1) {
+      setPreviewMode('bulk-impact');
+    } else {
+      setPreviewMode('stats');
+    }
+  }, [selectedBookmarks.length, hoveredPatternId, hoveredBookmarkId]);
 
   // Memoize button disabled state to prevent flashing
   const areButtonsDisabled = useMemo(
@@ -124,6 +244,100 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
     // Update dashboard state after operation
     if (onBookmarkUpdated) {
       onBookmarkUpdated();
+    }
+  };
+
+  // Handler for applying pattern from preview column (with selected bookmarks)
+  const handleApplyPatternPreview = async (bookmarkIds: string[]) => {
+    if (!selectedPattern) return;
+
+    const bookmarksToApply = dashboardState.bookmarks.filter(b =>
+      bookmarkIds.includes(b.bookmark.id)
+    );
+
+    await bulkOps.applyPattern(selectedPattern, bookmarksToApply);
+
+    if (onBookmarkUpdated) {
+      onBookmarkUpdated();
+    }
+  };
+
+  // Handler for applying labels from bookmark preview
+  const handleApplyBookmarkLabels = async (labelIds: string[]) => {
+    if (!selectedBookmark) return;
+
+    // Apply each selected label
+    for (const labelId of labelIds) {
+      const [labelName, category] = labelId.split('::');
+      const label = selectedBookmark.remainingLabels.find(
+        l => l.label === labelName && l.category === category
+      );
+
+      if (label) {
+        try {
+          await window.flow.bookmarks.addLabel(selectedBookmark.bookmark.id, {
+            label: label.label,
+            category: label.category as 'topic' | 'type' | 'priority'
+          });
+        } catch (error) {
+          console.error('Failed to apply label:', error);
+          toast.error(`Failed to apply label: ${label.label}`);
+        }
+      }
+    }
+
+    if (onBookmarkUpdated) {
+      onBookmarkUpdated();
+    }
+
+    toast.success(`Applied ${labelIds.length} label${labelIds.length !== 1 ? 's' : ''} to ${selectedBookmark.bookmark.title}`);
+  };
+
+  // Handler for bulk impact apply
+  const handleApplyBulk = async (
+    bookmarkIds: string[],
+    labelSelections: Map<string, Set<string>>
+  ) => {
+    const bookmarksToApply = dashboardState.bookmarks.filter(b =>
+      bookmarkIds.includes(b.bookmark.id)
+    );
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const bookmark of bookmarksToApply) {
+      const selectedLabelIds = labelSelections.get(bookmark.bookmark.id);
+      if (!selectedLabelIds || selectedLabelIds.size === 0) continue;
+
+      for (const labelId of selectedLabelIds) {
+        const [labelName, category] = labelId.split('::');
+        const label = bookmark.remainingLabels.find(
+          l => l.label === labelName && l.category === category
+        );
+
+        if (label) {
+          try {
+            await window.flow.bookmarks.addLabel(bookmark.bookmark.id, {
+              label: label.label,
+              category: label.category as 'topic' | 'type' | 'priority'
+            });
+            successCount++;
+          } catch (error) {
+            console.error('Failed to apply label:', error);
+            failCount++;
+          }
+        }
+      }
+    }
+
+    if (onBookmarkUpdated) {
+      onBookmarkUpdated();
+    }
+
+    if (failCount > 0) {
+      toast.error(`Applied ${successCount} labels, ${failCount} failed`);
+    } else {
+      toast.success(`Applied ${successCount} label${successCount !== 1 ? 's' : ''} to ${bookmarkIds.length} bookmark${bookmarkIds.length !== 1 ? 's' : ''}`);
     }
   };
 
@@ -226,9 +440,9 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
           </div>
 
           {/* Three-Column Layout */}
-          <div className="flex-1 grid grid-cols-3 gap-0 overflow-hidden min-h-0">
+          <div className="flex-1 flex gap-0 overflow-hidden min-h-0">
             {/* Column 1: Bookmark Overview */}
-            <div className="border-r h-full min-h-0">
+            <div className="flex-shrink-0 w-[33.333%] border-r h-full min-h-0 overflow-hidden">
               <BookmarkOverviewColumn
                 bookmarks={dashboardState.getFilteredBookmarks()}
                 selectedIds={dashboardState.selectedBookmarkIds}
@@ -237,11 +451,13 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
                 onClearSelection={dashboardState.clearSelection}
                 getConfidenceLevel={dashboardState.getConfidenceLevel}
                 isAnalyzing={isAnalyzing}
+                hoveredPatternId={hoveredPatternId}
+                onBookmarkHover={handleBookmarkHover}
               />
             </div>
 
             {/* Column 2: Label Suggestions */}
-            <div className="border-r h-full min-h-0">
+            <div className="flex-shrink-0 w-[33.333%] border-r h-full min-h-0 overflow-hidden">
               <LabelSuggestionsColumn
                 labelPatterns={patterns.labelPatterns}
                 categoryPatterns={patterns.categoryPatterns}
@@ -249,20 +465,24 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
                 onApplyCategory={handleApplyCategory}
                 isProcessing={bulkOps.isProcessing}
                 selectedBookmarkCount={dashboardState.selectedCount}
+                onPatternHover={handlePatternHover}
+                hoveredBookmarkId={hoveredBookmarkId}
               />
             </div>
 
-            {/* Column 3: Stats Only */}
-            <div className="h-full min-h-0">
-              <BulkActionsColumn
-                selectedBookmarks={selectedBookmarks}
-                isProcessing={bulkOps.isProcessing}
-                progress={bulkOps.progress}
-                onAcceptHighConfidence={() => {}}
-                onAcceptAll={() => {}}
-                onRejectAll={() => {}}
-                onReprocess={() => {}}
+            {/* Column 3: Context Preview Column */}
+            <div className="flex-shrink-0 w-[33.333%] h-full min-h-0 overflow-hidden">
+              <ContextPreviewColumn
+                mode={previewMode}
                 stats={patterns.stats}
+                selectedPattern={selectedPattern}
+                selectedBookmark={selectedBookmark}
+                selectedBookmarks={selectedBookmarks}
+                affectedBookmarks={affectedBookmarks}
+                onApplyPattern={handleApplyPatternPreview}
+                onApplyBookmarkLabels={handleApplyBookmarkLabels}
+                onApplyBulk={handleApplyBulk}
+                onColumnHover={handleColumn3Hover}
               />
             </div>
           </div>
