@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useCallback, useState } from 'react';
+import React, { useEffect, useMemo, useCallback, useState, useRef } from 'react';
 import { X, Sparkles, Check, RefreshCw } from 'lucide-react';
 import { Button } from '../ui/button';
 import { useDashboardState, type DashboardBookmark } from '../../hooks/use-dashboard-state';
@@ -38,11 +38,11 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
   // Hover state management for bidirectional highlighting
   const [hoveredPatternId, setHoveredPatternId] = useState<string | null>(null);
   const [hoveredBookmarkId, setHoveredBookmarkId] = useState<string | null>(null);
-  const [hoverClearTimer, setHoverClearTimer] = useState<NodeJS.Timeout | null>(null);
   const [isColumn3Hovered, setIsColumn3Hovered] = useState(false);
 
-  // Preview column state
-  const [previewMode, setPreviewMode] = useState<PreviewMode>('stats');
+  // Timeout refs for managing delayed hover clearing
+  const patternHoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const bookmarkHoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Initialize dashboard with bookmarks
   useEffect(() => {
@@ -66,74 +66,71 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
     [dashboardState.bookmarks, dashboardState.selectedBookmarkIds]
   );
 
-  // Hover handlers - delay clearing hover state to allow mouse movement to column 3
+  // Hover handlers - preserve hover state when moving to column 3
   const handlePatternHover = useCallback((patternId: string | null) => {
-    // Clear any existing timer
-    if (hoverClearTimer) {
-      clearTimeout(hoverClearTimer);
-      setHoverClearTimer(null);
+    // Clear any pending timeout
+    if (patternHoverTimeoutRef.current) {
+      clearTimeout(patternHoverTimeoutRef.current);
+      patternHoverTimeoutRef.current = null;
     }
 
-    if (patternId) {
-      // Immediately show the preview when hovering
-      setHoveredPatternId(patternId);
-      setPreviewMode('pattern');
-    } else {
-      // Don't clear if user is hovering over column 3
-      if (isColumn3Hovered) {
-        return;
-      }
-
-      // Delay clearing the hover state to allow mouse movement to column 3
-      const timer = setTimeout(() => {
+    if (patternId === null) {
+      // Add a delay before clearing to allow column 3's onMouseEnter to fire
+      // Column 3's onMouseEnter will cancel this timeout if the user moves there
+      // Increased to 200ms to handle slower mouse movements and ensure reliability
+      patternHoverTimeoutRef.current = setTimeout(() => {
         setHoveredPatternId(null);
-      }, 1500);
-      setHoverClearTimer(timer);
+        patternHoverTimeoutRef.current = null;
+      }, 200);
+    } else {
+      // Setting a new hover - apply immediately
+      setHoveredPatternId(patternId);
     }
-  }, [hoverClearTimer, isColumn3Hovered]);
+  }, []);
 
   const handleBookmarkHover = useCallback((bookmarkId: string | null) => {
-    // Clear any existing timer
-    if (hoverClearTimer) {
-      clearTimeout(hoverClearTimer);
-      setHoverClearTimer(null);
+    // Clear any pending timeout
+    if (bookmarkHoverTimeoutRef.current) {
+      clearTimeout(bookmarkHoverTimeoutRef.current);
+      bookmarkHoverTimeoutRef.current = null;
     }
 
-    if (bookmarkId) {
-      // Immediately show the preview when hovering
-      setHoveredBookmarkId(bookmarkId);
-      setPreviewMode('bookmark');
-    } else {
-      // Don't clear if user is hovering over column 3
-      if (isColumn3Hovered) {
-        return;
-      }
-
-      // Delay clearing the hover state to allow mouse movement to column 3
-      const timer = setTimeout(() => {
+    if (bookmarkId === null) {
+      // Add a delay before clearing to allow column 3's onMouseEnter to fire
+      // Column 3's onMouseEnter will cancel this timeout if the user moves there
+      // Increased to 200ms to handle slower mouse movements and ensure reliability
+      bookmarkHoverTimeoutRef.current = setTimeout(() => {
         setHoveredBookmarkId(null);
-      }, 1500);
-      setHoverClearTimer(timer);
+        bookmarkHoverTimeoutRef.current = null;
+      }, 200);
+    } else {
+      // Setting a new hover - apply immediately
+      setHoveredBookmarkId(bookmarkId);
     }
-  }, [hoverClearTimer, isColumn3Hovered]);
+  }, []);
 
   // Handle column 3 hover state changes
   const handleColumn3Hover = useCallback((isHovered: boolean) => {
+    if (isHovered) {
+      // Cancel any pending clear timeouts when entering column 3
+      if (patternHoverTimeoutRef.current) {
+        clearTimeout(patternHoverTimeoutRef.current);
+        patternHoverTimeoutRef.current = null;
+      }
+      if (bookmarkHoverTimeoutRef.current) {
+        clearTimeout(bookmarkHoverTimeoutRef.current);
+        bookmarkHoverTimeoutRef.current = null;
+      }
+    }
+
     setIsColumn3Hovered(isHovered);
 
-    // If user leaves column 3, start the clear timer
-    if (!isHovered && (hoveredPatternId || hoveredBookmarkId)) {
-      const timer = setTimeout(() => {
-        setHoveredPatternId(null);
-        setHoveredBookmarkId(null);
-      }, 500); // Short delay when leaving column 3
-      setHoverClearTimer(timer);
-    } else if (isHovered && hoverClearTimer) {
-      // If user enters column 3, cancel any pending clear timer
-      clearTimeout(hoverClearTimer);
-      setHoverClearTimer(null);
+    // When leaving column 3, immediately clear any hover states
+    if (!isHovered) {
+      setHoveredPatternId(null);
+      setHoveredBookmarkId(null);
     }
-  }, [hoveredPatternId, hoveredBookmarkId, hoverClearTimer]);
+  }, []);
 
   // Get data for preview column based on hover state
   const selectedPattern = useMemo(() => {
@@ -160,22 +157,20 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
     return null;
   }, [hoveredBookmarkId, selectedBookmarks, dashboardState.bookmarks]);
 
-  // Update preview mode based on selection state and hover state
-  useEffect(() => {
-    // If something is hovered, the hover handlers already set the preview mode
-    if (hoveredPatternId || hoveredBookmarkId) {
-      return;
-    }
+  // Calculate preview mode based on hover and selection state
+  // This is a pure calculation, no delays or timers
+  const previewMode = useMemo<PreviewMode>(() => {
+    // Priority 1: Active hover states (pattern or bookmark)
+    if (hoveredPatternId) return 'pattern';
+    if (hoveredBookmarkId) return 'bookmark';
 
-    // Nothing is hovered - determine mode based on selection
-    if (selectedBookmarks.length === 1) {
-      setPreviewMode('bookmark');
-    } else if (selectedBookmarks.length > 1) {
-      setPreviewMode('bulk-impact');
-    } else {
-      setPreviewMode('stats');
-    }
-  }, [selectedBookmarks.length, hoveredPatternId, hoveredBookmarkId]);
+    // Priority 2: Selection-based views (these persist when column 3 is hovered)
+    if (selectedBookmarks.length > 1) return 'bulk-impact';
+    if (selectedBookmarks.length === 1) return 'bookmark';
+
+    // Priority 3: Default to stats
+    return 'stats';
+  }, [hoveredPatternId, hoveredBookmarkId, selectedBookmarks.length]);
 
   // Memoize button disabled state to prevent flashing
   const areButtonsDisabled = useMemo(
@@ -402,6 +397,20 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
+
+  // Cleanup timeouts on unmount or when dashboard closes
+  useEffect(() => {
+    if (!isOpen) {
+      if (patternHoverTimeoutRef.current) {
+        clearTimeout(patternHoverTimeoutRef.current);
+        patternHoverTimeoutRef.current = null;
+      }
+      if (bookmarkHoverTimeoutRef.current) {
+        clearTimeout(bookmarkHoverTimeoutRef.current);
+        bookmarkHoverTimeoutRef.current = null;
+      }
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
