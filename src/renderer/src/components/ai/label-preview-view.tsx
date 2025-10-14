@@ -6,21 +6,22 @@ import type { LabelPattern } from '../../hooks/use-pattern-detection';
 import type { DashboardBookmark } from '../../hooks/use-dashboard-state';
 import { getCategoryStyles, getCategoryIcon } from '../../lib/label-styles';
 
-interface PatternPreviewViewProps {
+interface LabelPreviewViewProps {
   pattern: LabelPattern;
   bookmarks: DashboardBookmark[];
   onApplyToSelected: (bookmarkIds: string[]) => void;
 }
 
-export function PatternPreviewView({
+export function LabelPreviewView({
   pattern,
   bookmarks,
   onApplyToSelected
-}: PatternPreviewViewProps) {
+}: LabelPreviewViewProps) {
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
     new Set(bookmarks.map(b => b.bookmark.id))
   );
+  const [lastClickedBookmarkId, setLastClickedBookmarkId] = useState<string | null>(null);
 
   // Group bookmarks by confidence
   const grouped = useMemo(() => {
@@ -47,16 +48,76 @@ export function PatternPreviewView({
     return { high, medium, low };
   }, [bookmarks, pattern]);
 
-  const handleToggle = (bookmarkId: string) => {
+  const handleToggle = (bookmarkId: string, event?: React.ChangeEvent<HTMLInputElement>) => {
+    // Determine action based on checkbox state (what we're transitioning TO)
+    const action = event?.target.checked ? 'select' : 'deselect';
+
+    if ((event?.nativeEvent as any)?.shiftKey && lastClickedBookmarkId) {
+      // Find indices in the all bookmarks array (high, medium, low)
+      const allBookmarks = [...grouped.high, ...grouped.medium, ...grouped.low];
+      const allBookmarkIds = allBookmarks.map(b => b.bookmark.id);
+      const lastIndex = allBookmarkIds.indexOf(lastClickedBookmarkId);
+      const currentIndex = allBookmarkIds.indexOf(bookmarkId);
+
+      if (lastIndex !== -1 && currentIndex !== -1) {
+        // Apply the action to all items in the range
+        const start = Math.min(lastIndex, currentIndex);
+        const end = Math.max(lastIndex, currentIndex);
+
+        setSelectedIds(prev => {
+          const next = new Set(prev);
+          for (let i = start; i <= end; i++) {
+            const id = allBookmarkIds[i];
+            if (action === 'select') {
+              next.add(id);
+            } else {
+              next.delete(id);
+            }
+          }
+          return next;
+        });
+      }
+    } else {
+      // Normal click - apply action
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        if (action === 'select') {
+          next.add(bookmarkId);
+        } else {
+          next.delete(bookmarkId);
+        }
+        return next;
+      });
+    }
+
+    // Update last clicked ID
+    setLastClickedBookmarkId(bookmarkId);
+  };
+
+  const handleGroupToggle = (groupBookmarks: DashboardBookmark[]) => {
+    const groupIds = groupBookmarks.map(b => b.bookmark.id);
+    const allSelected = groupIds.every(id => selectedIds.has(id));
+
     setSelectedIds(prev => {
       const next = new Set(prev);
-      if (next.has(bookmarkId)) {
-        next.delete(bookmarkId);
+      if (allSelected) {
+        // Deselect all in group
+        groupIds.forEach(id => next.delete(id));
       } else {
-        next.add(bookmarkId);
+        // Select all in group
+        groupIds.forEach(id => next.add(id));
       }
       return next;
     });
+  };
+
+  const getGroupCheckboxState = (groupBookmarks: DashboardBookmark[]) => {
+    const groupIds = groupBookmarks.map(b => b.bookmark.id);
+    const selectedCount = groupIds.filter(id => selectedIds.has(id)).length;
+
+    if (selectedCount === 0) return 'unchecked';
+    if (selectedCount === groupIds.length) return 'checked';
+    return 'indeterminate';
   };
 
   const handleSelectAll = () => {
@@ -94,6 +155,20 @@ export function PatternPreviewView({
           count={grouped.high.length}
           isExpanded={expandedGroup === 'high'}
           onToggle={() => setExpandedGroup(prev => prev === 'high' ? null : 'high')}
+          headerAction={
+            <input
+              type="checkbox"
+              checked={getGroupCheckboxState(grouped.high) === 'checked'}
+              ref={(el) => {
+                if (el) {
+                  el.indeterminate = getGroupCheckboxState(grouped.high) === 'indeterminate';
+                }
+              }}
+              onChange={() => handleGroupToggle(grouped.high)}
+              className="rounded"
+              aria-label="Select all high confidence bookmarks"
+            />
+          }
         >
           <div className="space-y-1 px-3">
             {grouped.high.map(bookmark => {
@@ -104,11 +179,12 @@ export function PatternPreviewView({
                 <label
                   key={bookmark.bookmark.id}
                   className="grid grid-cols-[auto_1fr_auto] gap-2 items-center py-1 px-2 hover:bg-accent rounded cursor-pointer transition-colors"
+                  onMouseDown={(e) => { if (e.shiftKey) e.preventDefault(); }}
                 >
                   <input
                     type="checkbox"
                     checked={selectedIds.has(bookmark.bookmark.id)}
-                    onChange={() => handleToggle(bookmark.bookmark.id)}
+                    onChange={(e) => handleToggle(bookmark.bookmark.id, e)}
                     className="rounded"
                     aria-label={`Include ${bookmark.bookmark.title} (${Math.round((label?.confidence || 0) * 100)}% confidence)`}
                   />
@@ -131,6 +207,20 @@ export function PatternPreviewView({
           count={grouped.medium.length}
           isExpanded={expandedGroup === 'medium'}
           onToggle={() => setExpandedGroup(prev => prev === 'medium' ? null : 'medium')}
+          headerAction={
+            <input
+              type="checkbox"
+              checked={getGroupCheckboxState(grouped.medium) === 'checked'}
+              ref={(el) => {
+                if (el) {
+                  el.indeterminate = getGroupCheckboxState(grouped.medium) === 'indeterminate';
+                }
+              }}
+              onChange={() => handleGroupToggle(grouped.medium)}
+              className="rounded"
+              aria-label="Select all medium confidence bookmarks"
+            />
+          }
         >
           <div className="space-y-1 px-3">
             {grouped.medium.map(bookmark => {
@@ -141,11 +231,12 @@ export function PatternPreviewView({
                 <label
                   key={bookmark.bookmark.id}
                   className="grid grid-cols-[auto_1fr_auto] gap-2 items-center py-1 px-2 hover:bg-accent rounded cursor-pointer transition-colors"
+                  onMouseDown={(e) => { if (e.shiftKey) e.preventDefault(); }}
                 >
                   <input
                     type="checkbox"
                     checked={selectedIds.has(bookmark.bookmark.id)}
-                    onChange={() => handleToggle(bookmark.bookmark.id)}
+                    onChange={(e) => handleToggle(bookmark.bookmark.id, e)}
                     className="rounded"
                     aria-label={`Include ${bookmark.bookmark.title} (${Math.round((label?.confidence || 0) * 100)}% confidence)`}
                   />
@@ -168,6 +259,20 @@ export function PatternPreviewView({
           count={grouped.low.length}
           isExpanded={expandedGroup === 'low'}
           onToggle={() => setExpandedGroup(prev => prev === 'low' ? null : 'low')}
+          headerAction={
+            <input
+              type="checkbox"
+              checked={getGroupCheckboxState(grouped.low) === 'checked'}
+              ref={(el) => {
+                if (el) {
+                  el.indeterminate = getGroupCheckboxState(grouped.low) === 'indeterminate';
+                }
+              }}
+              onChange={() => handleGroupToggle(grouped.low)}
+              className="rounded"
+              aria-label="Select all low confidence bookmarks"
+            />
+          }
         >
           <div className="space-y-1 px-3">
             {grouped.low.map(bookmark => {
@@ -178,11 +283,12 @@ export function PatternPreviewView({
                 <label
                   key={bookmark.bookmark.id}
                   className="grid grid-cols-[auto_1fr_auto] gap-2 items-center py-1 px-2 hover:bg-accent rounded cursor-pointer transition-colors"
+                  onMouseDown={(e) => { if (e.shiftKey) e.preventDefault(); }}
                 >
                   <input
                     type="checkbox"
                     checked={selectedIds.has(bookmark.bookmark.id)}
-                    onChange={() => handleToggle(bookmark.bookmark.id)}
+                    onChange={(e) => handleToggle(bookmark.bookmark.id, e)}
                     className="rounded"
                     aria-label={`Include ${bookmark.bookmark.title} (${Math.round((label?.confidence || 0) * 100)}% confidence)`}
                   />

@@ -13,6 +13,7 @@ interface ExpandableSectionProps {
   className?: string;
   headerClassName?: string;
   contentClassName?: string;
+  headerAction?: React.ReactNode;
 }
 
 export function ExpandableSection({
@@ -24,31 +25,41 @@ export function ExpandableSection({
   level = 0,
   className,
   headerClassName,
-  contentClassName
+  contentClassName,
+  headerAction
 }: ExpandableSectionProps) {
   const contentId = useId();
 
   return (
     <div className={cn('border-b border-gray-200 dark:border-gray-700', level > 0 && 'ml-4', className)}>
-      <button
+      <div
         className={cn(
           'w-full flex items-center justify-between py-2 px-3 hover:bg-accent transition-colors',
           headerClassName
         )}
-        onClick={onToggle}
-        aria-expanded={isExpanded}
-        aria-controls={contentId}
       >
-        <span className="text-sm font-medium">
-          {title} ({count})
-        </span>
-        <ChevronDown
-          className={cn(
-            'h-4 w-4 transition-transform duration-200',
-            isExpanded && 'rotate-180'
-          )}
-        />
-      </button>
+        {headerAction && (
+          <div onClick={(e) => e.stopPropagation()} className="mr-2">
+            {headerAction}
+          </div>
+        )}
+        <button
+          className="flex items-center justify-between flex-1 min-w-0"
+          onClick={onToggle}
+          aria-expanded={isExpanded}
+          aria-controls={contentId}
+        >
+          <span className="text-sm font-medium">
+            {title} ({count})
+          </span>
+          <ChevronDown
+            className={cn(
+              'h-4 w-4 transition-transform duration-200',
+              isExpanded && 'rotate-180'
+            )}
+          />
+        </button>
+      </div>
 
       <motion.div
         id={contentId}

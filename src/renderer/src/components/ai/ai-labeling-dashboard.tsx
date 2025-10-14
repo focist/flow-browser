@@ -40,6 +40,9 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
   const [hoveredBookmarkId, setHoveredBookmarkId] = useState<string | null>(null);
   const [isColumn3Hovered, setIsColumn3Hovered] = useState(false);
 
+  // State for shift-click range selection
+  const [lastClickedBookmarkId, setLastClickedBookmarkId] = useState<string | null>(null);
+
   // Timeout refs for managing delayed hover clearing
   const patternHoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const bookmarkHoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -160,8 +163,8 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
   // Calculate preview mode based on hover and selection state
   // This is a pure calculation, no delays or timers
   const previewMode = useMemo<PreviewMode>(() => {
-    // Priority 1: Active hover states (pattern or bookmark)
-    if (hoveredPatternId) return 'pattern';
+    // Priority 1: Active hover states (label or bookmark)
+    if (hoveredPatternId) return 'label';
     if (hoveredBookmarkId) return 'bookmark';
 
     // Priority 2: Selection-based views (these persist when column 3 is hovered)
@@ -398,9 +401,10 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  // Cleanup timeouts on unmount or when dashboard closes
+  // Cleanup state and timeouts when dashboard closes
   useEffect(() => {
     if (!isOpen) {
+      // Clear timeout refs
       if (patternHoverTimeoutRef.current) {
         clearTimeout(patternHoverTimeoutRef.current);
         patternHoverTimeoutRef.current = null;
@@ -409,8 +413,17 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
         clearTimeout(bookmarkHoverTimeoutRef.current);
         bookmarkHoverTimeoutRef.current = null;
       }
+
+      // Clear hover states
+      setHoveredPatternId(null);
+      setHoveredBookmarkId(null);
+      setIsColumn3Hovered(false);
+
+      // Clear dashboard state (bookmarks and selections)
+      dashboardState.setBookmarks([]);
+      dashboardState.clearSelection();
     }
-  }, [isOpen]);
+  }, [isOpen, dashboardState]);
 
   if (!isOpen) return null;
 
@@ -462,6 +475,8 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
                 isAnalyzing={isAnalyzing}
                 hoveredPatternId={hoveredPatternId}
                 onBookmarkHover={handleBookmarkHover}
+                lastClickedId={lastClickedBookmarkId}
+                onSetLastClickedId={setLastClickedBookmarkId}
               />
             </div>
 

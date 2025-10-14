@@ -20,6 +20,7 @@ export function BookmarkPreviewView({
   const [selectedLabelIds, setSelectedLabelIds] = useState<Set<string>>(
     new Set(bookmark.remainingLabels.map(l => `${l.label}::${l.category}`))
   );
+  const [lastClickedLabelId, setLastClickedLabelId] = useState<string | null>(null);
 
   // Group labels by confidence
   const grouped = useMemo(() => {
@@ -40,16 +41,76 @@ export function BookmarkPreviewView({
     return { high, medium, low };
   }, [bookmark.remainingLabels]);
 
-  const handleToggle = (labelId: string) => {
+  const handleToggle = (labelId: string, event?: React.ChangeEvent<HTMLInputElement>) => {
+    // Determine action based on checkbox state (what we're transitioning TO)
+    const action = event?.target.checked ? 'select' : 'deselect';
+
+    if ((event?.nativeEvent as any)?.shiftKey && lastClickedLabelId) {
+      // Find indices in the all labels array (high, medium, low)
+      const allLabels = [...grouped.high, ...grouped.medium, ...grouped.low];
+      const allLabelIds = allLabels.map(l => `${l.label}::${l.category}`);
+      const lastIndex = allLabelIds.indexOf(lastClickedLabelId);
+      const currentIndex = allLabelIds.indexOf(labelId);
+
+      if (lastIndex !== -1 && currentIndex !== -1) {
+        // Apply the action to all items in the range
+        const start = Math.min(lastIndex, currentIndex);
+        const end = Math.max(lastIndex, currentIndex);
+
+        setSelectedLabelIds(prev => {
+          const next = new Set(prev);
+          for (let i = start; i <= end; i++) {
+            const id = allLabelIds[i];
+            if (action === 'select') {
+              next.add(id);
+            } else {
+              next.delete(id);
+            }
+          }
+          return next;
+        });
+      }
+    } else {
+      // Normal click - apply action
+      setSelectedLabelIds(prev => {
+        const next = new Set(prev);
+        if (action === 'select') {
+          next.add(labelId);
+        } else {
+          next.delete(labelId);
+        }
+        return next;
+      });
+    }
+
+    // Update last clicked ID
+    setLastClickedLabelId(labelId);
+  };
+
+  const handleGroupToggle = (groupLabels: BookmarkLabel[]) => {
+    const groupIds = groupLabels.map(l => `${l.label}::${l.category}`);
+    const allSelected = groupIds.every(id => selectedLabelIds.has(id));
+
     setSelectedLabelIds(prev => {
       const next = new Set(prev);
-      if (next.has(labelId)) {
-        next.delete(labelId);
+      if (allSelected) {
+        // Deselect all in group
+        groupIds.forEach(id => next.delete(id));
       } else {
-        next.add(labelId);
+        // Select all in group
+        groupIds.forEach(id => next.add(id));
       }
       return next;
     });
+  };
+
+  const getGroupCheckboxState = (groupLabels: BookmarkLabel[]) => {
+    const groupIds = groupLabels.map(l => `${l.label}::${l.category}`);
+    const selectedCount = groupIds.filter(id => selectedLabelIds.has(id)).length;
+
+    if (selectedCount === 0) return 'unchecked';
+    if (selectedCount === groupIds.length) return 'checked';
+    return 'indeterminate';
   };
 
   const handleSelectAll = () => {
@@ -109,6 +170,20 @@ export function BookmarkPreviewView({
           count={grouped.high.length}
           isExpanded={expandedGroup === 'high'}
           onToggle={() => setExpandedGroup(prev => prev === 'high' ? null : 'high')}
+          headerAction={
+            <input
+              type="checkbox"
+              checked={getGroupCheckboxState(grouped.high) === 'checked'}
+              ref={(el) => {
+                if (el) {
+                  el.indeterminate = getGroupCheckboxState(grouped.high) === 'indeterminate';
+                }
+              }}
+              onChange={() => handleGroupToggle(grouped.high)}
+              className="rounded"
+              aria-label="Select all high confidence labels"
+            />
+          }
         >
           <div className="space-y-1 px-3 min-w-0">
             {grouped.high.map(label => {
@@ -117,11 +192,12 @@ export function BookmarkPreviewView({
                 <label
                   key={labelId}
                   className="flex items-center gap-2 py-1 hover:bg-accent rounded px-2 cursor-pointer transition-colors min-w-0 max-w-full overflow-hidden"
+                  onMouseDown={(e) => { if (e.shiftKey) e.preventDefault(); }}
                 >
                   <input
                     type="checkbox"
                     checked={selectedLabelIds.has(labelId)}
-                    onChange={() => handleToggle(labelId)}
+                    onChange={(e) => handleToggle(labelId, e)}
                     className="rounded flex-shrink-0"
                     aria-label={`Include ${label.label} (${Math.round(label.confidence * 100)}% confidence)`}
                   />
@@ -147,6 +223,20 @@ export function BookmarkPreviewView({
           count={grouped.medium.length}
           isExpanded={expandedGroup === 'medium'}
           onToggle={() => setExpandedGroup(prev => prev === 'medium' ? null : 'medium')}
+          headerAction={
+            <input
+              type="checkbox"
+              checked={getGroupCheckboxState(grouped.medium) === 'checked'}
+              ref={(el) => {
+                if (el) {
+                  el.indeterminate = getGroupCheckboxState(grouped.medium) === 'indeterminate';
+                }
+              }}
+              onChange={() => handleGroupToggle(grouped.medium)}
+              className="rounded"
+              aria-label="Select all medium confidence labels"
+            />
+          }
         >
           <div className="space-y-1 px-3 min-w-0">
             {grouped.medium.map(label => {
@@ -155,11 +245,12 @@ export function BookmarkPreviewView({
                 <label
                   key={labelId}
                   className="flex items-center gap-2 py-1 hover:bg-accent rounded px-2 cursor-pointer transition-colors min-w-0 max-w-full overflow-hidden"
+                  onMouseDown={(e) => { if (e.shiftKey) e.preventDefault(); }}
                 >
                   <input
                     type="checkbox"
                     checked={selectedLabelIds.has(labelId)}
-                    onChange={() => handleToggle(labelId)}
+                    onChange={(e) => handleToggle(labelId, e)}
                     className="rounded flex-shrink-0"
                     aria-label={`Include ${label.label} (${Math.round(label.confidence * 100)}% confidence)`}
                   />
@@ -185,6 +276,20 @@ export function BookmarkPreviewView({
           count={grouped.low.length}
           isExpanded={expandedGroup === 'low'}
           onToggle={() => setExpandedGroup(prev => prev === 'low' ? null : 'low')}
+          headerAction={
+            <input
+              type="checkbox"
+              checked={getGroupCheckboxState(grouped.low) === 'checked'}
+              ref={(el) => {
+                if (el) {
+                  el.indeterminate = getGroupCheckboxState(grouped.low) === 'indeterminate';
+                }
+              }}
+              onChange={() => handleGroupToggle(grouped.low)}
+              className="rounded"
+              aria-label="Select all low confidence labels"
+            />
+          }
         >
           <div className="space-y-1 px-3 min-w-0">
             {grouped.low.map(label => {
@@ -193,11 +298,12 @@ export function BookmarkPreviewView({
                 <label
                   key={labelId}
                   className="flex items-center gap-2 py-1 hover:bg-accent rounded px-2 cursor-pointer transition-colors min-w-0 max-w-full overflow-hidden"
+                  onMouseDown={(e) => { if (e.shiftKey) e.preventDefault(); }}
                 >
                   <input
                     type="checkbox"
                     checked={selectedLabelIds.has(labelId)}
-                    onChange={() => handleToggle(labelId)}
+                    onChange={(e) => handleToggle(labelId, e)}
                     className="rounded flex-shrink-0"
                     aria-label={`Include ${label.label} (${Math.round(label.confidence * 100)}% confidence)`}
                   />

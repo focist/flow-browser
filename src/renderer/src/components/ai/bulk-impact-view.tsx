@@ -27,6 +27,7 @@ export function BulkImpactView({
       new Set(b.remainingLabels.map(l => `${l.label}::${l.category}`))
     ]))
   );
+  const [lastClickedBookmarkId, setLastClickedBookmarkId] = useState<string | null>(null);
 
   // Calculate total labels
   const totalLabels = useMemo(() => {
@@ -78,16 +79,52 @@ export function BulkImpactView({
     });
   };
 
-  const toggleBookmarkSelection = (bookmarkId: string) => {
-    setSelectedBookmarkIds(prev => {
-      const next = new Set(prev);
-      if (next.has(bookmarkId)) {
-        next.delete(bookmarkId);
-      } else {
-        next.add(bookmarkId);
+  const toggleBookmarkSelection = (bookmarkId: string, event?: React.ChangeEvent<HTMLInputElement>) => {
+    // Determine the action based on the checkbox event (what the user is DOING)
+    // This matches the main bookmarks manager behavior
+    const isChecked = event?.target.checked ?? !selectedBookmarkIds.has(bookmarkId);
+    const action = isChecked ? 'select' : 'deselect';
+
+    if (event?.nativeEvent && (event.nativeEvent as MouseEvent).shiftKey && lastClickedBookmarkId) {
+      // Find indices in the bookmarks array
+      const bookmarkIds = selectedBookmarks.map(b => b.bookmark.id);
+      const lastIndex = bookmarkIds.indexOf(lastClickedBookmarkId);
+      const currentIndex = bookmarkIds.indexOf(bookmarkId);
+
+      if (lastIndex !== -1 && currentIndex !== -1) {
+        // Apply the SAME action to all items in the range
+        const start = Math.min(lastIndex, currentIndex);
+        const end = Math.max(lastIndex, currentIndex);
+
+        setSelectedBookmarkIds(prev => {
+          const next = new Set(prev);
+          for (let i = start; i <= end; i++) {
+            const id = bookmarkIds[i];
+
+            if (action === 'select') {
+              next.add(id);
+            } else {
+              next.delete(id);
+            }
+          }
+          return next;
+        });
       }
-      return next;
-    });
+    } else {
+      // Normal click - apply the action from the checkbox
+      setSelectedBookmarkIds(prev => {
+        const next = new Set(prev);
+        if (action === 'select') {
+          next.add(bookmarkId);
+        } else {
+          next.delete(bookmarkId);
+        }
+        return next;
+      });
+    }
+
+    // Update last clicked ID
+    setLastClickedBookmarkId(bookmarkId);
   };
 
   const toggleLabelSelection = (bookmarkId: string, labelId: string) => {
@@ -102,6 +139,40 @@ export function BulkImpactView({
       next.set(bookmarkId, bookmarkLabels);
       return next;
     });
+  };
+
+  const toggleAllBookmarkLabels = (bookmarkId: string) => {
+    const bookmark = selectedBookmarks.find(b => b.bookmark.id === bookmarkId);
+    if (!bookmark) return;
+
+    const allLabelIds = bookmark.remainingLabels.map(l => `${l.label}::${l.category}`);
+    const currentLabels = labelSelections.get(bookmarkId) || new Set();
+    const allSelected = allLabelIds.every(id => currentLabels.has(id));
+
+    setLabelSelections(prev => {
+      const next = new Map(prev);
+      if (allSelected) {
+        // Deselect all labels
+        next.set(bookmarkId, new Set());
+      } else {
+        // Select all labels
+        next.set(bookmarkId, new Set(allLabelIds));
+      }
+      return next;
+    });
+  };
+
+  const getBookmarkLabelCheckboxState = (bookmarkId: string) => {
+    const bookmark = selectedBookmarks.find(b => b.bookmark.id === bookmarkId);
+    if (!bookmark || bookmark.remainingLabels.length === 0) return 'unchecked';
+
+    const allLabelIds = bookmark.remainingLabels.map(l => `${l.label}::${l.category}`);
+    const currentLabels = labelSelections.get(bookmarkId) || new Set();
+    const selectedCount = allLabelIds.filter(id => currentLabels.has(id)).length;
+
+    if (selectedCount === 0) return 'unchecked';
+    if (selectedCount === allLabelIds.length) return 'checked';
+    return 'indeterminate';
   };
 
   const handleSelectAll = () => {
@@ -162,16 +233,36 @@ export function BulkImpactView({
             const isExpanded = expandedBookmarkIds.has(bookmark.bookmark.id);
             const isSelected = selectedBookmarkIds.has(bookmark.bookmark.id);
 
+            const groupCheckboxState = getBookmarkLabelCheckboxState(bookmark.bookmark.id);
+
             return (
               <div key={bookmark.bookmark.id} className="border-l-2 border-gray-200 dark:border-gray-700 pl-2" style={{ minWidth: 0, maxWidth: '100%', overflow: 'hidden' }}>
-                <label className="grid grid-cols-[auto_1fr_auto_auto] gap-2 items-center py-1 px-2 hover:bg-accent rounded cursor-pointer transition-colors">
+                <div className={cn(
+                  "grid gap-2 items-center py-1 px-2",
+                  isExpanded ? "grid-cols-[auto_auto_1fr_auto_auto]" : "grid-cols-[auto_1fr_auto_auto]"
+                )}>
                   <input
                     type="checkbox"
                     checked={isSelected}
-                    onChange={() => toggleBookmarkSelection(bookmark.bookmark.id)}
+                    onMouseDown={(e) => { if (e.shiftKey) e.preventDefault(); }}
+                    onChange={(e) => toggleBookmarkSelection(bookmark.bookmark.id, e)}
                     className="rounded"
                     aria-label={`Include ${bookmark.bookmark.title}`}
                   />
+                  {isExpanded && (
+                    <input
+                      type="checkbox"
+                      checked={groupCheckboxState === 'checked'}
+                      ref={(el) => {
+                        if (el) {
+                          el.indeterminate = groupCheckboxState === 'indeterminate';
+                        }
+                      }}
+                      onChange={() => toggleAllBookmarkLabels(bookmark.bookmark.id)}
+                      className="rounded"
+                      aria-label={`Select all labels for ${bookmark.bookmark.title}`}
+                    />
+                  )}
                   <span className="text-sm truncate min-w-0">
                     {bookmark.bookmark.title}
                   </span>
@@ -193,7 +284,7 @@ export function BulkImpactView({
                       )}
                     />
                   </button>
-                </label>
+                </div>
 
                 {isExpanded && (
                   <div className="ml-6 mt-1 space-y-1">
@@ -205,6 +296,7 @@ export function BulkImpactView({
                         <label
                           key={labelId}
                           className="grid grid-cols-[auto_auto_1fr_auto_auto] gap-2 items-center py-1 hover:bg-accent rounded cursor-pointer transition-colors"
+                          onMouseDown={(e) => { if (e.shiftKey) e.preventDefault(); }}
                         >
                           <input
                             type="checkbox"
