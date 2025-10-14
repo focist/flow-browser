@@ -17,6 +17,8 @@ interface BookmarkOverviewColumnProps {
   isAnalyzing?: boolean;
   hoveredPatternId?: string | null;
   onBookmarkHover?: (bookmarkId: string | null) => void;
+  lastClickedId?: string | null;
+  onSetLastClickedId?: (id: string | null) => void;
 }
 
 interface BookmarkGroupProps {
@@ -31,12 +33,15 @@ interface BookmarkGroupProps {
   onToggleExpanded?: () => void;
   hoveredPatternId?: string | null;
   onBookmarkHover?: (bookmarkId: string | null) => void;
+  lastClickedId?: string | null;
+  onSetLastClickedId?: (id: string | null) => void;
+  allBookmarks: DashboardBookmark[];
 }
 
 const BookmarkItem: React.FC<{
   bookmark: DashboardBookmark;
   isSelected: boolean;
-  onToggle: () => void;
+  onToggle: (e: React.MouseEvent) => void;
   isHighlighted?: boolean;
   isDimmed?: boolean;
   onHover?: (bookmarkId: string | null) => void;
@@ -57,7 +62,13 @@ const BookmarkItem: React.FC<{
       } ${
         isDimmed ? 'opacity-40' : 'opacity-100'
       }`}
-      onClick={onToggle}
+      onClick={(e) => onToggle(e)}
+      onMouseDown={(e) => {
+        // Prevent text selection on shift-click by stopping the mousedown event early
+        if (e.shiftKey) {
+          e.preventDefault();
+        }
+      }}
       onMouseEnter={() => onHover?.(bookmark.bookmark.id)}
       onMouseLeave={() => onHover?.(null)}
       onFocus={() => onHover?.(bookmark.bookmark.id)}
@@ -66,7 +77,9 @@ const BookmarkItem: React.FC<{
     >
       <Checkbox
         checked={isSelected}
-        onCheckedChange={onToggle}
+        onCheckedChange={() => {
+          // Checkbox state is managed by parent click handler
+        }}
         onClick={(e) => e.stopPropagation()}
         className="mt-0.5 flex-shrink-0"
       />
@@ -114,9 +127,50 @@ const BookmarkGroup: React.FC<BookmarkGroupProps> = ({
   expanded = true,
   onToggleExpanded,
   hoveredPatternId,
-  onBookmarkHover
+  onBookmarkHover,
+  lastClickedId,
+  onSetLastClickedId,
+  allBookmarks
 }) => {
   if (count === 0) return null;
+
+  const handleBookmarkClick = (bookmarkId: string, event: React.MouseEvent) => {
+    // Determine the action based on current selection state
+    const action = selectedIds.has(bookmarkId) ? 'deselect' : 'select';
+
+    if (event.shiftKey && lastClickedId && onSetLastClickedId) {
+      // Find indices in the full bookmarks array
+      const allIds = allBookmarks.map(b => b.bookmark.id);
+      const lastIndex = allIds.indexOf(lastClickedId);
+      const currentIndex = allIds.indexOf(bookmarkId);
+
+      if (lastIndex !== -1 && currentIndex !== -1) {
+        // Apply the SAME action to all items in the range
+        const start = Math.min(lastIndex, currentIndex);
+        const end = Math.max(lastIndex, currentIndex);
+
+        for (let i = start; i <= end; i++) {
+          const id = allIds[i];
+          const isCurrentlySelected = selectedIds.has(id);
+
+          // Only toggle if the current state doesn't match the desired action
+          if (action === 'select' && !isCurrentlySelected) {
+            onToggleSelection(id);
+          } else if (action === 'deselect' && isCurrentlySelected) {
+            onToggleSelection(id);
+          }
+        }
+      }
+    } else {
+      // Normal click - toggle selection
+      onToggleSelection(bookmarkId);
+    }
+
+    // Update last clicked ID
+    if (onSetLastClickedId) {
+      onSetLastClickedId(bookmarkId);
+    }
+  };
 
   return (
     <div className="space-y-2">
@@ -170,7 +224,7 @@ const BookmarkGroup: React.FC<BookmarkGroupProps> = ({
                   key={bookmark.bookmark.id}
                   bookmark={bookmark}
                   isSelected={selectedIds.has(bookmark.bookmark.id)}
-                  onToggle={() => onToggleSelection(bookmark.bookmark.id)}
+                  onToggle={(e) => handleBookmarkClick(bookmark.bookmark.id, e)}
                   isHighlighted={!!isHighlighted}
                   isDimmed={!!isDimmed}
                   onHover={onBookmarkHover}
@@ -193,7 +247,9 @@ export const BookmarkOverviewColumn: React.FC<BookmarkOverviewColumnProps> = ({
   getConfidenceLevel,
   isAnalyzing = false,
   hoveredPatternId,
-  onBookmarkHover
+  onBookmarkHover,
+  lastClickedId,
+  onSetLastClickedId
 }) => {
   const [expandedGroups, setExpandedGroups] = React.useState({
     high: true,
@@ -274,6 +330,9 @@ export const BookmarkOverviewColumn: React.FC<BookmarkOverviewColumnProps> = ({
             onToggleExpanded={() => toggleGroup('high')}
             hoveredPatternId={hoveredPatternId}
             onBookmarkHover={onBookmarkHover}
+            lastClickedId={lastClickedId}
+            onSetLastClickedId={onSetLastClickedId}
+            allBookmarks={bookmarks}
           />
 
           <BookmarkGroup
@@ -288,6 +347,9 @@ export const BookmarkOverviewColumn: React.FC<BookmarkOverviewColumnProps> = ({
             onToggleExpanded={() => toggleGroup('medium')}
             hoveredPatternId={hoveredPatternId}
             onBookmarkHover={onBookmarkHover}
+            lastClickedId={lastClickedId}
+            onSetLastClickedId={onSetLastClickedId}
+            allBookmarks={bookmarks}
           />
 
           <BookmarkGroup
@@ -302,6 +364,9 @@ export const BookmarkOverviewColumn: React.FC<BookmarkOverviewColumnProps> = ({
             onToggleExpanded={() => toggleGroup('low')}
             hoveredPatternId={hoveredPatternId}
             onBookmarkHover={onBookmarkHover}
+            lastClickedId={lastClickedId}
+            onSetLastClickedId={onSetLastClickedId}
+            allBookmarks={bookmarks}
           />
 
           <BookmarkGroup
@@ -316,6 +381,9 @@ export const BookmarkOverviewColumn: React.FC<BookmarkOverviewColumnProps> = ({
             onToggleExpanded={() => toggleGroup('none')}
             hoveredPatternId={hoveredPatternId}
             onBookmarkHover={onBookmarkHover}
+            lastClickedId={lastClickedId}
+            onSetLastClickedId={onSetLastClickedId}
+            allBookmarks={bookmarks}
           />
 
           {totalCount === 0 && (
