@@ -6,6 +6,8 @@ import { ChevronDown } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import type { DashboardBookmark } from '../../hooks/use-dashboard-state';
 import { getCategoryStyles, getCategoryIcon } from '../../lib/label-styles';
+import { useShiftClickSelection } from '../../hooks/use-shift-click-selection';
+import { SelectionControls } from './selection-controls';
 
 interface BulkImpactViewProps {
   selectedBookmarks: DashboardBookmark[];
@@ -18,16 +20,25 @@ export function BulkImpactView({
 }: BulkImpactViewProps) {
   const [isListExpanded, setIsListExpanded] = useState(false);
   const [expandedBookmarkIds, setExpandedBookmarkIds] = useState<Set<string>>(new Set());
-  const [selectedBookmarkIds, setSelectedBookmarkIds] = useState<Set<string>>(
-    new Set(selectedBookmarks.map(b => b.bookmark.id))
-  );
   const [labelSelections, setLabelSelections] = useState<Map<string, Set<string>>>(
     new Map(selectedBookmarks.map(b => [
       b.bookmark.id,
       new Set(b.remainingLabels.map(l => `${l.label}::${l.category}`))
     ]))
   );
-  const [lastClickedBookmarkId, setLastClickedBookmarkId] = useState<string | null>(null);
+
+  // Use shared selection hook for bookmark selection
+  const {
+    selectedIds: selectedBookmarkIds,
+    setSelectedIds: setSelectedBookmarkIds,
+    handleToggle: handleBookmarkToggle,
+    selectAll,
+    deselectAll
+  } = useShiftClickSelection({
+    items: selectedBookmarks,
+    getId: (b) => b.bookmark.id,
+    initialSelection: new Set(selectedBookmarks.map(b => b.bookmark.id))
+  });
 
   // Calculate total labels
   const totalLabels = useMemo(() => {
@@ -79,54 +90,6 @@ export function BulkImpactView({
     });
   };
 
-  const toggleBookmarkSelection = (bookmarkId: string, event?: React.ChangeEvent<HTMLInputElement>) => {
-    // Determine the action based on the checkbox event (what the user is DOING)
-    // This matches the main bookmarks manager behavior
-    const isChecked = event?.target.checked ?? !selectedBookmarkIds.has(bookmarkId);
-    const action = isChecked ? 'select' : 'deselect';
-
-    if (event?.nativeEvent && (event.nativeEvent as MouseEvent).shiftKey && lastClickedBookmarkId) {
-      // Find indices in the bookmarks array
-      const bookmarkIds = selectedBookmarks.map(b => b.bookmark.id);
-      const lastIndex = bookmarkIds.indexOf(lastClickedBookmarkId);
-      const currentIndex = bookmarkIds.indexOf(bookmarkId);
-
-      if (lastIndex !== -1 && currentIndex !== -1) {
-        // Apply the SAME action to all items in the range
-        const start = Math.min(lastIndex, currentIndex);
-        const end = Math.max(lastIndex, currentIndex);
-
-        setSelectedBookmarkIds(prev => {
-          const next = new Set(prev);
-          for (let i = start; i <= end; i++) {
-            const id = bookmarkIds[i];
-
-            if (action === 'select') {
-              next.add(id);
-            } else {
-              next.delete(id);
-            }
-          }
-          return next;
-        });
-      }
-    } else {
-      // Normal click - apply the action from the checkbox
-      setSelectedBookmarkIds(prev => {
-        const next = new Set(prev);
-        if (action === 'select') {
-          next.add(bookmarkId);
-        } else {
-          next.delete(bookmarkId);
-        }
-        return next;
-      });
-    }
-
-    // Update last clicked ID
-    setLastClickedBookmarkId(bookmarkId);
-  };
-
   const toggleLabelSelection = (bookmarkId: string, labelId: string) => {
     setLabelSelections(prev => {
       const next = new Map(prev);
@@ -173,14 +136,6 @@ export function BulkImpactView({
     if (selectedCount === 0) return 'unchecked';
     if (selectedCount === allLabelIds.length) return 'checked';
     return 'indeterminate';
-  };
-
-  const handleSelectAll = () => {
-    setSelectedBookmarkIds(new Set(selectedBookmarks.map(b => b.bookmark.id)));
-  };
-
-  const handleDeselectAll = () => {
-    setSelectedBookmarkIds(new Set());
   };
 
   const handleApply = () => {
@@ -245,7 +200,7 @@ export function BulkImpactView({
                     type="checkbox"
                     checked={isSelected}
                     onMouseDown={(e) => { if (e.shiftKey) e.preventDefault(); }}
-                    onChange={(e) => toggleBookmarkSelection(bookmark.bookmark.id, e)}
+                    onChange={(e) => handleBookmarkToggle(bookmark.bookmark.id, e)}
                     className="rounded"
                     aria-label={`Include ${bookmark.bookmark.title}`}
                   />
@@ -333,25 +288,13 @@ export function BulkImpactView({
       </div>
 
       {/* Selection Controls */}
-      <div className="flex gap-2 min-w-0 max-w-full flex-shrink-0 mb-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleSelectAll}
-          disabled={selectedBookmarkIds.size === selectedBookmarks.length}
-          className="flex-1 min-w-0 !max-w-full"
-        >
-          Select All
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleDeselectAll}
-          disabled={selectedBookmarkIds.size === 0}
-          className="flex-1 min-w-0 !max-w-full"
-        >
-          Deselect All
-        </Button>
+      <div className="flex-shrink-0 mb-4">
+        <SelectionControls
+          onSelectAll={selectAll}
+          onDeselectAll={deselectAll}
+          selectedCount={selectedBookmarkIds.size}
+          totalCount={selectedBookmarks.length}
+        />
       </div>
 
       {/* Apply Button */}

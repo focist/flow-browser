@@ -82,6 +82,13 @@ export const useDashboardState = () => {
     }));
   }, []);
 
+  const setSelectedBookmarkIds = useCallback((ids: Set<string>) => {
+    setState(prev => ({
+      ...prev,
+      selectedBookmarkIds: ids
+    }));
+  }, []);
+
   const setFilterMode = useCallback((mode: DashboardState['filterMode']) => {
     setState(prev => ({ ...prev, filterMode: mode }));
   }, []);
@@ -193,6 +200,7 @@ export const useDashboardState = () => {
     removeBookmark,
     updateBookmark,
     toggleBookmarkSelection,
+    setSelectedBookmarkIds,
     selectAllBookmarks,
     clearSelection,
     setFilterMode,

@@ -291,6 +291,43 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
     toast.success(`Applied ${labelIds.length} label${labelIds.length !== 1 ? 's' : ''} to ${selectedBookmark.bookmark.title}`);
   };
 
+  // Shift-click handler for bookmark selection
+  const handleBookmarkToggle = useCallback((bookmarkId: string, event?: React.ChangeEvent<HTMLInputElement>) => {
+    // Determine action based on checkbox state (what we're transitioning TO)
+    const action = event?.target.checked ? 'select' : 'deselect';
+
+    if ((event?.nativeEvent as any)?.shiftKey && lastClickedBookmarkId) {
+      // Find indices in the bookmarks array
+      const allBookmarks = dashboardState.getFilteredBookmarks();
+      const allIds = allBookmarks.map(b => b.bookmark.id);
+      const lastIndex = allIds.indexOf(lastClickedBookmarkId);
+      const currentIndex = allIds.indexOf(bookmarkId);
+
+      if (lastIndex !== -1 && currentIndex !== -1) {
+        // Apply the action to all items in the range
+        const start = Math.min(lastIndex, currentIndex);
+        const end = Math.max(lastIndex, currentIndex);
+
+        const newSelected = new Set(dashboardState.selectedBookmarkIds);
+        for (let i = start; i <= end; i++) {
+          const id = allIds[i];
+          if (action === 'select') {
+            newSelected.add(id);
+          } else {
+            newSelected.delete(id);
+          }
+        }
+        dashboardState.setSelectedBookmarkIds(newSelected);
+      }
+    } else {
+      // Normal click - toggle
+      dashboardState.toggleBookmarkSelection(bookmarkId);
+    }
+
+    // Update last clicked ID
+    setLastClickedBookmarkId(bookmarkId);
+  }, [lastClickedBookmarkId, dashboardState]);
+
   // Handler for bulk impact apply
   const handleApplyBulk = async (
     bookmarkIds: string[],
@@ -468,7 +505,7 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
               <BookmarkOverviewColumn
                 bookmarks={dashboardState.getFilteredBookmarks()}
                 selectedIds={dashboardState.selectedBookmarkIds}
-                onToggleSelection={dashboardState.toggleBookmarkSelection}
+                onToggleSelection={handleBookmarkToggle}
                 onSelectAll={dashboardState.selectAllBookmarks}
                 onClearSelection={dashboardState.clearSelection}
                 getConfidenceLevel={dashboardState.getConfidenceLevel}

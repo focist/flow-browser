@@ -1,11 +1,15 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { ExpandableSection } from './expandable-section';
 import { Sparkles } from 'lucide-react';
 import type { DashboardBookmark } from '../../hooks/use-dashboard-state';
 import type { BookmarkLabel } from '~/flow/interfaces/ai';
 import { getCategoryStyles, getCategoryIcon } from '../../lib/label-styles';
+import { useShiftClickSelection } from '../../hooks/use-shift-click-selection';
+import { useConfidenceGrouping } from '../../hooks/use-confidence-grouping';
+import { useGroupCheckbox } from '../../hooks/use-group-checkbox';
+import { ConfidenceGroupSection } from './confidence-group-section';
+import { SelectionControls } from './selection-controls';
 
 interface BookmarkPreviewViewProps {
   bookmark: DashboardBookmark;
@@ -17,112 +21,63 @@ export function BookmarkPreviewView({
   onApplySelectedLabels
 }: BookmarkPreviewViewProps) {
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
-  const [selectedLabelIds, setSelectedLabelIds] = useState<Set<string>>(
-    new Set(bookmark.remainingLabels.map(l => `${l.label}::${l.category}`))
+
+  // Use shared selection hook
+  const {
+    selectedIds: selectedLabelIds,
+    setSelectedIds: setSelectedLabelIds,
+    handleToggle,
+    selectAll,
+    deselectAll
+  } = useShiftClickSelection({
+    items: bookmark.remainingLabels,
+    getId: (l) => `${l.label}::${l.category}`,
+    initialSelection: new Set(bookmark.remainingLabels.map(l => `${l.label}::${l.category}`))
+  });
+
+  // Use shared confidence grouping hook
+  const grouped = useConfidenceGrouping(
+    bookmark.remainingLabels,
+    (label) => label.confidence
   );
-  const [lastClickedLabelId, setLastClickedLabelId] = useState<string | null>(null);
 
-  // Group labels by confidence
-  const grouped = useMemo(() => {
-    const high: BookmarkLabel[] = [];
-    const medium: BookmarkLabel[] = [];
-    const low: BookmarkLabel[] = [];
+  // Use shared group checkbox hooks for each confidence level
+  const highCheckbox = useGroupCheckbox(
+    grouped.high.map(l => `${l.label}::${l.category}`),
+    selectedLabelIds,
+    setSelectedLabelIds
+  );
 
-    bookmark.remainingLabels.forEach(label => {
-      if (label.confidence >= 0.85) {
-        high.push(label);
-      } else if (label.confidence >= 0.60) {
-        medium.push(label);
-      } else {
-        low.push(label);
-      }
-    });
+  const mediumCheckbox = useGroupCheckbox(
+    grouped.medium.map(l => `${l.label}::${l.category}`),
+    selectedLabelIds,
+    setSelectedLabelIds
+  );
 
-    return { high, medium, low };
-  }, [bookmark.remainingLabels]);
-
-  const handleToggle = (labelId: string, event?: React.ChangeEvent<HTMLInputElement>) => {
-    // Determine action based on checkbox state (what we're transitioning TO)
-    const action = event?.target.checked ? 'select' : 'deselect';
-
-    if ((event?.nativeEvent as any)?.shiftKey && lastClickedLabelId) {
-      // Find indices in the all labels array (high, medium, low)
-      const allLabels = [...grouped.high, ...grouped.medium, ...grouped.low];
-      const allLabelIds = allLabels.map(l => `${l.label}::${l.category}`);
-      const lastIndex = allLabelIds.indexOf(lastClickedLabelId);
-      const currentIndex = allLabelIds.indexOf(labelId);
-
-      if (lastIndex !== -1 && currentIndex !== -1) {
-        // Apply the action to all items in the range
-        const start = Math.min(lastIndex, currentIndex);
-        const end = Math.max(lastIndex, currentIndex);
-
-        setSelectedLabelIds(prev => {
-          const next = new Set(prev);
-          for (let i = start; i <= end; i++) {
-            const id = allLabelIds[i];
-            if (action === 'select') {
-              next.add(id);
-            } else {
-              next.delete(id);
-            }
-          }
-          return next;
-        });
-      }
-    } else {
-      // Normal click - apply action
-      setSelectedLabelIds(prev => {
-        const next = new Set(prev);
-        if (action === 'select') {
-          next.add(labelId);
-        } else {
-          next.delete(labelId);
-        }
-        return next;
-      });
-    }
-
-    // Update last clicked ID
-    setLastClickedLabelId(labelId);
-  };
-
-  const handleGroupToggle = (groupLabels: BookmarkLabel[]) => {
-    const groupIds = groupLabels.map(l => `${l.label}::${l.category}`);
-    const allSelected = groupIds.every(id => selectedLabelIds.has(id));
-
-    setSelectedLabelIds(prev => {
-      const next = new Set(prev);
-      if (allSelected) {
-        // Deselect all in group
-        groupIds.forEach(id => next.delete(id));
-      } else {
-        // Select all in group
-        groupIds.forEach(id => next.add(id));
-      }
-      return next;
-    });
-  };
-
-  const getGroupCheckboxState = (groupLabels: BookmarkLabel[]) => {
-    const groupIds = groupLabels.map(l => `${l.label}::${l.category}`);
-    const selectedCount = groupIds.filter(id => selectedLabelIds.has(id)).length;
-
-    if (selectedCount === 0) return 'unchecked';
-    if (selectedCount === groupIds.length) return 'checked';
-    return 'indeterminate';
-  };
-
-  const handleSelectAll = () => {
-    setSelectedLabelIds(new Set(bookmark.remainingLabels.map(l => `${l.label}::${l.category}`)));
-  };
-
-  const handleDeselectAll = () => {
-    setSelectedLabelIds(new Set());
-  };
+  const lowCheckbox = useGroupCheckbox(
+    grouped.low.map(l => `${l.label}::${l.category}`),
+    selectedLabelIds,
+    setSelectedLabelIds
+  );
 
   const handleApply = () => {
     onApplySelectedLabels(Array.from(selectedLabelIds));
+  };
+
+  // Render function for label items
+  const renderLabel = (label: BookmarkLabel) => {
+    return (
+      <>
+        <span className="mr-1 flex-shrink-0">{getCategoryIcon(label.category)}</span>
+        <span className="flex-1 text-sm truncate min-w-0">{label.label}</span>
+        <Badge variant="outline" className={`text-xs h-5 flex-shrink-0 ${getCategoryStyles(label.category)}`}>
+          {label.category}
+        </Badge>
+        <span className="text-xs text-muted-foreground flex-shrink-0">
+          {Math.round(label.confidence * 100)}%
+        </span>
+      </>
+    );
   };
 
   const totalLabels = bookmark.remainingLabels.length + bookmark.autoAppliedLabels.length;
@@ -163,164 +118,45 @@ export function BookmarkPreviewView({
         )}
       </div>
 
-      {/* High Confidence Labels */}
-      {grouped.high.length > 0 && (
-        <ExpandableSection
-          title="High Confidence"
-          count={grouped.high.length}
-          isExpanded={expandedGroup === 'high'}
-          onToggle={() => setExpandedGroup(prev => prev === 'high' ? null : 'high')}
-          headerAction={
-            <input
-              type="checkbox"
-              checked={getGroupCheckboxState(grouped.high) === 'checked'}
-              ref={(el) => {
-                if (el) {
-                  el.indeterminate = getGroupCheckboxState(grouped.high) === 'indeterminate';
-                }
-              }}
-              onChange={() => handleGroupToggle(grouped.high)}
-              className="rounded"
-              aria-label="Select all high confidence labels"
-            />
-          }
-        >
-          <div className="space-y-1 px-3 min-w-0">
-            {grouped.high.map(label => {
-              const labelId = `${label.label}::${label.category}`;
-              return (
-                <label
-                  key={labelId}
-                  className="flex items-center gap-2 py-1 hover:bg-accent rounded px-2 cursor-pointer transition-colors min-w-0 max-w-full overflow-hidden"
-                  onMouseDown={(e) => { if (e.shiftKey) e.preventDefault(); }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedLabelIds.has(labelId)}
-                    onChange={(e) => handleToggle(labelId, e)}
-                    className="rounded flex-shrink-0"
-                    aria-label={`Include ${label.label} (${Math.round(label.confidence * 100)}% confidence)`}
-                  />
-                  <span className="mr-1 flex-shrink-0">{getCategoryIcon(label.category)}</span>
-                  <span className="flex-1 text-sm truncate min-w-0">{label.label}</span>
-                  <Badge variant="outline" className={`text-xs h-5 flex-shrink-0 ${getCategoryStyles(label.category)}`}>
-                    {label.category}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground flex-shrink-0">
-                    {Math.round(label.confidence * 100)}%
-                  </span>
-                </label>
-              );
-            })}
-          </div>
-        </ExpandableSection>
-      )}
+      {/* Confidence Groups */}
+      <ConfidenceGroupSection
+        level="High"
+        items={grouped.high}
+        isExpanded={expandedGroup === 'high'}
+        onToggle={() => setExpandedGroup(prev => prev === 'high' ? null : 'high')}
+        groupCheckboxState={highCheckbox.state}
+        onGroupToggle={highCheckbox.toggle}
+        selectedIds={selectedLabelIds}
+        getId={(l) => `${l.label}::${l.category}`}
+        onItemToggle={handleToggle}
+        renderItem={renderLabel}
+      />
 
-      {/* Medium Confidence Labels */}
-      {grouped.medium.length > 0 && (
-        <ExpandableSection
-          title="Medium Confidence"
-          count={grouped.medium.length}
-          isExpanded={expandedGroup === 'medium'}
-          onToggle={() => setExpandedGroup(prev => prev === 'medium' ? null : 'medium')}
-          headerAction={
-            <input
-              type="checkbox"
-              checked={getGroupCheckboxState(grouped.medium) === 'checked'}
-              ref={(el) => {
-                if (el) {
-                  el.indeterminate = getGroupCheckboxState(grouped.medium) === 'indeterminate';
-                }
-              }}
-              onChange={() => handleGroupToggle(grouped.medium)}
-              className="rounded"
-              aria-label="Select all medium confidence labels"
-            />
-          }
-        >
-          <div className="space-y-1 px-3 min-w-0">
-            {grouped.medium.map(label => {
-              const labelId = `${label.label}::${label.category}`;
-              return (
-                <label
-                  key={labelId}
-                  className="flex items-center gap-2 py-1 hover:bg-accent rounded px-2 cursor-pointer transition-colors min-w-0 max-w-full overflow-hidden"
-                  onMouseDown={(e) => { if (e.shiftKey) e.preventDefault(); }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedLabelIds.has(labelId)}
-                    onChange={(e) => handleToggle(labelId, e)}
-                    className="rounded flex-shrink-0"
-                    aria-label={`Include ${label.label} (${Math.round(label.confidence * 100)}% confidence)`}
-                  />
-                  <span className="mr-1 flex-shrink-0">{getCategoryIcon(label.category)}</span>
-                  <span className="flex-1 text-sm truncate min-w-0">{label.label}</span>
-                  <Badge variant="outline" className={`text-xs h-5 flex-shrink-0 ${getCategoryStyles(label.category)}`}>
-                    {label.category}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground flex-shrink-0">
-                    {Math.round(label.confidence * 100)}%
-                  </span>
-                </label>
-              );
-            })}
-          </div>
-        </ExpandableSection>
-      )}
+      <ConfidenceGroupSection
+        level="Medium"
+        items={grouped.medium}
+        isExpanded={expandedGroup === 'medium'}
+        onToggle={() => setExpandedGroup(prev => prev === 'medium' ? null : 'medium')}
+        groupCheckboxState={mediumCheckbox.state}
+        onGroupToggle={mediumCheckbox.toggle}
+        selectedIds={selectedLabelIds}
+        getId={(l) => `${l.label}::${l.category}`}
+        onItemToggle={handleToggle}
+        renderItem={renderLabel}
+      />
 
-      {/* Low Confidence Labels */}
-      {grouped.low.length > 0 && (
-        <ExpandableSection
-          title="Low Confidence"
-          count={grouped.low.length}
-          isExpanded={expandedGroup === 'low'}
-          onToggle={() => setExpandedGroup(prev => prev === 'low' ? null : 'low')}
-          headerAction={
-            <input
-              type="checkbox"
-              checked={getGroupCheckboxState(grouped.low) === 'checked'}
-              ref={(el) => {
-                if (el) {
-                  el.indeterminate = getGroupCheckboxState(grouped.low) === 'indeterminate';
-                }
-              }}
-              onChange={() => handleGroupToggle(grouped.low)}
-              className="rounded"
-              aria-label="Select all low confidence labels"
-            />
-          }
-        >
-          <div className="space-y-1 px-3 min-w-0">
-            {grouped.low.map(label => {
-              const labelId = `${label.label}::${label.category}`;
-              return (
-                <label
-                  key={labelId}
-                  className="flex items-center gap-2 py-1 hover:bg-accent rounded px-2 cursor-pointer transition-colors min-w-0 max-w-full overflow-hidden"
-                  onMouseDown={(e) => { if (e.shiftKey) e.preventDefault(); }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedLabelIds.has(labelId)}
-                    onChange={(e) => handleToggle(labelId, e)}
-                    className="rounded flex-shrink-0"
-                    aria-label={`Include ${label.label} (${Math.round(label.confidence * 100)}% confidence)`}
-                  />
-                  <span className="mr-1 flex-shrink-0">{getCategoryIcon(label.category)}</span>
-                  <span className="flex-1 text-sm truncate min-w-0">{label.label}</span>
-                  <Badge variant="outline" className={`text-xs h-5 flex-shrink-0 ${getCategoryStyles(label.category)}`}>
-                    {label.category}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground flex-shrink-0">
-                    {Math.round(label.confidence * 100)}%
-                  </span>
-                </label>
-              );
-            })}
-          </div>
-        </ExpandableSection>
-      )}
+      <ConfidenceGroupSection
+        level="Low"
+        items={grouped.low}
+        isExpanded={expandedGroup === 'low'}
+        onToggle={() => setExpandedGroup(prev => prev === 'low' ? null : 'low')}
+        groupCheckboxState={lowCheckbox.state}
+        onGroupToggle={lowCheckbox.toggle}
+        selectedIds={selectedLabelIds}
+        getId={(l) => `${l.label}::${l.category}`}
+        onItemToggle={handleToggle}
+        renderItem={renderLabel}
+      />
 
       {bookmark.remainingLabels.length === 0 && (
         <div className="text-center py-6 text-muted-foreground">
@@ -331,26 +167,12 @@ export function BookmarkPreviewView({
       {/* Selection Controls */}
       {bookmark.remainingLabels.length > 0 && (
         <>
-          <div className="flex gap-2 pt-2 min-w-0">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleSelectAll}
-              disabled={selectedLabelIds.size === bookmark.remainingLabels.length}
-              className="flex-1 min-w-0"
-            >
-              Select All
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleDeselectAll}
-              disabled={selectedLabelIds.size === 0}
-              className="flex-1 min-w-0"
-            >
-              Deselect All
-            </Button>
-          </div>
+          <SelectionControls
+            onSelectAll={selectAll}
+            onDeselectAll={deselectAll}
+            selectedCount={selectedLabelIds.size}
+            totalCount={bookmark.remainingLabels.length}
+          />
 
           {/* Apply Button */}
           <Button
