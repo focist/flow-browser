@@ -10,7 +10,7 @@ import { getCategoryStyles } from '../../lib/label-styles';
 interface BookmarkOverviewColumnProps {
   bookmarks: DashboardBookmark[];
   selectedIds: Set<string>;
-  onToggleSelection: (id: string) => void;
+  onToggleSelection: (id: string, event?: React.ChangeEvent<HTMLInputElement>) => void;
   onSelectAll: () => void;
   onClearSelection: () => void;
   getConfidenceLevel: (confidence: number) => 'high' | 'medium' | 'low';
@@ -28,7 +28,7 @@ interface BookmarkGroupProps {
   color: string;
   bookmarks: DashboardBookmark[];
   selectedIds: Set<string>;
-  onToggleSelection: (id: string) => void;
+  onToggleSelection: (id: string, event?: React.ChangeEvent<HTMLInputElement>) => void;
   expanded?: boolean;
   onToggleExpanded?: () => void;
   hoveredPatternId?: string | null;
@@ -41,7 +41,7 @@ interface BookmarkGroupProps {
 const BookmarkItem: React.FC<{
   bookmark: DashboardBookmark;
   isSelected: boolean;
-  onToggle: (e: React.MouseEvent) => void;
+  onToggle: (e: React.ChangeEvent<HTMLInputElement>) => void;
   isHighlighted?: boolean;
   isDimmed?: boolean;
   onHover?: (bookmarkId: string | null) => void;
@@ -55,14 +55,13 @@ const BookmarkItem: React.FC<{
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -10 }}
-      className={`flex items-start gap-2 p-2 rounded border cursor-pointer hover:bg-accent/50 transition-all duration-200 overflow-hidden ${
+      className={`flex items-start gap-2 p-2 rounded border hover:bg-accent/50 transition-all duration-200 overflow-hidden ${
         isSelected ? 'bg-accent border-primary' : 'bg-card'
       } ${
         isHighlighted ? 'ring-2 ring-blue-500/50 bg-blue-50 dark:bg-blue-950/20' : ''
       } ${
         isDimmed ? 'opacity-40' : 'opacity-100'
       }`}
-      onClick={(e) => onToggle(e)}
       onMouseDown={(e) => {
         // Prevent text selection on shift-click by stopping the mousedown event early
         if (e.shiftKey) {
@@ -77,10 +76,28 @@ const BookmarkItem: React.FC<{
     >
       <Checkbox
         checked={isSelected}
-        onCheckedChange={() => {
-          // Checkbox state is managed by parent click handler
+        onCheckedChange={(checked, event) => {
+          // If we have the actual event, use it directly
+          if (event) {
+            onToggle(event);
+          } else {
+            // Fallback: create a minimal synthetic event
+            const syntheticEvent = {
+              target: {
+                checked: checked === true
+              },
+              currentTarget: {
+                checked: checked === true
+              },
+              nativeEvent: {
+                shiftKey: false
+              },
+              shiftKey: false
+            } as React.ChangeEvent<HTMLInputElement>;
+
+            onToggle(syntheticEvent);
+          }
         }}
-        onClick={(e) => e.stopPropagation()}
         className="mt-0.5 flex-shrink-0"
       />
       <div className="flex-1 min-w-0 overflow-hidden">
@@ -134,42 +151,9 @@ const BookmarkGroup: React.FC<BookmarkGroupProps> = ({
 }) => {
   if (count === 0) return null;
 
-  const handleBookmarkClick = (bookmarkId: string, event: React.MouseEvent) => {
-    // Determine the action based on current selection state
-    const action = selectedIds.has(bookmarkId) ? 'deselect' : 'select';
-
-    if (event.shiftKey && lastClickedId && onSetLastClickedId) {
-      // Find indices in the full bookmarks array
-      const allIds = allBookmarks.map(b => b.bookmark.id);
-      const lastIndex = allIds.indexOf(lastClickedId);
-      const currentIndex = allIds.indexOf(bookmarkId);
-
-      if (lastIndex !== -1 && currentIndex !== -1) {
-        // Apply the SAME action to all items in the range
-        const start = Math.min(lastIndex, currentIndex);
-        const end = Math.max(lastIndex, currentIndex);
-
-        for (let i = start; i <= end; i++) {
-          const id = allIds[i];
-          const isCurrentlySelected = selectedIds.has(id);
-
-          // Only toggle if the current state doesn't match the desired action
-          if (action === 'select' && !isCurrentlySelected) {
-            onToggleSelection(id);
-          } else if (action === 'deselect' && isCurrentlySelected) {
-            onToggleSelection(id);
-          }
-        }
-      }
-    } else {
-      // Normal click - toggle selection
-      onToggleSelection(bookmarkId);
-    }
-
-    // Update last clicked ID
-    if (onSetLastClickedId) {
-      onSetLastClickedId(bookmarkId);
-    }
+  const handleBookmarkClick = (bookmarkId: string, event: React.ChangeEvent<HTMLInputElement>) => {
+    // Simply delegate to the parent handler which has the correct shift-click logic
+    onToggleSelection(bookmarkId, event);
   };
 
   return (

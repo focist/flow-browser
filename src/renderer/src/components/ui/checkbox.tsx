@@ -3,14 +3,28 @@ import { Check } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface CheckboxProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'> {
-  onCheckedChange?: (checked: boolean) => void;
+  onCheckedChange?: (checked: boolean, event?: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
 const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
   ({ className, onCheckedChange, onChange, ...props }, ref) => {
+    const inputRef = React.useRef<HTMLInputElement>(null);
+    const lastMouseEventRef = React.useRef<React.MouseEvent | null>(null);
+
     const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+      // Inject the mouse event's shiftKey state into the native event
+      // This allows shift-click range selection to work properly
+      if (lastMouseEventRef.current) {
+        Object.defineProperty(event.nativeEvent, 'shiftKey', {
+          value: lastMouseEventRef.current.shiftKey,
+          writable: false,
+          configurable: true
+        });
+        lastMouseEventRef.current = null;
+      }
+
       onChange?.(event);
-      onCheckedChange?.(event.target.checked);
+      onCheckedChange?.(event.target.checked, event);
     };
 
     return (
@@ -18,7 +32,14 @@ const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
         <input
           type="checkbox"
           className="sr-only"
-          ref={ref}
+          ref={(node) => {
+            inputRef.current = node;
+            if (typeof ref === 'function') {
+              ref(node);
+            } else if (ref) {
+              (ref as React.MutableRefObject<HTMLInputElement | null>).current = node;
+            }
+          }}
           onChange={handleChange}
           {...props}
         />
@@ -28,9 +49,10 @@ const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
             props.checked ? "bg-primary text-primary-foreground" : "bg-background",
             className
           )}
-          onClick={() => {
-            const input = ref as React.RefObject<HTMLInputElement>;
-            input.current?.click();
+          onClick={(e) => {
+            // Capture the mouse event to preserve shift key state
+            lastMouseEventRef.current = e;
+            inputRef.current?.click();
           }}
         >
           {props.checked && (
