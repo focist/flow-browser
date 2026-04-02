@@ -474,7 +474,7 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
 
       {/* Dashboard */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="w-full max-w-7xl h-[90vh] bg-background rounded-lg shadow-2xl border flex flex-col">
+        <div className="w-full max-w-7xl h-[90vh] bg-background rounded-lg shadow-2xl border flex flex-col overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b">
             <div>
@@ -501,7 +501,7 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
           {/* Three-Column Layout */}
           <div className="flex-1 flex gap-0 overflow-hidden min-h-0">
             {/* Column 1: Bookmark Overview */}
-            <div className="flex-shrink-0 w-[33.333%] border-r h-full min-h-0 overflow-hidden">
+            <div className="flex-shrink-0 w-[33.333%] border-r h-full min-h-0 overflow-hidden min-w-0">
               <BookmarkOverviewColumn
                 bookmarks={dashboardState.getFilteredBookmarks()}
                 selectedIds={dashboardState.selectedBookmarkIds}
@@ -518,7 +518,7 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
             </div>
 
             {/* Column 2: Label Suggestions */}
-            <div className="flex-shrink-0 w-[33.333%] border-r h-full min-h-0 overflow-hidden">
+            <div className="flex-shrink-0 w-[33.333%] border-r h-full min-h-0 overflow-hidden min-w-0">
               <LabelSuggestionsColumn
                 labelPatterns={patterns.labelPatterns}
                 categoryPatterns={patterns.categoryPatterns}
@@ -532,7 +532,7 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
             </div>
 
             {/* Column 3: Context Preview Column */}
-            <div className="flex-shrink-0 w-[33.333%] h-full min-h-0 overflow-hidden">
+            <div className="flex-shrink-0 w-[33.333%] h-full min-h-0 overflow-hidden min-w-0">
               <ContextPreviewColumn
                 mode={previewMode}
                 stats={patterns.stats}

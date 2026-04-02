@@ -31,7 +31,7 @@ export function ExpandableSection({
   const contentId = useId();
 
   return (
-    <div className={cn('border-b border-gray-200 dark:border-gray-700', level > 0 && 'ml-4', className)}>
+    <div className={cn('border-b border-gray-200 dark:border-gray-700 min-w-0', level > 0 && 'ml-4', className)}>
       <div
         className={cn(
           'w-full flex items-center justify-between py-2 px-3 hover:bg-accent transition-colors',

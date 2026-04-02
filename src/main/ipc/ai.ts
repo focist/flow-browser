@@ -86,24 +86,42 @@ ipcMain.handle('ai:extractBasicInfo', async (_, url: string, title?: string) => 
   }
 });
 
-// Test available models
-ipcMain.handle('ai:listModels', async () => {
+// Provider Management (NEW)
+ipcMain.handle('ai:listProviders', async () => {
   try {
-    const settings = await aiService.getSettings();
-    if (!settings.apiKey || settings.provider !== 'openai') {
-      return { success: false, error: 'OpenAI not configured' };
-    }
-    
-    const OpenAI = require('openai');
-    const openai = new OpenAI({
-      apiKey: settings.apiKey,
-    });
-    
-    const models = await openai.models.list();
-    return { success: true, data: models.data };
+    const providers = await aiService.listProviders();
+    return { success: true, data: providers };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 });
 
-console.log('AI IPC handlers registered');
+ipcMain.handle('ai:listModels', async (_, providerId?: string) => {
+  try {
+    const models = await aiService.listModels(providerId);
+    return { success: true, data: models };
+  } catch (error) {
+    console.error('Failed to list models:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+});
+
+ipcMain.handle('ai:testConnection', async (_, providerId: string, apiKey: string) => {
+  try {
+    const result = await aiService.testConnection(providerId, apiKey);
+    return { success: true, data: result };
+  } catch (error) {
+    console.error('Failed to test connection:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+});
+
+ipcMain.handle('ai:estimateCost', async (_, bookmarkCount: number, model?: string) => {
+  try {
+    const cost = await aiService.estimateCost(bookmarkCount, model);
+    return { success: true, data: cost };
+  } catch (error) {
+    console.error('Failed to estimate cost:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+});

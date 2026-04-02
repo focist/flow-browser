@@ -7,14 +7,99 @@ import { Switch } from '../ui/switch';
 import { Slider } from '../ui/slider';
 import { Badge } from '../ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Brain, Key, Settings, AlertCircle, CheckCircle, Sparkles } from 'lucide-react';
+import { Brain, Key, Settings, AlertCircle, CheckCircle, Sparkles, Loader2, DollarSign, Eye, Code } from 'lucide-react';
 import { toast } from 'sonner';
-import type { AISettings } from '~/flow/interfaces/ai';
+import type { AISettings, ModelMetadata } from '~/flow/interfaces/ai';
 
 interface AISettingsProps {
   onSettingsChange?: (settings: AISettings) => void;
   className?: string;
 }
+
+interface ProviderInfo {
+  id: string;
+  name: string;
+  description: string;
+}
+
+interface ModelCardProps {
+  model: ModelMetadata;
+  selected: boolean;
+  onSelect: () => void;
+}
+
+const ModelCard: React.FC<ModelCardProps> = ({ model, selected, onSelect }) => {
+  return (
+    <label
+      className={`relative flex cursor-pointer flex-col gap-3 rounded-lg border-2 p-4 transition-all ${
+        selected
+          ? 'border-primary bg-primary/5'
+          : 'border-border bg-card hover:border-primary/50'
+      }`}
+    >
+      <input
+        type="radio"
+        checked={selected}
+        onChange={onSelect}
+        className="sr-only"
+      />
+
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <h4 className="font-semibold text-base">{model.name}</h4>
+          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+            {model.description}
+          </p>
+        </div>
+
+        {selected && (
+          <CheckCircle className="h-5 w-5 text-primary shrink-0" />
+        )}
+      </div>
+
+      <div className="flex flex-wrap gap-1.5">
+        {model.tags.includes('recommended') && (
+          <Badge variant="default" className="text-[10px] px-1.5 py-0.5">
+            Recommended
+          </Badge>
+        )}
+        {model.tags.includes('budget') && (
+          <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5">
+            Budget
+          </Badge>
+        )}
+        {model.tags.includes('fast') && (
+          <Badge variant="outline" className="text-[10px] px-1.5 py-0.5">
+            Fast
+          </Badge>
+        )}
+      </div>
+
+      <div className="space-y-1 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1">
+          <DollarSign className="h-3 w-3" />
+          <span>
+            ${model.pricing.inputCostPerMillion.toFixed(2)} / $
+            {model.pricing.outputCostPerMillion.toFixed(2)} per 1M tokens
+          </span>
+        </div>
+        <div className="flex items-center gap-3 flex-wrap">
+          <span>{(model.contextWindow / 1000).toFixed(0)}K context</span>
+          {model.capabilities.vision && (
+            <span className="flex items-center gap-1">
+              <Eye className="h-3 w-3" /> Vision
+            </span>
+          )}
+          {model.capabilities.functionCalling && (
+            <span className="flex items-center gap-1">
+              <Code className="h-3 w-3" /> Functions
+            </span>
+          )}
+        </div>
+      </div>
+    </label>
+  );
+};
 
 export const AISettingsComponent: React.FC<AISettingsProps> = ({
   onSettingsChange,
@@ -37,7 +122,7 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
       priority: false,
     }
   });
-  
+
   const [apiKey, setApiKey] = useState('');
   const [lastTestedApiKey, setLastTestedApiKey] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -45,22 +130,14 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [availableModels, setAvailableModels] = useState<string[]>([]);
 
-  // Model options for each provider
-  const modelOptions = {
-    openai: [
-      { value: 'gpt-5-nano', label: 'GPT-5 Nano (Recommended)', description: '~$0.0001 per bookmark' },
-      { value: 'gpt-4.1-nano', label: 'GPT-4.1 Nano (Ultra Budget)', description: '~$0.0001 per bookmark' },
-      { value: 'gpt-4o-mini', label: 'GPT-4o Mini (Budget)', description: '~$0.0005 per bookmark' },
-      { value: 'gpt-4o', label: 'GPT-4o (High Quality)', description: '~$0.01 per bookmark' },
-      { value: 'gpt-4-turbo', label: 'GPT-4 Turbo', description: '~$0.02 per bookmark' }
-    ],
-    claude: [
-      { value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet (Recommended)', description: '~$0.015 per bookmark' },
-      { value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku (Budget)', description: '~$0.005 per bookmark' },
-      { value: 'claude-3-haiku-20240307', label: 'Claude 3 Haiku (Cheapest)', description: '~$0.002 per bookmark' }
-    ],
-    local: []
-  };
+  // Dynamic provider and model data
+  // Note: providers and isLoadingProviders are available for future provider selection UI
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [providers, setProviders] = useState<ProviderInfo[]>([]);
+  const [models, setModels] = useState<ModelMetadata[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [isLoadingProviders, setIsLoadingProviders] = useState(false);
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
 
   const getDefaultModel = (provider: 'openai' | 'claude' | 'local') => {
     switch (provider) {
@@ -70,10 +147,20 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
     }
   };
 
-  // Load settings on mount
+  // Load settings and providers on mount
   useEffect(() => {
     loadSettings();
+    loadProviders();
   }, []);
+
+  // Load models when provider changes
+  useEffect(() => {
+    if (settings.provider && settings.provider !== 'local') {
+      loadModelsForProvider(settings.provider);
+    } else {
+      setModels([]);
+    }
+  }, [settings.provider]);
 
   const loadSettings = async () => {
     try {
@@ -95,6 +182,39 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
     } catch (error) {
       console.error('Failed to load AI settings:', error);
       toast.error('Failed to load AI settings');
+    }
+  };
+
+  const loadProviders = async () => {
+    setIsLoadingProviders(true);
+    try {
+      const result = await flow.ai['ai:listProviders']();
+      if (result.success && result.data) {
+        setProviders(result.data);
+      }
+    } catch (error) {
+      console.error('Failed to load providers:', error);
+      toast.error('Failed to load AI providers');
+    } finally {
+      setIsLoadingProviders(false);
+    }
+  };
+
+  const loadModelsForProvider = async (providerId: string) => {
+    setIsLoadingModels(true);
+    try {
+      // Normalize provider ID (claude -> anthropic)
+      const normalizedProviderId = providerId === 'claude' ? 'anthropic' : providerId;
+      const result = await flow.ai['ai:listModels'](normalizedProviderId);
+      if (result.success && result.data) {
+        setModels(result.data);
+      }
+    } catch (error) {
+      console.error('Failed to load models:', error);
+      // Don't show error toast here as models might not be available without API key
+      setModels([]);
+    } finally {
+      setIsLoadingModels(false);
     }
   };
 
@@ -143,20 +263,26 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
       // Save settings first to ensure AI service is configured
       const testSettings = { ...settings, enabled: true, apiKey: apiKey.trim() };
       await flow.ai['ai:updateSettings'](testSettings);
-      
+
+      // Normalize provider ID (claude -> anthropic)
+      const normalizedProviderId = settings.provider === 'claude' ? 'anthropic' : settings.provider;
+
       // Test by listing available models
-      const modelsResult = await flow.ai['ai:listModels']();
-      
+      const modelsResult = await flow.ai['ai:listModels'](normalizedProviderId);
+
       if (modelsResult.success && modelsResult.data) {
         setConnectionStatus('success');
         setLastTestedApiKey(apiKey.trim());
-        
-        // Store available models for display
+
+        // Store models with full metadata
+        setModels(modelsResult.data);
+
+        // Store model IDs for backward compatibility
         const modelNames = modelsResult.data
           .map((m: any) => m.id)
           .filter((id: string) => id && id.trim().length > 0);
         setAvailableModels(modelNames);
-        
+
         toast.success(`AI connection successful! ${modelsResult.data.length} models available.`);
       } else {
         throw new Error(modelsResult.error || 'Connection test failed');
@@ -256,28 +382,37 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
                   </p>
                 </div>
 
-                {/* Model Selection */}
+                {/* Model Selection - Radio Card Grid */}
                 {(settings.provider === 'openai' || settings.provider === 'claude') && (
-                  <div className="space-y-2">
-                    <Label htmlFor="model-select">Model</Label>
-                    <Select
-                      value={settings.model || getDefaultModel(settings.provider)}
-                      onValueChange={(value: string) => handleSettingChange('model', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {modelOptions[settings.provider].map((model) => (
-                          <SelectItem key={model.value} value={model.value}>
-                            <div className="flex flex-col">
-                              <span>{model.label}</span>
-                              <span className="text-xs text-muted-foreground">{model.description}</span>
-                            </div>
-                          </SelectItem>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label>Select Model</Label>
+                      {isLoadingModels && (
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Loading models...
+                        </div>
+                      )}
+                    </div>
+
+                    {models.length === 0 && !isLoadingModels ? (
+                      <div className="p-4 bg-amber-50 border border-amber-200 rounded-md">
+                        <p className="text-sm text-amber-800">
+                          Enter your API key and test the connection to load available models
+                        </p>
+                      </div>
+                    ) : models.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {models.map((model) => (
+                          <ModelCard
+                            key={model.id}
+                            model={model}
+                            selected={settings.model === model.id}
+                            onSelect={() => handleSettingChange('model', model.id)}
+                          />
                         ))}
-                      </SelectContent>
-                    </Select>
+                      </div>
+                    ) : null}
                   </div>
                 )}
               </div>
@@ -327,25 +462,6 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
                       <>Get your API key from <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer" className="underline">Anthropic Console</a></>
                     )}
                   </p>
-                  
-                  {/* Available Models Display */}
-                  {availableModels.length > 0 && (
-                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
-                      <h4 className="text-sm font-medium text-green-800 mb-2">
-                        Available Models ({availableModels.length}):
-                      </h4>
-                      <div className="flex flex-wrap gap-1">
-                        {availableModels.map((model, index) => (
-                          <span 
-                            key={`${model}-${index}`} 
-                            className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800 border"
-                          >
-                            {model || 'Unknown Model'}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
                 </div>
               )}

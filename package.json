@@ -33,6 +33,7 @@
     "@anthropic-ai/sdk": "^0.61.0",
     "@ghostery/adblocker-electron": "^2.5.2",
     "@phosphor-icons/core": "^2.1.1",
+    "axios": "^1.12.2",
     "better-sqlite3": "^12.2.0",
     "electron-chrome-extensions": "npm:@iamevan/electron-chrome-extensions@4.7.5",
     "electron-chrome-web-store": "npm:@iamevan/electron-chrome-web-store@0.11.2",

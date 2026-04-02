@@ -86,7 +86,7 @@ export function LabelPreviewView({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 min-w-0 overflow-hidden">
       {/* Header */}
       <div>
         <div className="flex items-center gap-2 mb-1">
