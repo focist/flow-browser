@@ -85,7 +85,7 @@ export function ContextPreviewColumn({
 
   return (
     <div
-      className="flex flex-col h-full"
+      className="flex flex-col h-full overflow-hidden"
       onMouseEnter={() => onColumnHover?.(true)}
       onMouseLeave={() => onColumnHover?.(false)}
     >
@@ -106,12 +106,12 @@ export function ContextPreviewColumn({
       </div>
 
       {/* Content Area with Transition */}
-      <ScrollArea className="flex-1 overflow-hidden">
-        <div className="p-4 w-full min-w-0">
+      {mode === 'bulk-impact' ? (
+        <div className="flex-1 overflow-hidden p-4 min-w-0 flex flex-col min-h-0">
           <AnimatePresence mode="sync">
             <motion.div
               key={mode}
-              className="w-full min-w-0"
+              className="flex-1 min-h-0 w-full min-w-0 flex flex-col"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
@@ -121,7 +121,24 @@ export function ContextPreviewColumn({
             </motion.div>
           </AnimatePresence>
         </div>
-      </ScrollArea>
+      ) : (
+        <ScrollArea className="flex-1 overflow-hidden">
+          <div className="p-4 w-full min-w-0">
+            <AnimatePresence mode="sync">
+              <motion.div
+                key={mode}
+                className="w-full min-w-0"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2, ease: 'easeInOut' }}
+              >
+                {renderContent()}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        </ScrollArea>
+      )}
     </div>
   );
 }

@@ -696,8 +696,17 @@ const aiAPI: AIFlowInterface = {
   'ai:findDuplicates': async (request, existingBookmarks) => {
     return ipcRenderer.invoke('ai:findDuplicates', request, existingBookmarks);
   },
-  'ai:listModels': async () => {
-    return ipcRenderer.invoke('ai:listModels');
+  'ai:listProviders': async () => {
+    return ipcRenderer.invoke('ai:listProviders');
+  },
+  'ai:listModels': async (providerId) => {
+    return ipcRenderer.invoke('ai:listModels', providerId);
+  },
+  'ai:testConnection': async (providerId, apiKey) => {
+    return ipcRenderer.invoke('ai:testConnection', providerId, apiKey);
+  },
+  'ai:estimateCost': async (bookmarkCount, model) => {
+    return ipcRenderer.invoke('ai:estimateCost', bookmarkCount, model);
   }
 };
 
@@ -744,6 +753,6 @@ const flowAPI: typeof flow = {
   onboarding: wrapAPI(onboardingAPI, "settings"),
 
   // AI APIs
-  ai: wrapAPI(aiAPI, "app")
+  ai: wrapAPI(aiAPI, "settings")
 };
 contextBridge.exposeInMainWorld("flow", flowAPI);

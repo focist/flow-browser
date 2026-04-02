@@ -1,3 +1,31 @@
+export interface ModelMetadata {
+  id: string;
+  name: string;
+  provider: string;
+  description: string;
+  contextWindow: number;
+  pricing: {
+    inputCostPerMillion: number;
+    outputCostPerMillion: number;
+    cacheCostPerMillion?: number;
+    cacheDiscountPercent?: number;
+  };
+  capabilities: {
+    vision: boolean;
+    functionCalling: boolean;
+    streaming: boolean;
+    batchProcessing: boolean;
+  };
+  limits: {
+    maxTokensPerRequest: number;
+    requestsPerMinute: number;
+    tokensPerMinute: number;
+  };
+  tags: string[];
+  deprecatedAt?: Date;
+  replacedBy?: string;
+}
+
 export interface AISettings {
   enabled: boolean;
   provider: 'openai' | 'claude' | 'local';
@@ -100,18 +128,21 @@ export interface AIFlowInterface {
   'ai:getSettings': () => Promise<{ success: boolean; data?: AISettings; error?: string }>;
   'ai:updateSettings': (settings: Partial<AISettings>) => Promise<{ success: boolean; error?: string }>;
   'ai:isEnabled': () => Promise<{ success: boolean; data?: boolean; error?: string }>;
-  
+
   // Analysis
   'ai:analyzeBookmark': (request: BookmarkAnalysisRequest) => Promise<{ success: boolean; data?: CategoryAnalysis; error?: string }>;
   'ai:generateDescription': (request: BookmarkAnalysisRequest) => Promise<{ success: boolean; data?: string; error?: string }>;
-  
+
   // Content Fetching
   'ai:fetchPageContent': (url: string, options?: FetchOptions) => Promise<{ success: boolean; data?: PageContent; error?: string }>;
   'ai:extractBasicInfo': (url: string, title?: string) => Promise<{ success: boolean; data?: Pick<PageContent, 'url' | 'title' | 'siteName'>; error?: string }>;
-  
+
   // Duplicate detection
   'ai:findDuplicates': (request: BookmarkAnalysisRequest, existingBookmarks: { id: string; url: string; title: string; description?: string; }[]) => Promise<{ success: boolean; data?: DuplicateCandidate[]; error?: string }>;
-  
-  // Testing
-  'ai:listModels': () => Promise<{ success: boolean; data?: any[]; error?: string }>;
+
+  // Provider Management (NEW)
+  'ai:listProviders': () => Promise<{ success: boolean; data?: Array<{ id: string; name: string; description: string }>; error?: string }>;
+  'ai:listModels': (providerId?: string) => Promise<{ success: boolean; data?: any[]; error?: string }>;
+  'ai:testConnection': (providerId: string, apiKey: string) => Promise<{ success: boolean; data?: { success: boolean; models?: any[]; error?: string }; error?: string }>;
+  'ai:estimateCost': (bookmarkCount: number, model?: string) => Promise<{ success: boolean; data?: { inputCost: number; outputCost: number; totalCost: number }; error?: string }>;
 }

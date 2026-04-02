@@ -1,19 +1,27 @@
-import OpenAI from 'openai';
-import Anthropic from '@anthropic-ai/sdk';
 import { SettingsDataStore } from '@/saving/settings';
-import type { 
-  AISettings, 
-  BookmarkAnalysisRequest, 
-  BookmarkLabel, 
-  CategoryAnalysis, 
-  DuplicateCandidate 
+import { ProviderRegistry } from './ai/provider-registry';
+import { LLMRequest } from './ai/providers/base-provider';
+import type {
+  AISettings,
+  BookmarkAnalysisRequest,
+  BookmarkLabel,
+  CategoryAnalysis,
+  DuplicateCandidate
 } from '~/flow/interfaces/ai';
 
+/**
+ * AI Service - Refactored to use Provider Abstraction
+ *
+ * This service now uses the Provider Registry for unified LLM provider management.
+ * Maintains full backward compatibility with existing code while enabling:
+ * - Dynamic model discovery
+ * - Provider switching without code changes
+ * - Extensible architecture for new providers
+ */
 class AIService {
-  private openai: OpenAI | null = null;
-  private claude: Anthropic | null = null;
+  private registry: ProviderRegistry;
   private settings: AISettings = {
-    enabled: true, // Default to enabled so it works immediately
+    enabled: true,
     provider: 'openai',
     model: 'gpt-5-nano',
     autoAnalyze: false,
@@ -37,6 +45,7 @@ class AIService {
       case 'openai':
         return 'gpt-5-nano';
       case 'claude':
+      case 'anthropic':
         return 'claude-3-5-sonnet-20241022';
       default:
         return 'gpt-5-nano';
@@ -44,9 +53,16 @@ class AIService {
   }
 
   constructor() {
-    this.initPromise = this.loadSettings().then(() => {
-      this.initialized = true;
-    });
+    this.registry = new ProviderRegistry();
+    this.initPromise = this.loadSettings()
+      .then(() => {
+        this.initialized = true;
+      })
+      .catch((error) => {
+        console.error('AIService initialization failed:', error);
+        // Mark as initialized even on failure to prevent blocking
+        this.initialized = true;
+      });
   }
 
   private async ensureInitialized() {
@@ -61,53 +77,55 @@ class AIService {
       if (savedSettings) {
         this.settings = { ...this.settings, ...savedSettings };
         console.log('🔧 AI Settings loaded:', this.settings);
-        
-        // Initialize AI clients if we have settings
-        if (this.settings.apiKey) {
-          if (this.settings.provider === 'openai') {
-            this.openai = new OpenAI({
-              apiKey: this.settings.apiKey,
-            });
-          } else if (this.settings.provider === 'claude') {
-            this.claude = new Anthropic({
-              apiKey: this.settings.apiKey,
-            });
-          }
+
+        // Initialize registry with defaults
+        await this.registry.initializeDefaults();
+
+        // Configure the active provider if we have an API key
+        if (this.settings.apiKey && this.settings.provider !== 'local') {
+          const providerId = this.normalizeProviderId(this.settings.provider);
+          await this.registry.configureProvider(providerId, {
+            apiKey: this.settings.apiKey
+          });
         }
       } else {
         console.log('🔧 No saved AI settings found, using defaults');
+        await this.registry.initializeDefaults();
       }
     } catch (error) {
       console.error('Failed to load AI settings:', error);
+      await this.registry.initializeDefaults();
     }
+  }
+
+  /**
+   * Normalize provider ID to match registry (claude -> anthropic)
+   */
+  private normalizeProviderId(provider: string): string {
+    return provider === 'claude' ? 'anthropic' : provider;
   }
 
   public async updateSettings(newSettings: Partial<AISettings>) {
     this.settings = { ...this.settings, ...newSettings };
-    
+
     // Set default model if provider changed but no model specified
     if (newSettings.provider && !newSettings.model) {
       this.settings.model = this.getDefaultModel(newSettings.provider);
     }
-    
-    // Initialize AI clients based on provider
-    if (this.settings.apiKey) {
-      if (this.settings.provider === 'openai') {
-        this.openai = new OpenAI({
-          apiKey: this.settings.apiKey,
+
+    // Configure provider in registry if we have an API key
+    if (this.settings.apiKey && this.settings.provider !== 'local') {
+      try {
+        const providerId = this.normalizeProviderId(this.settings.provider);
+        await this.registry.configureProvider(providerId, {
+          apiKey: this.settings.apiKey
         });
-        this.claude = null;
-      } else if (this.settings.provider === 'claude') {
-        this.claude = new Anthropic({
-          apiKey: this.settings.apiKey,
-        });
-        this.openai = null;
+        console.log(`🔧 Configured ${providerId} provider in registry`);
+      } catch (error) {
+        console.error('Failed to configure provider:', error);
       }
-    } else {
-      this.openai = null;
-      this.claude = null;
     }
-    
+
     // Save settings to persistent storage
     try {
       await SettingsDataStore.set('ai-settings', this.settings);
@@ -119,193 +137,106 @@ class AIService {
 
   public async isEnabled(): Promise<boolean> {
     await this.ensureInitialized();
-    return this.settings.enabled && (
-      (this.settings.provider === 'openai' && this.openai !== null) ||
-      (this.settings.provider === 'claude' && this.claude !== null) ||
-      this.settings.provider === 'local'
-    );
+
+    if (!this.settings.enabled) {
+      return false;
+    }
+
+    if (this.settings.provider === 'local') {
+      return true;
+    }
+
+    const providerId = this.normalizeProviderId(this.settings.provider);
+    const provider = this.registry.getProvider(providerId);
+    return provider !== null;
   }
 
   public async analyzeBookmark(request: BookmarkAnalysisRequest): Promise<CategoryAnalysis> {
     console.log(`AI-SERVICE: Starting bookmark analysis for "${request.title}"`);
     console.log(`AI-SERVICE: URL: ${request.url}`);
     console.log(`AI-SERVICE: Content length: ${request.content?.length || 0}`);
-    
+
     await this.ensureInitialized();
     console.log(`AI-SERVICE: Provider: ${this.settings.provider}, Enabled: ${this.settings.enabled}`);
-    
+
     if (!(await this.isEnabled())) {
       console.error('AI-SERVICE: AI service is not enabled or configured');
       throw new Error('AI service is not enabled or configured');
     }
 
-    // Force reinitialize OpenAI client if settings exist but client is null
-    if (this.settings.provider === 'openai' && this.settings.apiKey && !this.openai) {
-      console.log('AI-SERVICE: Reinitializing OpenAI client...');
-      try {
-        this.openai = new OpenAI({
-          apiKey: this.settings.apiKey,
-        });
-        console.log('AI-SERVICE: OpenAI client reinitialized successfully');
-      } catch (error) {
-        console.error('AI-SERVICE: Failed to reinitialize OpenAI client:', error);
-      }
-    }
-
-    if (this.settings.provider === 'openai' && this.openai) {
-      console.log('AI-SERVICE: Using OpenAI for analysis');
-      return this.analyzeWithOpenAI(request);
-    } else if (this.settings.provider === 'claude' && this.claude) {
-      console.log('AI-SERVICE: Using Claude for analysis');
-      return this.analyzeWithClaude(request);
-    } else {
-      console.log('AI-SERVICE: Falling back to local analysis');
+    // Use local analysis if local provider is selected
+    if (this.settings.provider === 'local') {
+      console.log('AI-SERVICE: Using local analysis');
       return this.analyzeLocally(request);
     }
-  }
 
-  private async analyzeWithOpenAI(request: BookmarkAnalysisRequest): Promise<CategoryAnalysis> {
-    console.log('AI-SERVICE: Starting OpenAI analysis');
-    
-    if (!this.openai) {
-      console.error('AI-SERVICE: OpenAI client not initialized');
-      throw new Error('OpenAI client not initialized');
+    // Use provider abstraction for API-based analysis
+    const providerId = this.normalizeProviderId(this.settings.provider);
+    const provider = this.registry.getProvider(providerId);
+
+    if (!provider) {
+      console.error(`AI-SERVICE: Provider ${providerId} not configured`);
+      throw new Error(`Provider ${providerId} not configured`);
     }
 
-    const prompt = this.buildAnalysisPrompt(request);
-    console.log(`AI-SERVICE: Generated prompt (${prompt.length} chars)`);
-    console.log(`AI-SERVICE: Prompt preview: ${prompt.substring(0, 200)}...`);
-    
-    const model = this.settings.model || 'gpt-5-nano';
-    
-    // Nano models use reasoning tokens internally and need much higher limits
-    const isNanoModel = model.includes('nano');
-    const maxTokens = isNanoModel ? 5000 : 500;
-    
-    console.log(`AI-SERVICE: Model type: ${isNanoModel ? 'nano (reasoning model)' : 'standard'}`);
-    
-    const requestPayload = {
-      model: model,
-      messages: [
-        {
-          role: 'user' as const,
-          content: prompt
-        }
-      ],
-      max_completion_tokens: maxTokens,
-    };
-    
-    console.log(`AI-SERVICE: Using model: ${requestPayload.model}`);
-    console.log(`AI-SERVICE: Max completion tokens: ${requestPayload.max_completion_tokens}`);
-    
-    try {
-      console.log('AI-SERVICE: Sending request to OpenAI...');
-      const startTime = Date.now();
-      const response = await this.openai.chat.completions.create(requestPayload);
-      const duration = Date.now() - startTime;
-      console.log(`AI-SERVICE: OpenAI request completed in ${duration}ms`);
-      
-      // Log the full response structure for debugging
-      console.log('AI-SERVICE: Full response object:', JSON.stringify(response, null, 2));
-      console.log(`AI-SERVICE: Response has ${response.choices?.length || 0} choices`);
-      
-      if (response.choices && response.choices.length > 0) {
-        console.log('AI-SERVICE: First choice:', JSON.stringify(response.choices[0], null, 2));
-      }
+    console.log(`AI-SERVICE: Using ${providerId} provider for analysis`);
 
-      const content = response.choices[0]?.message?.content;
-      console.log(`AI-SERVICE: Response received (${content?.length || 0} chars)`);
-      console.log(`AI-SERVICE: Response preview: ${content?.substring(0, 200)}...`);
-      
-      if (!content) {
-        console.error('AI-SERVICE: No content in OpenAI response');
-        throw new Error('No response from OpenAI');
+    try {
+      const prompt = this.buildAnalysisPrompt(request);
+      const model = this.settings.model || this.getDefaultModel(this.settings.provider);
+
+      // Determine max tokens based on model type
+      const isNanoModel = model.includes('nano');
+      const maxTokens = isNanoModel ? 5000 : 500;
+
+      console.log(`AI-SERVICE: Model: ${model}, Max tokens: ${maxTokens}`);
+
+      const llmRequest: LLMRequest = {
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        maxTokens: maxTokens
+      };
+
+      console.log('AI-SERVICE: Sending request to provider...');
+      const startTime = Date.now();
+      const response = await provider.complete(llmRequest, model);
+      const duration = Date.now() - startTime;
+
+      console.log(`AI-SERVICE: Provider request completed in ${duration}ms`);
+      console.log(`AI-SERVICE: Response received (${response.content?.length || 0} chars)`);
+      console.log(`AI-SERVICE: Cost: $${response.cost.totalCost.toFixed(6)}`);
+      console.log(`AI-SERVICE: Tokens: ${response.usage.totalTokens}`);
+
+      if (!response.content) {
+        console.error('AI-SERVICE: No content in provider response');
+        throw new Error('No response from provider');
       }
 
       console.log('AI-SERVICE: Parsing AI response...');
-      const result = this.parseAIResponse(content, request);
+      const result = this.parseAIResponse(response.content, request);
       console.log(`AI-SERVICE: Successfully parsed ${result.labels.length} labels`);
       console.log(`AI-SERVICE: Labels: ${result.labels.map(l => `${l.label} (${Math.round(l.confidence * 100)}%)`).join(', ')}`);
-      
+
       return result;
     } catch (error) {
-      console.error('AI-SERVICE: OpenAI analysis failed:', error);
-      
+      console.error('AI-SERVICE: Provider analysis failed:', error);
+
       // Return detailed error info in the analysis response
       let errorMessage = error instanceof Error ? error.message : String(error);
-      let debugInfo = '';
-      
-      // Log the full error structure for debugging
-      console.error('AI-SERVICE: Full error object:', JSON.stringify(error, null, 2));
-      debugInfo += ` | Full error: ${JSON.stringify(error, null, 2)}`;
-      
-      // Try different ways to get headers from OpenAI error
-      if (error && typeof error === 'object') {
-        const apiError = error as any;
-        
-        // Check for headers in various possible locations
-        const possibleHeaderSources = [
-          apiError.response?.headers,
-          apiError.headers,
-          apiError.error?.response?.headers,
-          apiError.cause?.response?.headers
-        ];
-        
-        for (const headers of possibleHeaderSources) {
-          if (headers) {
-            console.log('AI-SERVICE: Found error headers:', headers);
-            debugInfo += ` | Found headers: ${JSON.stringify(headers)}`;
-            break;
-          }
-        }
-        
-        if (apiError.status || (apiError.error && apiError.error.message)) {
-          errorMessage = `${apiError.status || 'Unknown'}: ${apiError.error?.message || apiError.message || errorMessage}`;
-        }
-      }
-      
-      const errorResult = {
+
+      const errorResult: CategoryAnalysis = {
         labels: [],
         language: 'en',
-        suggestedDescription: `OpenAI API Error: ${errorMessage}${debugInfo}`,
+        suggestedDescription: `${providerId.toUpperCase()} API Error: ${errorMessage}`,
       };
-      
+
       console.log('AI-SERVICE: Returning error result:', errorResult);
       return errorResult;
-    }
-  }
-
-  private async analyzeWithClaude(request: BookmarkAnalysisRequest): Promise<CategoryAnalysis> {
-    if (!this.claude) {
-      throw new Error('Claude client not initialized');
-    }
-
-    const prompt = this.buildAnalysisPrompt(request);
-    
-    try {
-      const response = await this.claude.messages.create({
-        model: this.settings.model || 'claude-3-5-sonnet-20241022',
-        max_tokens: 1000,
-        temperature: 0.3,
-        system: 'You are an expert at analyzing web content and categorizing bookmarks. Return only valid JSON responses.',
-        messages: [
-          {
-            role: 'user' as const,
-            content: prompt
-          }
-        ]
-      });
-
-      const content = response.content[0];
-      if (content.type !== 'text' || !content.text) {
-        throw new Error('No response from Claude');
-      }
-
-      return this.parseAIResponse(content.text, request);
-    } catch (error) {
-      console.error('Claude API error:', error);
-      // Fallback to local analysis
-      return this.analyzeLocally(request);
     }
   }
 
@@ -316,7 +247,7 @@ class AIService {
       .map(([category]) => category);
 
     const contentPreview = request.content?.substring(0, 1000) || 'No content available';
-    
+
     return `
 You are an expert at categorizing bookmarks and web content. Analyze this bookmark carefully and provide useful labels.
 
@@ -373,7 +304,7 @@ OUTPUT FORMAT (valid JSON only):
   private parseAIResponse(content: string, request: BookmarkAnalysisRequest): CategoryAnalysis {
     console.log('AI-SERVICE: Starting response parsing');
     console.log(`AI-SERVICE: Raw content length: ${content.length}`);
-    
+
     try {
       // Remove markdown code blocks if present
       let cleanContent = content;
@@ -382,11 +313,11 @@ OUTPUT FORMAT (valid JSON only):
         cleanContent = content.replace(/```json\s*|\s*```/g, '');
         console.log(`AI-SERVICE: Cleaned content length: ${cleanContent.length}`);
       }
-      
+
       console.log('AI-SERVICE: Parsing JSON...');
       const parsed = JSON.parse(cleanContent);
       console.log('AI-SERVICE: JSON parsed successfully');
-      
+
       // Validate and clean the response
       console.log('AI-SERVICE: Validating response structure...');
       const analysis: CategoryAnalysis = {
@@ -394,43 +325,43 @@ OUTPUT FORMAT (valid JSON only):
         suggestedDescription: parsed.suggestedDescription,
         language: parsed.language || 'en'
       };
-      
+
       console.log(`AI-SERVICE: Suggested description: ${parsed.suggestedDescription}`);
       console.log(`AI-SERVICE: Language: ${parsed.language || 'en'}`);
 
       if (Array.isArray(parsed.labels)) {
         console.log(`AI-SERVICE: Found ${parsed.labels.length} raw labels`);
-        
+
         const filteredLabels = parsed.labels.filter((label: unknown) => {
           const isValid = typeof label === 'object' && label !== null &&
             'label' in label && 'category' in label && 'confidence' in label &&
             typeof (label as { confidence: unknown }).confidence === 'number' &&
             (label as { confidence: number }).confidence >= this.settings.confidenceThreshold;
-          
+
           if (!isValid) {
             console.log('AI-SERVICE: Filtered out invalid label:', label);
           }
           return isValid;
         });
-        
+
         console.log(`AI-SERVICE: ${filteredLabels.length} labels passed validation and confidence threshold (${this.settings.confidenceThreshold})`);
-        
+
         // Additional filtering to exclude labels that already exist on the bookmark
         const newLabels = filteredLabels.filter((label: unknown) => {
           const l = label as { label: string; category: string; confidence: number; reasoning?: string };
           const existingLabels = request.existingLabels || [];
-          const isDuplicate = existingLabels.some((existing: string) => 
+          const isDuplicate = existingLabels.some((existing: string) =>
             existing.toLowerCase() === l.label.toLowerCase()
           );
-          
+
           if (isDuplicate) {
             console.log(`AI-SERVICE: Skipping existing label: ${l.label}`);
           }
           return !isDuplicate;
         });
-        
+
         console.log(`AI-SERVICE: ${newLabels.length} new labels after filtering existing ones`);
-        
+
         analysis.labels = newLabels.map((label: unknown) => {
           const l = label as { label: string; category: string; confidence: number; reasoning?: string };
           const processedLabel = {
@@ -439,7 +370,7 @@ OUTPUT FORMAT (valid JSON only):
             confidence: Math.min(Math.max(l.confidence, 0), 1),
             reasoning: l.reasoning
           };
-          
+
           console.log(`AI-SERVICE: Processed new label: ${processedLabel.label} (${processedLabel.category}, ${Math.round(processedLabel.confidence * 100)}%)`);
           return processedLabel;
         });
@@ -524,23 +455,16 @@ OUTPUT FORMAT (valid JSON only):
     if (!(await this.isEnabled())) {
       throw new Error('AI service is not enabled or configured');
     }
-    
-    if (this.settings.provider === 'local') {
-      throw new Error('Description generation requires AI provider (OpenAI or Claude)');
-    }
-    
-    if (this.settings.provider === 'openai' && this.openai) {
-      return this.generateDescriptionWithOpenAI(request);
-    } else if (this.settings.provider === 'claude' && this.claude) {
-      return this.generateDescriptionWithClaude(request);
-    } else {
-      throw new Error('AI provider not properly configured');
-    }
-  }
 
-  private async generateDescriptionWithOpenAI(request: BookmarkAnalysisRequest): Promise<string> {
-    if (!this.openai) {
-      throw new Error('OpenAI client not initialized');
+    if (this.settings.provider === 'local') {
+      throw new Error('Description generation requires AI provider (OpenAI or Anthropic)');
+    }
+
+    const providerId = this.normalizeProviderId(this.settings.provider);
+    const provider = this.registry.getProvider(providerId);
+
+    if (!provider) {
+      throw new Error('AI provider not properly configured');
     }
 
     const prompt = `
@@ -554,66 +478,27 @@ Please provide a 1-2 sentence description that explains what this bookmark is ab
 `.trim();
 
     try {
-      const response = await this.openai.chat.completions.create({
-        model: this.settings.model || 'gpt-5-nano',
+      const llmRequest: LLMRequest = {
         messages: [
           {
-            role: 'system' as const,
+            role: 'system',
             content: 'You are an expert at creating concise, helpful descriptions for bookmarked web content.'
           },
           {
-            role: 'user' as const,
+            role: 'user',
             content: prompt
           }
         ],
         temperature: 0.3,
-        max_tokens: 200,
-      });
+        maxTokens: 200
+      };
 
-      return response.choices[0]?.message?.content?.trim() || '';
+      const model = this.settings.model || this.getDefaultModel(this.settings.provider);
+      const response = await provider.complete(llmRequest, model);
+
+      return response.content.trim();
     } catch (error) {
-      console.error('OpenAI description generation error:', error);
-      throw new Error('Failed to generate description');
-    }
-  }
-
-  private async generateDescriptionWithClaude(request: BookmarkAnalysisRequest): Promise<string> {
-    if (!this.claude) {
-      throw new Error('Claude client not initialized');
-    }
-
-    const prompt = `
-Generate a concise, informative description for this bookmark:
-
-URL: ${request.url}
-Title: ${request.title}
-Content Preview: ${request.content?.substring(0, 1000) || 'No content available'}
-
-Please provide a 1-2 sentence description that explains what this bookmark is about and why someone might want to save it. Focus on the key value or purpose of the content.
-`.trim();
-
-    try {
-      const response = await this.claude.messages.create({
-        model: this.settings.model || 'claude-3-5-sonnet-20241022',
-        max_tokens: 200,
-        temperature: 0.3,
-        system: 'You are an expert at creating concise, helpful descriptions for bookmarked web content.',
-        messages: [
-          {
-            role: 'user' as const,
-            content: prompt
-          }
-        ]
-      });
-
-      const content = response.content[0];
-      if (content.type !== 'text' || !content.text) {
-        throw new Error('No response from Claude');
-      }
-
-      return content.text.trim();
-    } catch (error) {
-      console.error('Claude description generation error:', error);
+      console.error('Description generation error:', error);
       throw new Error('Failed to generate description');
     }
   }
@@ -627,16 +512,15 @@ Please provide a 1-2 sentence description that explains what this bookmark is ab
     const newBookmark = {
       url: request.url,
       title: request.title,
-      description: request.content?.substring(0, 500) // Use content preview as description
+      description: request.content?.substring(0, 500)
     };
 
     for (const existing of existingBookmarks) {
       const similarity = this.calculateSimilarity(newBookmark, existing);
-      
-      // Only consider as duplicate if overall similarity is above threshold
+
       if (similarity.overall >= 0.7) {
         const differences = this.identifyDifferences(newBookmark, existing);
-        
+
         candidates.push({
           existingBookmark: existing,
           newBookmark,
@@ -646,36 +530,31 @@ Please provide a 1-2 sentence description that explains what this bookmark is ab
       }
     }
 
-    // Sort by overall similarity (highest first)
     candidates.sort((a, b) => b.similarity.overall - a.similarity.overall);
 
     return candidates;
   }
 
   private calculateSimilarity(bookmark1: { url: string; title: string; description?: string; }, bookmark2: { url: string; title: string; description?: string; }) {
-    // URL similarity (exact match or normalized comparison)
     const url1 = this.normalizeUrl(bookmark1.url);
     const url2 = this.normalizeUrl(bookmark2.url);
     const urlSimilarity = url1 === url2 ? 1.0 : this.calculateStringSimilarity(url1, url2);
 
-    // Title similarity using string similarity
     const titleSimilarity = this.calculateStringSimilarity(
       bookmark1.title.toLowerCase().trim(),
       bookmark2.title.toLowerCase().trim()
     );
 
-    // Content similarity (if available)
     const content1 = bookmark1.description || '';
     const content2 = bookmark2.description || '';
-    const contentSimilarity = content1 && content2 
+    const contentSimilarity = content1 && content2
       ? this.calculateStringSimilarity(content1.toLowerCase(), content2.toLowerCase())
       : 0;
 
-    // Weighted overall similarity
     const overall = (
-      urlSimilarity * 0.5 +      // URL is most important
-      titleSimilarity * 0.3 +    // Title is second most important
-      contentSimilarity * 0.2    // Content provides additional context
+      urlSimilarity * 0.5 +
+      titleSimilarity * 0.3 +
+      contentSimilarity * 0.2
     );
 
     return {
@@ -689,18 +568,15 @@ Please provide a 1-2 sentence description that explains what this bookmark is ab
   private normalizeUrl(url: string): string {
     try {
       const parsed = new URL(url.toLowerCase());
-      
-      // Remove common tracking parameters
+
       const paramsToRemove = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'fbclid', 'gclid'];
       paramsToRemove.forEach(param => parsed.searchParams.delete(param));
-      
-      // Remove trailing slash
+
       let pathname = parsed.pathname.replace(/\/$/, '');
       if (!pathname) pathname = '/';
-      
-      // Normalize www subdomain
+
       const hostname = parsed.hostname.replace(/^www\./, '');
-      
+
       return `${parsed.protocol}//${hostname}${pathname}${parsed.search}`;
     } catch {
       return url.toLowerCase();
@@ -711,7 +587,6 @@ Please provide a 1-2 sentence description that explains what this bookmark is ab
     if (str1 === str2) return 1.0;
     if (!str1 || !str2) return 0;
 
-    // Use Levenshtein distance for similarity calculation
     const maxLength = Math.max(str1.length, str2.length);
     if (maxLength === 0) return 1.0;
 
@@ -729,9 +604,9 @@ Please provide a 1-2 sentence description that explains what this bookmark is ab
       for (let i = 1; i <= str1.length; i++) {
         const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
         matrix[j][i] = Math.min(
-          matrix[j][i - 1] + 1, // deletion
-          matrix[j - 1][i] + 1, // insertion
-          matrix[j - 1][i - 1] + indicator // substitution
+          matrix[j][i - 1] + 1,
+          matrix[j - 1][i] + 1,
+          matrix[j - 1][i - 1] + indicator
         );
       }
     }
@@ -742,7 +617,6 @@ Please provide a 1-2 sentence description that explains what this bookmark is ab
   private identifyDifferences(bookmark1: { url: string; title: string; description?: string; }, bookmark2: { url: string; title: string; description?: string; }): string[] {
     const differences: string[] = [];
 
-    // URL differences
     if (this.normalizeUrl(bookmark1.url) !== this.normalizeUrl(bookmark2.url)) {
       if (bookmark1.url.toLowerCase() !== bookmark2.url.toLowerCase()) {
         differences.push('Different URLs');
@@ -751,12 +625,10 @@ Please provide a 1-2 sentence description that explains what this bookmark is ab
       }
     }
 
-    // Title differences
     if (bookmark1.title.toLowerCase().trim() !== bookmark2.title.toLowerCase().trim()) {
       differences.push('Different titles');
     }
 
-    // Description differences
     if (bookmark1.description && bookmark2.description) {
       if (bookmark1.description !== bookmark2.description) {
         differences.push('Different descriptions');
@@ -771,6 +643,83 @@ Please provide a 1-2 sentence description that explains what this bookmark is ab
   public async getSettings(): Promise<AISettings> {
     await this.ensureInitialized();
     return { ...this.settings };
+  }
+
+  /**
+   * NEW METHODS - Provider Abstraction Integration
+   */
+
+  /**
+   * List all available providers
+   */
+  public async listProviders(): Promise<Array<{ id: string; name: string; description: string }>> {
+    await this.ensureInitialized();
+    const providers = this.registry.listProviders();
+    return providers.map(p => ({
+      id: p.id,
+      name: p.name,
+      description: p.description
+    }));
+  }
+
+  /**
+   * List available models for a provider (or all providers)
+   */
+  public async listModels(providerId?: string) {
+    await this.ensureInitialized();
+
+    if (providerId) {
+      return this.registry.getProviderModels(providerId);
+    }
+    return this.registry.listAllModels();
+  }
+
+  /**
+   * Test API connection for a provider
+   */
+  public async testConnection(
+    providerId: string,
+    apiKey: string
+  ): Promise<{ success: boolean; models?: any[]; error?: string }> {
+    await this.ensureInitialized();
+    return this.registry.testConnection(providerId, apiKey);
+  }
+
+  /**
+   * Estimate cost for analyzing bookmarks
+   */
+  public async estimateCost(
+    bookmarkCount: number,
+    model?: string
+  ): Promise<{ inputCost: number; outputCost: number; totalCost: number }> {
+    await this.ensureInitialized();
+
+    const providerId = this.normalizeProviderId(this.settings.provider);
+    const provider = this.registry.getProvider(providerId);
+
+    if (!provider) {
+      throw new Error('No provider configured');
+    }
+
+    // Average bookmark analysis: ~200 input tokens, ~150 output tokens
+    const avgInputTokens = 200;
+    const avgOutputTokens = 150;
+
+    const modelId = model || this.settings.model || this.getDefaultModel(this.settings.provider);
+    const modelMeta = await provider.getModel(modelId);
+
+    if (!modelMeta) {
+      throw new Error('Model not found');
+    }
+
+    const inputCost = (avgInputTokens * bookmarkCount / 1_000_000) * modelMeta.pricing.inputCostPerMillion;
+    const outputCost = (avgOutputTokens * bookmarkCount / 1_000_000) * modelMeta.pricing.outputCostPerMillion;
+
+    return {
+      inputCost,
+      outputCost,
+      totalCost: inputCost + outputCost
+    };
   }
 }
 
