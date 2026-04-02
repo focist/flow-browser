@@ -143,7 +143,7 @@ export function BulkImpactView({
   };
 
   return (
-    <div className="flex flex-col h-full" style={{ maxWidth: '100%', overflow: 'hidden', width: '100%' }}>
+    <div className="flex flex-col flex-1 min-h-0" style={{ maxWidth: '100%', overflow: 'hidden', width: '100%' }}>
       {/* Header */}
       <div className="min-w-0 flex-shrink-0 mb-4">
         <h3 className="text-lg font-semibold mb-2">Bulk Impact Preview</h3>
