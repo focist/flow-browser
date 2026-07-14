@@ -1,0 +1,33 @@
+# Wires this repo's committed git hooks into git (idempotent).
+# .githooks/commit-msg enforces Conventional Commits via commitlint.
+# mise [hooks] are experimental; scoped opt-in here so teammates don't need
+# a global `mise settings experimental=true`.
+[settings]
+experimental = true
+
+[hooks]
+enter = "git config --local core.hooksPath .githooks && (mise run plugins:ensure >/dev/null 2>&1 &) || true"
+
+[tasks.setup]
+description = "One-time repo setup: wire git hooks and install the repo's Claude Code plugins"
+run = """
+git config --local core.hooksPath .githooks
+mise run plugins:ensure
+"""
+
+[tasks."hooks:verify"]
+description = "Check hook wiring and script health"
+run = """
+test "$(git config --local core.hooksPath)" = ".githooks" || { echo "hooksPath not set — run: mise run setup"; exit 1; }
+test -x .githooks/commit-msg || { echo ".githooks/commit-msg missing or not executable"; exit 1; }
+echo "hooks OK"
+"""
+
+
+[tasks."plugins:ensure"]
+description = "Install the repo-declared Claude Code plugins for this project (idempotent; runs in background on directory entry)"
+run = """
+command -v claude >/dev/null 2>&1 || exit 0
+claude plugin install atomic-commit@coding-octopus-marketplace --scope project >/dev/null 2>&1 || true
+claude plugin install atlas@coding-octopus-marketplace --scope project >/dev/null 2>&1 || true
+"""
