@@ -1,0 +1,29 @@
+# .atlas/config.toml — managed by /atlas:setup (ADR 0012).
+# Re-run /atlas:setup to change values.
+
+# Root of the lifecycle artifacts. Fixed subdirectories beneath it:
+# briefs/ research/ specs/ designs/ plans/ decisions/
+artifacts_root = "docs"
+
+# Verification gates (ADR 0009). Every gate is optional; every defined
+# gate is mandatory — an absent key is skipped, a present one must pass.
+[gates]
+lint = 'bun run lint'
+validate = 'bun run typecheck'
+
+# Ticketing (ADRs 0010/0011). mode: external | local | none.
+[ticketing]
+mode = 'external'
+system = 'clickup'
+url = 'https://app.clickup.com/8538476'
+project = '901412857705'   # Oasis list — https://app.clickup.com/8538476/v/li/901412857705
+
+# Atlas file statuses to ClickUp statuses (ADR 0010).
+[ticketing.status_map]
+in-progress = 'in progress'
+complete = 'complete'
+
+# /atlas:implement's confirm step (ADR 0008). true: show the per-task
+# confirm plan, build only on approval.
+[implement]
+confirm = true
