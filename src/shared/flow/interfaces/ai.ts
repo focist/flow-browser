@@ -142,7 +142,7 @@ export interface AIFlowInterface {
 
   // Provider Management (NEW)
   'ai:listProviders': () => Promise<{ success: boolean; data?: Array<{ id: string; name: string; description: string }>; error?: string }>;
-  'ai:listModels': (providerId?: string) => Promise<{ success: boolean; data?: any[]; error?: string }>;
-  'ai:testConnection': (providerId: string, apiKey: string) => Promise<{ success: boolean; data?: { success: boolean; models?: any[]; error?: string }; error?: string }>;
+  'ai:listModels': (providerId?: string) => Promise<{ success: boolean; data?: ModelMetadata[]; error?: string }>;
+  'ai:testConnection': (providerId: string, apiKey: string) => Promise<{ success: boolean; data?: { success: boolean; models?: ModelMetadata[]; error?: string }; error?: string }>;
   'ai:estimateCost': (bookmarkCount: number, model?: string) => Promise<{ success: boolean; data?: { inputCost: number; outputCost: number; totalCost: number }; error?: string }>;
 }
