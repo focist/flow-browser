@@ -59,7 +59,6 @@ import {
   DragOverlay,
   DragStartEvent,
   DragEndEvent,
-  DragMoveEvent,
   useDraggable,
   useDroppable,
   MouseSensor,
@@ -338,6 +337,1084 @@ const formatUrlForDisplay = (url: string, maxLength: number = 50): string => {
   }
 };
 
+// Handlers/flags needed by the bookmark context menu
+interface BookmarkContextMenuProps {
+  isAIEnabled: boolean;
+  showDeleted: boolean;
+  handleOpenBookmark: (bookmark: Bookmark) => void | Promise<void>;
+  handleAnalyzeBookmark: (bookmark: Bookmark) => void | Promise<void>;
+  handleGenerateDescription: (bookmark: Bookmark) => void | Promise<void>;
+  handleRestoreBookmark: (bookmarkId: string) => void | Promise<void>;
+  handlePermanentlyDeleteBookmark: (bookmarkId: string) => void | Promise<void>;
+  handleDeleteBookmark: (bookmarkId: string) => void | Promise<void>;
+}
+
+// Shared props for the draggable bookmark card/list/grid components.
+// These live at module scope (stable component identity) so they re-render instead of remounting.
+interface BookmarkItemProps extends BookmarkContextMenuProps {
+  selectedBookmarks: Set<string>;
+  activeId: string | null;
+  isCollecting: boolean;
+  collectAnimationComplete: boolean;
+  lastClickedBookmarkId: string | null;
+  lastAction: 'select' | 'deselect' | null;
+  handleRangeSelection: (fromId: string, toId: string, action: 'select' | 'deselect') => void;
+  setSelectedBookmarks: React.Dispatch<React.SetStateAction<Set<string>>>;
+  setLastClickedBookmarkId: React.Dispatch<React.SetStateAction<string | null>>;
+  setLastAction: React.Dispatch<React.SetStateAction<'select' | 'deselect' | null>>;
+  recentlyDeletedIds: Set<string>;
+  setRecentlyDeletedIds: React.Dispatch<React.SetStateAction<Set<string>>>;
+  loadBookmarks: () => void | Promise<void>;
+  handleShowInfoPanel: (bookmark: Bookmark) => void;
+}
+
+// Context menu component for bookmarks
+const BookmarkContextMenu = ({
+  bookmark,
+  children,
+  isAIEnabled,
+  showDeleted,
+  handleOpenBookmark,
+  handleAnalyzeBookmark,
+  handleGenerateDescription,
+  handleRestoreBookmark,
+  handlePermanentlyDeleteBookmark,
+  handleDeleteBookmark,
+}: { bookmark: Bookmark; children: React.ReactNode } & BookmarkContextMenuProps) => (
+  <ContextMenu>
+    <ContextMenuTrigger asChild>
+      {children}
+    </ContextMenuTrigger>
+    <ContextMenuContent className="w-48" onClick={(e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    }}>
+      <ContextMenuItem onClick={() => handleOpenBookmark(bookmark)}>
+        <ExternalLink className="h-4 w-4 mr-2" />
+        Open bookmark
+      </ContextMenuItem>
+      <ContextMenuItem onClick={() => {
+        navigator.clipboard.writeText(bookmark.url);
+        toast.success('URL copied to clipboard');
+      }}>
+        <Link className="h-4 w-4 mr-2" />
+        Copy URL
+      </ContextMenuItem>
+      <ContextMenuItem onClick={() => {
+        toast.info('Edit functionality coming soon!');
+      }}>
+        <Edit3 className="h-4 w-4 mr-2" />
+        Edit bookmark
+      </ContextMenuItem>
+      {isAIEnabled && (
+        <>
+          <ContextMenuItem onSelect={async () => {
+            // Immediately run analysis and ignore all selection bullshit
+            await handleAnalyzeBookmark(bookmark);
+          }}>
+            <Sparkles className="h-4 w-4 mr-2" />
+            AI Analyze
+          </ContextMenuItem>
+          <ContextMenuItem onClick={() => handleGenerateDescription(bookmark)}>
+            <FileText className="h-4 w-4 mr-2" />
+            Generate Description
+          </ContextMenuItem>
+        </>
+      )}
+      <ContextMenuSeparator />
+      {showDeleted ? (
+        <>
+          <ContextMenuItem 
+            className="text-blue-600"
+            onClick={() => handleRestoreBookmark(bookmark.id)}
+          >
+            <RotateCcw className="h-4 w-4 mr-2" />
+            Restore bookmark
+          </ContextMenuItem>
+          <ContextMenuItem 
+            className="text-destructive"
+            onClick={() => handlePermanentlyDeleteBookmark(bookmark.id)}
+          >
+            <X className="h-4 w-4 mr-2" />
+            Delete forever
+          </ContextMenuItem>
+        </>
+      ) : (
+        <ContextMenuItem 
+          className="text-destructive"
+          onClick={() => handleDeleteBookmark(bookmark.id)}
+        >
+          <Trash2 className="h-4 w-4 mr-2" />
+          Move to trash
+        </ContextMenuItem>
+      )}
+    </ContextMenuContent>
+  </ContextMenu>
+);
+
+// Draggable Bookmark Card Component
+const BookmarkCard = ({
+  bookmark,
+  selectedBookmarks,
+  activeId,
+  isCollecting,
+  collectAnimationComplete,
+  lastClickedBookmarkId,
+  lastAction,
+  handleRangeSelection,
+  setSelectedBookmarks,
+  setLastClickedBookmarkId,
+  setLastAction,
+  recentlyDeletedIds,
+  setRecentlyDeletedIds,
+  loadBookmarks,
+  handleShowInfoPanel,
+  isAIEnabled,
+  showDeleted,
+  handleOpenBookmark,
+  handleAnalyzeBookmark,
+  handleGenerateDescription,
+  handleRestoreBookmark,
+  handlePermanentlyDeleteBookmark,
+  handleDeleteBookmark,
+}: { bookmark: Bookmark } & BookmarkItemProps) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    isDragging,
+  } = useDraggable({ 
+    id: bookmark.id,
+    data: { 
+      type: 'bookmark',
+      bookmark 
+    }
+  });
+  
+
+  const isSelected = selectedBookmarks.has(bookmark.id);
+  const isMultiDrag = selectedBookmarks.size > 1 && activeId;
+  const isDraggedItem = bookmark.id === activeId;
+  
+  // Apply ghost effect to all selected items when multi-dragging, except the dragged item
+  const shouldShowGhost = isDragging || (isSelected && isMultiDrag && !isDraggedItem);
+  
+  // For other selected items in multi-drag, we want them to animate toward the dragged item
+  // But ONLY after a delay (when collectAnimationComplete becomes true)
+  const shouldCollect = isCollecting && collectAnimationComplete && isSelected && isMultiDrag && !isDraggedItem && !isDragging;
+  
+  let finalTransform: string;
+  if (isDragging || (isSelected && isMultiDrag)) {
+    // ALL placeholders (dragged item AND other selected items) stay in place
+    // No transforms, no animations for any placeholders
+    finalTransform = 'none';
+  } else {
+    // Normal positioning for non-selected items only
+    finalTransform = CSS.Transform.toString(transform) || '';
+  }
+  
+  const style = {
+    transform: finalTransform,
+    opacity: shouldShowGhost ? 0.3 : 1,
+    filter: shouldShowGhost ? 'grayscale(100%)' : 'none',
+    transition: shouldCollect ? 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)' : undefined,
+    zIndex: shouldCollect ? 50 : undefined,
+    // Force placeholder to maintain size when dragging
+    ...(isDragging && {
+      width: 'auto',
+      height: '160px',
+      minWidth: '100%',
+      minHeight: '160px'
+    })
+  };
+
+  return (
+    <div className="relative">
+      <input
+        type="checkbox"
+        checked={isSelected}
+        onChange={(e) => {
+          e.stopPropagation();
+          const isChecked = e.target.checked;
+          const action = isChecked ? 'select' : 'deselect';
+          const shiftKey = (e.nativeEvent as MouseEvent).shiftKey;
+
+          if (shiftKey && lastClickedBookmarkId && lastAction) {
+            // Handle range selection
+            handleRangeSelection(lastClickedBookmarkId, bookmark.id, action);
+          } else {
+            // Handle single selection
+            if (isChecked) {
+              setSelectedBookmarks(prev => new Set([...prev, bookmark.id]));
+            } else {
+              setSelectedBookmarks(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(bookmark.id);
+                return newSet;
+              });
+            }
+          }
+          
+          // Update tracking state
+          setLastClickedBookmarkId(bookmark.id);
+          setLastAction(action);
+        }}
+        className={`absolute top-2 left-2 z-10 w-4 h-4 cursor-pointer ${isDragging ? 'opacity-30' : ''}`}
+        onClick={(e) => e.stopPropagation()}
+      />
+      <div
+        ref={setNodeRef}
+        style={isDragging ? { transform: 'none', opacity: 0.3 } : style}
+        data-bookmark-id={bookmark.id}
+        data-is-dragging={isDragging}
+        className={isDragging ? 'pointer-events-none' : ''}
+        {...listeners}
+        {...attributes}
+      >
+        <BookmarkContextMenu
+        bookmark={bookmark}
+        isAIEnabled={isAIEnabled}
+        showDeleted={showDeleted}
+        handleOpenBookmark={handleOpenBookmark}
+        handleAnalyzeBookmark={handleAnalyzeBookmark}
+        handleGenerateDescription={handleGenerateDescription}
+        handleRestoreBookmark={handleRestoreBookmark}
+        handlePermanentlyDeleteBookmark={handlePermanentlyDeleteBookmark}
+        handleDeleteBookmark={handleDeleteBookmark}
+      >
+          <Card 
+            className={`group hover:shadow-lg transition-all duration-200 relative min-h-[160px] h-[180px] flex flex-col select-none cursor-grab py-0 ${isDragging ? 'cursor-grabbing opacity-30' : ''} ${
+              recentlyDeletedIds.has(bookmark.id) ? 'opacity-60' : ''
+            } ${isDragging ? 'shadow-lg' : ''} ${isSelected ? 'ring-2 ring-primary' : ''}`}
+          >
+          <CardContent className="p-4 pb-0 flex flex-col h-full">
+            {/* Header Section - Better height distribution */}
+            <div className="flex-shrink-0 min-h-[50px] max-h-[70px] flex flex-col items-center justify-center text-center mb-3 px-6">
+              <div className="flex items-start gap-2 max-w-full">
+                {bookmark.favicon && (
+                  <img src={bookmark.favicon} alt="" className="w-4 h-4 rounded-sm flex-shrink-0 mt-0.5" />
+                )}
+                <h3
+                  className="font-medium text-base leading-tight line-clamp-3 hover:text-primary text-center cursor-pointer flex-1 min-w-0"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenBookmark(bookmark);
+                  }}
+                  title={bookmark.title}
+                >
+                  {bookmark.title}
+                </h3>
+              </div>
+            </div>
+
+            {/* Content Area - Flexible height with better spacing */}
+            <div className="flex-1 flex flex-col items-center justify-start space-y-2 overflow-hidden min-h-0">
+              {/* Existing Labels */}
+              {bookmark.labels && bookmark.labels.length > 0 && (
+                <div className="flex flex-wrap gap-1 justify-center max-w-full">
+                  {bookmark.labels.slice(0, 3).map((label, index) => (
+                    <Badge key={index} variant="secondary" className="text-xs py-1 px-2" title={label.label}>
+                      {label.label}
+                    </Badge>
+                  ))}
+                  {bookmark.labels.length > 3 && (
+                    <Badge variant="outline" className="text-xs py-1 px-2">
+                      +{bookmark.labels.length - 3}
+                    </Badge>
+                  )}
+                </div>
+              )}
+
+            </div>
+
+            {/* Action Area - Bottom Actions */}
+            <div
+              className={`flex-shrink-0 h-[44px] flex items-center justify-center gap-3 mt-auto ${isDragging ? 'opacity-30 pointer-events-none' : ''}`}
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+            >
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 hover:bg-blue-100 hover:text-blue-600 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation(); 
+                  handleOpenBookmark(bookmark);
+                }}
+                title="Open bookmark"
+              >
+                <ExternalLink className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 hover:bg-green-100 hover:text-green-600 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigator.clipboard.writeText(bookmark.url);
+                  toast.success('URL copied to clipboard');
+                }}
+                title="Copy URL"
+              >
+                <Link className="h-4 w-4" />
+              </Button>
+              {isAIEnabled && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 hover:bg-yellow-100 hover:text-yellow-600 transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAnalyzeBookmark(bookmark);
+                  }}
+                  title="AI Analyze"
+                >
+                  <Sparkles className="h-4 w-4" />
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0 hover:bg-gray-100 hover:text-gray-600"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toast.info('Edit functionality coming soon!');
+                }}
+                title="Edit bookmark"
+              >
+                <Edit3 className="h-3.5 w-3.5" />
+              </Button>
+              <HoverCard>
+                <HoverCardTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0 hover:bg-yellow-100 hover:text-yellow-600"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleShowInfoPanel(bookmark);
+                    }}
+                    title="Show bookmark info"
+                  >
+                    <Info className="h-3.5 w-3.5" />
+                  </Button>
+                </HoverCardTrigger>
+                <HoverCardContent>
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-semibold">{bookmark.title}</h4>
+                    <p className="text-xs text-muted-foreground break-all">{bookmark.url}</p>
+                    <div className="flex justify-between text-xs">
+                      <span>Added: {new Date(bookmark.dateAdded).toLocaleDateString()}</span>
+                      <span>{bookmark.visitCount || 0} visits</span>
+                    </div>
+                    {bookmark.description && (
+                      <p className="text-xs text-muted-foreground">{bookmark.description}</p>
+                    )}
+                  </div>
+                </HoverCardContent>
+              </HoverCard>
+              {showDeleted ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0 hover:bg-blue-100 hover:text-blue-600"
+                    onClick={(e) => {e.stopPropagation(); handleRestoreBookmark(bookmark.id);}}
+                    title="Restore bookmark"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0 hover:bg-red-100 hover:text-red-600"
+                    onClick={(e) => {e.stopPropagation(); handlePermanentlyDeleteBookmark(bookmark.id);}}
+                    title="Delete forever"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </>
+              ) : recentlyDeletedIds.has(bookmark.id) ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0 hover:bg-blue-100 hover:text-blue-600"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    try {
+                      await flow.bookmarks.restore(bookmark.id);
+                      setRecentlyDeletedIds(prev => {
+                        const newSet = new Set(prev);
+                        newSet.delete(bookmark.id);
+                        return newSet;
+                      });
+                      toast.success('Bookmark restored');
+                    } catch (error) {
+                      console.error('Failed to restore bookmark:', error);
+                      toast.error('Failed to restore bookmark');
+                      await loadBookmarks();
+                    }
+                  }}
+                  title="Undo delete"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                </Button>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0 hover:bg-red-100 hover:text-red-600"
+                  onClick={(e) => {e.stopPropagation(); handleDeleteBookmark(bookmark.id);}}
+                  title="Delete bookmark"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </div>
+          </CardContent>
+          </Card>
+        </BookmarkContextMenu>
+      </div>
+    </div>
+  );
+};
+
+const BookmarkListItem = ({
+  bookmark,
+  selectedBookmarks,
+  activeId,
+  isCollecting,
+  collectAnimationComplete,
+  lastClickedBookmarkId,
+  lastAction,
+  handleRangeSelection,
+  setSelectedBookmarks,
+  setLastClickedBookmarkId,
+  setLastAction,
+  recentlyDeletedIds,
+  setRecentlyDeletedIds,
+  loadBookmarks,
+  handleShowInfoPanel,
+  isAIEnabled,
+  showDeleted,
+  handleOpenBookmark,
+  handleAnalyzeBookmark,
+  handleGenerateDescription,
+  handleRestoreBookmark,
+  handlePermanentlyDeleteBookmark,
+  handleDeleteBookmark,
+}: { bookmark: Bookmark } & BookmarkItemProps) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    isDragging,
+  } = useDraggable({ 
+    id: bookmark.id,
+    data: { 
+      type: 'bookmark',
+      bookmark 
+    }
+  });
+
+
+  const isSelected = selectedBookmarks.has(bookmark.id);
+  const isMultiDrag = selectedBookmarks.size > 1 && activeId;
+  const isDraggedItem = bookmark.id === activeId;
+  
+  // Apply ghost effect to all selected items when multi-dragging, except the dragged item
+  const shouldShowGhost = isDragging || (isSelected && isMultiDrag && !isDraggedItem);
+  
+  // For other selected items in multi-drag, we want them to animate toward the dragged item
+  // But ONLY after a delay (when collectAnimationComplete becomes true)
+  const shouldCollect = isCollecting && collectAnimationComplete && isSelected && isMultiDrag && !isDraggedItem && !isDragging;
+  
+  
+  let finalTransform: string;
+  if (isDragging || (isSelected && isMultiDrag)) {
+    // ALL placeholders (dragged item AND other selected items) stay in place
+    // No transforms, no animations for any placeholders - floating overlay handles animation
+    finalTransform = 'none';
+  } else {
+    // Normal positioning for non-selected items only
+    finalTransform = CSS.Transform.toString(transform) || '';
+  }
+  
+  const style = {
+    transform: finalTransform,
+    opacity: shouldShowGhost ? 0.3 : 1,
+    filter: shouldShowGhost ? 'grayscale(100%)' : 'none',
+    transition: shouldCollect ? 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)' : undefined,
+    zIndex: shouldCollect ? 50 : undefined,
+  };
+
+  return (
+    <div className="relative">
+      <input
+        type="checkbox"
+        checked={isSelected}
+        onChange={(e) => {
+          e.stopPropagation();
+          const isChecked = e.target.checked;
+          const action = isChecked ? 'select' : 'deselect';
+          const shiftKey = (e.nativeEvent as MouseEvent).shiftKey;
+
+          if (shiftKey && lastClickedBookmarkId && lastAction) {
+            // Handle range selection
+            handleRangeSelection(lastClickedBookmarkId, bookmark.id, action);
+          } else {
+            // Handle single selection
+            if (isChecked) {
+              setSelectedBookmarks(prev => new Set([...prev, bookmark.id]));
+            } else {
+              setSelectedBookmarks(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(bookmark.id);
+                return newSet;
+              });
+            }
+          }
+          
+          // Update tracking state
+          setLastClickedBookmarkId(bookmark.id);
+          setLastAction(action);
+        }}
+        className={`absolute left-3 top-1/2 -translate-y-1/2 z-10 w-4 h-4 cursor-pointer ${isDragging ? 'opacity-30' : ''}`}
+        onClick={(e) => e.stopPropagation()}
+        onContextMenu={(e) => {
+          // Prevent right-click from triggering checkbox
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+      />
+      <BookmarkContextMenu
+        bookmark={bookmark}
+        isAIEnabled={isAIEnabled}
+        showDeleted={showDeleted}
+        handleOpenBookmark={handleOpenBookmark}
+        handleAnalyzeBookmark={handleAnalyzeBookmark}
+        handleGenerateDescription={handleGenerateDescription}
+        handleRestoreBookmark={handleRestoreBookmark}
+        handlePermanentlyDeleteBookmark={handlePermanentlyDeleteBookmark}
+        handleDeleteBookmark={handleDeleteBookmark}
+      >
+        <div 
+          ref={setNodeRef}
+          style={style}
+          data-bookmark-id={bookmark.id}
+          className={`group flex items-center gap-3 p-3 pl-10 rounded-lg hover:bg-muted/50 transition-colors select-none cursor-grab ${isDragging ? 'cursor-grabbing' : ''} ${
+            recentlyDeletedIds.has(bookmark.id) ? 'opacity-60' : ''
+          } ${isDragging ? 'shadow-lg' : ''} ${isSelected ? 'ring-2 ring-primary' : ''}`}
+          {...listeners}
+          {...attributes}
+        >
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+        {bookmark.favicon && (
+          <img src={bookmark.favicon} alt="" className="w-4 h-4 rounded-sm flex-shrink-0" />
+        )}
+        <div className="flex-1 min-w-0 pr-2">
+          <div className="flex items-center gap-2">
+            <h3 
+              className="font-medium text-sm truncate hover:text-primary cursor-pointer" 
+              onClick={() => handleOpenBookmark(bookmark)}
+            >
+              {bookmark.title}
+            </h3>
+            {bookmark.labels && bookmark.labels.length > 0 && (
+              <div className="flex gap-1">
+                {bookmark.labels.slice(0, 2).map((label, index) => (
+                  <Badge key={index} variant="secondary" className="text-xs">
+                    {label.label}
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
+          <p 
+            className="text-xs text-muted-foreground flex-1 break-all"
+            style={{ 
+              wordBreak: 'break-all',
+              overflowWrap: 'break-word',
+              lineHeight: '1.3'
+            }}
+            title={bookmark.url}
+          >
+            {formatUrlForDisplay(bookmark.url, 80)}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <span>{new Date(bookmark.dateAdded).toLocaleDateString()}</span>
+        <span>{bookmark.visitCount || 0} visits</span>
+      </div>
+
+      <div className={`flex items-center gap-1 ${isDragging ? 'opacity-30 pointer-events-none' : ''}`} onClick={(e) => e.stopPropagation()}>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="h-7 w-7 p-0 hover:bg-blue-100 hover:text-blue-600"
+          onClick={(e) => {e.stopPropagation(); handleOpenBookmark(bookmark);}}
+          title="Open bookmark"
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+        </Button>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="h-7 w-7 p-0 hover:bg-green-100 hover:text-green-600"
+          onClick={(e) => {
+            e.stopPropagation();
+            navigator.clipboard.writeText(bookmark.url);
+            toast.success('URL copied to clipboard');
+          }}
+          title="Copy URL"
+        >
+          <Link className="h-3.5 w-3.5" />
+        </Button>
+        {isAIEnabled && (
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-7 w-7 p-0 hover:bg-yellow-100 hover:text-yellow-600"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleAnalyzeBookmark(bookmark);
+            }}
+            title="AI Analyze"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+          </Button>
+        )}
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="h-7 w-7 p-0 hover:bg-gray-100 hover:text-gray-600"
+          onClick={(e) => {
+            e.stopPropagation();
+            toast.info('Edit functionality coming soon!');
+          }}
+          title="Edit bookmark"
+        >
+          <Edit3 className="h-3.5 w-3.5" />
+        </Button>
+        <HoverCard>
+          <HoverCardTrigger asChild>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-7 w-7 p-0 hover:bg-yellow-100 hover:text-yellow-600"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleShowInfoPanel(bookmark);
+              }}
+              title="Show bookmark info"
+            >
+              <Info className="h-3.5 w-3.5" />
+            </Button>
+          </HoverCardTrigger>
+          <HoverCardContent>
+            <div className="space-y-2">
+              <h4 className="text-sm font-semibold">{bookmark.title}</h4>
+              <p className="text-xs text-muted-foreground break-all">{bookmark.url}</p>
+              <div className="flex justify-between text-xs">
+                <span>Added: {new Date(bookmark.dateAdded).toLocaleDateString()}</span>
+                <span>{bookmark.visitCount || 0} visits</span>
+              </div>
+              {bookmark.description && (
+                <p className="text-xs text-muted-foreground">{bookmark.description}</p>
+              )}
+            </div>
+          </HoverCardContent>
+        </HoverCard>
+        {showDeleted ? (
+          <>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-7 w-7 p-0 hover:bg-blue-100 hover:text-blue-600"
+              onClick={(e) => {e.stopPropagation(); handleRestoreBookmark(bookmark.id);}}
+              title="Restore bookmark"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-7 w-7 p-0 hover:bg-red-100 hover:text-red-600"
+              onClick={(e) => {e.stopPropagation(); handlePermanentlyDeleteBookmark(bookmark.id);}}
+              title="Delete forever"
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </>
+        ) : recentlyDeletedIds.has(bookmark.id) ? (
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-7 w-7 p-0 hover:bg-blue-100 hover:text-blue-600"
+            onClick={async (e) => {
+              e.stopPropagation();
+              try {
+                await flow.bookmarks.restore(bookmark.id);
+                setRecentlyDeletedIds(prev => {
+                  const newSet = new Set(prev);
+                  newSet.delete(bookmark.id);
+                  return newSet;
+                });
+                toast.success('Bookmark restored');
+              } catch (error) {
+                console.error('Failed to restore bookmark:', error);
+                toast.error('Failed to restore bookmark');
+                await loadBookmarks();
+              }
+            }}
+            title="Undo delete"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+          </Button>
+        ) : (
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-7 w-7 p-0 hover:bg-red-100 hover:text-red-600"
+            onClick={(e) => {e.stopPropagation(); handleDeleteBookmark(bookmark.id);}}
+            title="Delete bookmark"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
+        </div>
+      </BookmarkContextMenu>
+    </div>
+  );
+};
+
+// Draggable Bookmark Grid Item Component
+const BookmarkGridItem = ({
+  bookmark,
+  selectedBookmarks,
+  activeId,
+  isCollecting,
+  collectAnimationComplete,
+  lastClickedBookmarkId,
+  lastAction,
+  handleRangeSelection,
+  setSelectedBookmarks,
+  setLastClickedBookmarkId,
+  setLastAction,
+  recentlyDeletedIds,
+  setRecentlyDeletedIds,
+  loadBookmarks,
+  handleShowInfoPanel,
+  isAIEnabled,
+  showDeleted,
+  handleOpenBookmark,
+  handleAnalyzeBookmark,
+  handleGenerateDescription,
+  handleRestoreBookmark,
+  handlePermanentlyDeleteBookmark,
+  handleDeleteBookmark,
+}: { bookmark: Bookmark } & BookmarkItemProps) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    isDragging,
+  } = useDraggable({ 
+    id: bookmark.id,
+    data: { 
+      type: 'bookmark',
+      bookmark 
+    }
+  });
+
+
+  const isSelected = selectedBookmarks.has(bookmark.id);
+  const isMultiDrag = selectedBookmarks.size > 1 && activeId;
+  const isDraggedItem = bookmark.id === activeId;
+  
+  // Apply ghost effect to all selected items when multi-dragging, except the dragged item
+  const shouldShowGhost = isDragging || (isSelected && isMultiDrag && !isDraggedItem);
+  
+  // For other selected items in multi-drag, we want them to animate toward the dragged item
+  // But ONLY after a delay (when collectAnimationComplete becomes true)
+  const shouldCollect = isCollecting && collectAnimationComplete && isSelected && isMultiDrag && !isDraggedItem && !isDragging;
+  
+  
+  let finalTransform: string;
+  if (isDragging || (isSelected && isMultiDrag)) {
+    // ALL placeholders (dragged item AND other selected items) stay in place
+    // No transforms, no animations for any placeholders - floating overlay handles animation
+    finalTransform = 'none';
+  } else {
+    // Normal positioning for non-selected items only
+    finalTransform = CSS.Transform.toString(transform) || '';
+  }
+  
+  const style = {
+    transform: finalTransform,
+    opacity: shouldShowGhost ? 0.3 : 1,
+    filter: shouldShowGhost ? 'grayscale(100%)' : 'none',
+    transition: shouldCollect ? 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)' : undefined,
+    zIndex: shouldCollect ? 50 : undefined,
+  };
+
+  return (
+    <div className="relative">
+      <input
+        type="checkbox"
+        checked={isSelected}
+        onChange={(e) => {
+          e.stopPropagation();
+          const isChecked = e.target.checked;
+          const action = isChecked ? 'select' : 'deselect';
+          const shiftKey = (e.nativeEvent as MouseEvent).shiftKey;
+
+          if (shiftKey && lastClickedBookmarkId && lastAction) {
+            // Handle range selection
+            handleRangeSelection(lastClickedBookmarkId, bookmark.id, action);
+          } else {
+            // Handle single selection
+            if (isChecked) {
+              setSelectedBookmarks(prev => new Set([...prev, bookmark.id]));
+            } else {
+              setSelectedBookmarks(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(bookmark.id);
+                return newSet;
+              });
+            }
+          }
+          
+          // Update tracking state
+          setLastClickedBookmarkId(bookmark.id);
+          setLastAction(action);
+        }}
+        className={`absolute top-1 left-1 z-10 w-3 h-3 cursor-pointer ${isDragging ? 'opacity-30' : ''}`}
+        onClick={(e) => e.stopPropagation()}
+        onContextMenu={(e) => {
+          // Prevent right-click from triggering checkbox
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+      />
+      <BookmarkContextMenu
+        bookmark={bookmark}
+        isAIEnabled={isAIEnabled}
+        showDeleted={showDeleted}
+        handleOpenBookmark={handleOpenBookmark}
+        handleAnalyzeBookmark={handleAnalyzeBookmark}
+        handleGenerateDescription={handleGenerateDescription}
+        handleRestoreBookmark={handleRestoreBookmark}
+        handlePermanentlyDeleteBookmark={handlePermanentlyDeleteBookmark}
+        handleDeleteBookmark={handleDeleteBookmark}
+      >
+        <div 
+          ref={setNodeRef}
+          style={style}
+          data-bookmark-id={bookmark.id}
+          className={`group aspect-square bg-card border border-border rounded-lg p-3 hover:shadow-lg transition-all flex flex-col relative select-none cursor-grab ${isDragging ? 'cursor-grabbing' : ''} ${
+            recentlyDeletedIds.has(bookmark.id) ? 'opacity-60' : ''
+          } ${isDragging ? 'shadow-lg' : ''} ${isSelected ? 'ring-2 ring-primary' : ''}`}
+          {...listeners}
+          {...attributes}
+        >
+          <div className="flex items-center mb-2">
+            {bookmark.favicon && (
+              <img src={bookmark.favicon} alt="" className="w-6 h-6 rounded" />
+            )}
+          </div>
+          
+          <h3 className="font-medium text-sm line-clamp-2 mb-1">{bookmark.title}</h3>
+          <p 
+            className="text-xs text-muted-foreground break-all mb-1"
+            style={{ 
+              wordBreak: 'break-all',
+              overflowWrap: 'break-word',
+              lineHeight: '1.3'
+            }}
+            title={bookmark.url}
+          >
+            {(() => {
+              try {
+                return new URL(bookmark.url).hostname;
+              } catch {
+                return formatUrlForDisplay(bookmark.url, 25);
+              }
+            })()}
+          </p>
+          
+          <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+            <span>{bookmark.visitCount || 0} visits</span>
+          </div>
+          
+          {bookmark.labels && bookmark.labels.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {bookmark.labels.slice(0, 2).map((label, index) => (
+                <Badge key={index} variant="secondary" className="text-xs">
+                  {label.label}
+                </Badge>
+              ))}
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className={`absolute bottom-2 left-0 right-0 flex items-center justify-center gap-1 ${isDragging ? 'opacity-50 pointer-events-none' : ''}`} onClick={(e) => e.stopPropagation()}>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-6 w-6 p-0 hover:bg-blue-100 hover:text-blue-600"
+              onClick={(e) => {e.stopPropagation(); handleOpenBookmark(bookmark);}}
+              title="Open bookmark"
+            >
+              <ExternalLink className="h-3 w-3" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-6 w-6 p-0 hover:bg-green-100 hover:text-green-600"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigator.clipboard.writeText(bookmark.url);
+                toast.success('URL copied to clipboard', {
+                  // Enhanced green styling to match copy success (was default green but now more vibrant)
+                  className: 'bg-green-50 border-green-200 text-green-800',
+                  style: {
+                    backgroundColor: '#f0fdf4',
+                    borderColor: '#bbf7d0',
+                    color: '#166534'
+                  }
+                });
+              }}
+              title="Copy URL"
+            >
+              <Link className="h-3 w-3" />
+            </Button>
+            {isAIEnabled && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-6 w-6 p-0 hover:bg-yellow-100 hover:text-yellow-600"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleAnalyzeBookmark(bookmark);
+                }}
+                title="AI Analyze"
+              >
+                <Sparkles className="h-3 w-3" />
+              </Button>
+            )}
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-6 w-6 p-0 hover:bg-gray-100 hover:text-gray-600"
+              onClick={(e) => {
+                e.stopPropagation();
+                toast.info('Edit functionality coming soon!');
+              }}
+              title="Edit bookmark"
+            >
+              <Edit3 className="h-3 w-3" />
+            </Button>
+            <HoverCard>
+              <HoverCardTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-6 w-6 p-0 hover:bg-yellow-100 hover:text-yellow-600"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleShowInfoPanel(bookmark);
+                  }}
+                  title="Show bookmark info"
+                >
+                  <Info className="h-3 w-3" />
+                </Button>
+              </HoverCardTrigger>
+              <HoverCardContent>
+                <div className="space-y-2">
+                  <h4 className="text-sm font-semibold">{bookmark.title}</h4>
+                  <p className="text-xs text-muted-foreground break-all">{bookmark.url}</p>
+                  <div className="flex justify-between text-xs">
+                    <span>Added: {new Date(bookmark.dateAdded).toLocaleDateString()}</span>
+                    <span>{bookmark.visitCount || 0} visits</span>
+                  </div>
+                  {bookmark.description && (
+                    <p className="text-xs text-muted-foreground">{bookmark.description}</p>
+                  )}
+                </div>
+              </HoverCardContent>
+            </HoverCard>
+            {showDeleted ? (
+              <>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-6 w-6 p-0 hover:bg-blue-100 hover:text-blue-600"
+                  onClick={(e) => {e.stopPropagation(); handleRestoreBookmark(bookmark.id);}}
+                  title="Restore bookmark"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-6 w-6 p-0 hover:bg-red-100 hover:text-red-600"
+                  onClick={(e) => {e.stopPropagation(); handlePermanentlyDeleteBookmark(bookmark.id);}}
+                  title="Delete forever"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </>
+            ) : recentlyDeletedIds.has(bookmark.id) ? (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-6 w-6 p-0 hover:bg-blue-100 hover:text-blue-600"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  try {
+                    await flow.bookmarks.restore(bookmark.id);
+                    setRecentlyDeletedIds(prev => {
+                      const newSet = new Set(prev);
+                      newSet.delete(bookmark.id);
+                      return newSet;
+                    });
+                    toast.success('Bookmark restored');
+                  } catch (error) {
+                    console.error('Failed to restore bookmark:', error);
+                    toast.error('Failed to restore bookmark');
+                    await loadBookmarks();
+                  }
+                }}
+                title="Undo delete"
+              >
+                <RotateCcw className="h-3 w-3" />
+              </Button>
+            ) : (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-6 w-6 p-0 hover:bg-red-100 hover:text-red-600"
+                onClick={(e) => {e.stopPropagation(); handleDeleteBookmark(bookmark.id);}}
+                title="Delete bookmark"
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
+        </div>
+      </BookmarkContextMenu>
+    </div>
+  );
+};
+
 function BookmarksPage() {
   console.log("🚀 BOOKMARKS PAGE LOADED - THIS SHOULD ALWAYS APPEAR");
   console.log('BookmarksPage component rendering...');
@@ -385,7 +1462,6 @@ function BookmarksPage() {
   const [isCollecting, setIsCollecting] = useState(false);
   const [collectAnimationComplete, setCollectAnimationComplete] = useState(false);
   const [collectingBookmarks, setCollectingBookmarks] = useState<Bookmark[]>([]);
-  const [dragPosition, setDragPosition] = useState<{ x: number; y: number } | null>(null);
 
   // AI Dashboard state
   const [showDashboard, setShowDashboard] = useState(false);
@@ -630,79 +1706,6 @@ function BookmarksPage() {
   };
 
   // Description generation functionality removed - keeping simple
-
-  // Context menu component for bookmarks
-  const BookmarkContextMenu = ({ bookmark, children }: { bookmark: Bookmark; children: React.ReactNode }) => (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>
-        {children}
-      </ContextMenuTrigger>
-      <ContextMenuContent className="w-48" onClick={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-      }}>
-        <ContextMenuItem onClick={() => handleOpenBookmark(bookmark)}>
-          <ExternalLink className="h-4 w-4 mr-2" />
-          Open bookmark
-        </ContextMenuItem>
-        <ContextMenuItem onClick={() => {
-          navigator.clipboard.writeText(bookmark.url);
-          toast.success('URL copied to clipboard');
-        }}>
-          <Link className="h-4 w-4 mr-2" />
-          Copy URL
-        </ContextMenuItem>
-        <ContextMenuItem onClick={() => {
-          toast.info('Edit functionality coming soon!');
-        }}>
-          <Edit3 className="h-4 w-4 mr-2" />
-          Edit bookmark
-        </ContextMenuItem>
-        {isAIEnabled && (
-          <>
-            <ContextMenuItem onSelect={async () => {
-              // Immediately run analysis and ignore all selection bullshit
-              await handleAnalyzeBookmark(bookmark);
-            }}>
-              <Sparkles className="h-4 w-4 mr-2" />
-              AI Analyze
-            </ContextMenuItem>
-            <ContextMenuItem onClick={() => handleGenerateDescription(bookmark)}>
-              <FileText className="h-4 w-4 mr-2" />
-              Generate Description
-            </ContextMenuItem>
-          </>
-        )}
-        <ContextMenuSeparator />
-        {showDeleted ? (
-          <>
-            <ContextMenuItem 
-              className="text-blue-600"
-              onClick={() => handleRestoreBookmark(bookmark.id)}
-            >
-              <RotateCcw className="h-4 w-4 mr-2" />
-              Restore bookmark
-            </ContextMenuItem>
-            <ContextMenuItem 
-              className="text-destructive"
-              onClick={() => handlePermanentlyDeleteBookmark(bookmark.id)}
-            >
-              <X className="h-4 w-4 mr-2" />
-              Delete forever
-            </ContextMenuItem>
-          </>
-        ) : (
-          <ContextMenuItem 
-            className="text-destructive"
-            onClick={() => handleDeleteBookmark(bookmark.id)}
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Move to trash
-          </ContextMenuItem>
-        )}
-      </ContextMenuContent>
-    </ContextMenu>
-  );
 
   // Initialize from localStorage when folders are loaded (only on mount)
   useEffect(() => {
@@ -1114,20 +2117,6 @@ function BookmarksPage() {
     }
   };
 
-  const handleDragMove = (event: DragMoveEvent) => {
-    if (isCollecting && activeId) {
-      // Get the original position of the dragged element
-      const draggedEl = document.querySelector(`[data-bookmark-id="${activeId}"]`);
-      if (draggedEl) {
-        const rect = draggedEl.getBoundingClientRect();
-        setDragPosition({ 
-          x: rect.left + event.delta.x, 
-          y: rect.top + event.delta.y 
-        });
-      }
-    }
-  };
-
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
@@ -1135,7 +2124,6 @@ function BookmarksPage() {
     setIsCollecting(false);
     setCollectAnimationComplete(false);
     setCollectingBookmarks([]);
-    setDragPosition(null);
     
     // Reset cursor
     document.body.style.cursor = '';
@@ -1241,865 +2229,31 @@ function BookmarksPage() {
     }
   };
 
-  // Draggable Bookmark Card Component
-  const BookmarkCard = ({ bookmark }: { bookmark: Bookmark }) => {
-    const {
-      attributes,
-      listeners,
-      setNodeRef,
-      transform,
-      isDragging,
-    } = useDraggable({ 
-      id: bookmark.id,
-      data: { 
-        type: 'bookmark',
-        bookmark 
-      }
-    });
-    
 
-    const isSelected = selectedBookmarks.has(bookmark.id);
-    const isMultiDrag = selectedBookmarks.size > 1 && activeId;
-    const isDraggedItem = bookmark.id === activeId;
-    
-    // Apply ghost effect to all selected items when multi-dragging, except the dragged item
-    const shouldShowGhost = isDragging || (isSelected && isMultiDrag && !isDraggedItem);
-    
-    // For other selected items in multi-drag, we want them to animate toward the dragged item
-    // But ONLY after a delay (when collectAnimationComplete becomes true)
-    const shouldCollect = isCollecting && collectAnimationComplete && isSelected && isMultiDrag && !isDraggedItem && !isDragging;
-    
-    let finalTransform: string;
-    if (isDragging || (isSelected && isMultiDrag)) {
-      // ALL placeholders (dragged item AND other selected items) stay in place
-      // No transforms, no animations for any placeholders
-      finalTransform = 'none';
-    } else {
-      // Normal positioning for non-selected items only
-      finalTransform = CSS.Transform.toString(transform) || '';
-    }
-    
-    const style = {
-      transform: finalTransform,
-      opacity: shouldShowGhost ? 0.3 : 1,
-      filter: shouldShowGhost ? 'grayscale(100%)' : 'none',
-      transition: shouldCollect ? 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)' : undefined,
-      zIndex: shouldCollect ? 50 : undefined,
-      // Force placeholder to maintain size when dragging
-      ...(isDragging && {
-        width: 'auto',
-        height: '160px',
-        minWidth: '100%',
-        minHeight: '160px'
-      })
-    };
-
-    return (
-      <div className="relative">
-        <input
-          type="checkbox"
-          checked={isSelected}
-          onChange={(e) => {
-            e.stopPropagation();
-            const isChecked = e.target.checked;
-            const action = isChecked ? 'select' : 'deselect';
-            const shiftKey = (e.nativeEvent as MouseEvent).shiftKey;
-
-            if (shiftKey && lastClickedBookmarkId && lastAction) {
-              // Handle range selection
-              handleRangeSelection(lastClickedBookmarkId, bookmark.id, action);
-            } else {
-              // Handle single selection
-              if (isChecked) {
-                setSelectedBookmarks(prev => new Set([...prev, bookmark.id]));
-              } else {
-                setSelectedBookmarks(prev => {
-                  const newSet = new Set(prev);
-                  newSet.delete(bookmark.id);
-                  return newSet;
-                });
-              }
-            }
-            
-            // Update tracking state
-            setLastClickedBookmarkId(bookmark.id);
-            setLastAction(action);
-          }}
-          className={`absolute top-2 left-2 z-10 w-4 h-4 cursor-pointer ${isDragging ? 'opacity-30' : ''}`}
-          onClick={(e) => e.stopPropagation()}
-        />
-        <div
-          ref={setNodeRef}
-          style={isDragging ? { transform: 'none', opacity: 0.3 } : style}
-          data-bookmark-id={bookmark.id}
-          data-is-dragging={isDragging}
-          className={isDragging ? 'pointer-events-none' : ''}
-          {...listeners}
-          {...attributes}
-        >
-          <BookmarkContextMenu bookmark={bookmark}>
-            <Card 
-              className={`group hover:shadow-lg transition-all duration-200 relative min-h-[160px] h-[180px] flex flex-col select-none cursor-grab py-0 ${isDragging ? 'cursor-grabbing opacity-30' : ''} ${
-                recentlyDeletedIds.has(bookmark.id) ? 'opacity-60' : ''
-              } ${isDragging ? 'shadow-lg' : ''} ${isSelected ? 'ring-2 ring-primary' : ''}`}
-            >
-            <CardContent className="p-4 pb-0 flex flex-col h-full">
-              {/* Header Section - Better height distribution */}
-              <div className="flex-shrink-0 min-h-[50px] max-h-[70px] flex flex-col items-center justify-center text-center mb-3 px-6">
-                <div className="flex items-start gap-2 max-w-full">
-                  {bookmark.favicon && (
-                    <img src={bookmark.favicon} alt="" className="w-4 h-4 rounded-sm flex-shrink-0 mt-0.5" />
-                  )}
-                  <h3
-                    className="font-medium text-base leading-tight line-clamp-3 hover:text-primary text-center cursor-pointer flex-1 min-w-0"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleOpenBookmark(bookmark);
-                    }}
-                    title={bookmark.title}
-                  >
-                    {bookmark.title}
-                  </h3>
-                </div>
-              </div>
-
-              {/* Content Area - Flexible height with better spacing */}
-              <div className="flex-1 flex flex-col items-center justify-start space-y-2 overflow-hidden min-h-0">
-                {/* Existing Labels */}
-                {bookmark.labels && bookmark.labels.length > 0 && (
-                  <div className="flex flex-wrap gap-1 justify-center max-w-full">
-                    {bookmark.labels.slice(0, 3).map((label, index) => (
-                      <Badge key={index} variant="secondary" className="text-xs py-1 px-2" title={label.label}>
-                        {label.label}
-                      </Badge>
-                    ))}
-                    {bookmark.labels.length > 3 && (
-                      <Badge variant="outline" className="text-xs py-1 px-2">
-                        +{bookmark.labels.length - 3}
-                      </Badge>
-                    )}
-                  </div>
-                )}
-
-              </div>
-
-              {/* Action Area - Bottom Actions */}
-              <div
-                className={`flex-shrink-0 h-[44px] flex items-center justify-center gap-3 mt-auto ${isDragging ? 'opacity-30 pointer-events-none' : ''}`}
-                onClick={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
-                onTouchStart={(e) => e.stopPropagation()}
-              >
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 w-8 p-0 hover:bg-blue-100 hover:text-blue-600 transition-colors"
-                  onClick={(e) => {
-                    e.stopPropagation(); 
-                    handleOpenBookmark(bookmark);
-                  }}
-                  title="Open bookmark"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 w-8 p-0 hover:bg-green-100 hover:text-green-600 transition-colors"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigator.clipboard.writeText(bookmark.url);
-                    toast.success('URL copied to clipboard');
-                  }}
-                  title="Copy URL"
-                >
-                  <Link className="h-4 w-4" />
-                </Button>
-                {isAIEnabled && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0 hover:bg-yellow-100 hover:text-yellow-600 transition-colors"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleAnalyzeBookmark(bookmark);
-                    }}
-                    title="AI Analyze"
-                  >
-                    <Sparkles className="h-4 w-4" />
-                  </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 w-7 p-0 hover:bg-gray-100 hover:text-gray-600"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toast.info('Edit functionality coming soon!');
-                  }}
-                  title="Edit bookmark"
-                >
-                  <Edit3 className="h-3.5 w-3.5" />
-                </Button>
-                <HoverCard>
-                  <HoverCardTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0 hover:bg-yellow-100 hover:text-yellow-600"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleShowInfoPanel(bookmark);
-                      }}
-                      title="Show bookmark info"
-                    >
-                      <Info className="h-3.5 w-3.5" />
-                    </Button>
-                  </HoverCardTrigger>
-                  <HoverCardContent>
-                    <div className="space-y-2">
-                      <h4 className="text-sm font-semibold">{bookmark.title}</h4>
-                      <p className="text-xs text-muted-foreground break-all">{bookmark.url}</p>
-                      <div className="flex justify-between text-xs">
-                        <span>Added: {new Date(bookmark.dateAdded).toLocaleDateString()}</span>
-                        <span>{bookmark.visitCount || 0} visits</span>
-                      </div>
-                      {bookmark.description && (
-                        <p className="text-xs text-muted-foreground">{bookmark.description}</p>
-                      )}
-                    </div>
-                  </HoverCardContent>
-                </HoverCard>
-                {showDeleted ? (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0 hover:bg-blue-100 hover:text-blue-600"
-                      onClick={(e) => {e.stopPropagation(); handleRestoreBookmark(bookmark.id);}}
-                      title="Restore bookmark"
-                    >
-                      <RotateCcw className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0 hover:bg-red-100 hover:text-red-600"
-                      onClick={(e) => {e.stopPropagation(); handlePermanentlyDeleteBookmark(bookmark.id);}}
-                      title="Delete forever"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </Button>
-                  </>
-                ) : recentlyDeletedIds.has(bookmark.id) ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0 hover:bg-blue-100 hover:text-blue-600"
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      try {
-                        await flow.bookmarks.restore(bookmark.id);
-                        setRecentlyDeletedIds(prev => {
-                          const newSet = new Set(prev);
-                          newSet.delete(bookmark.id);
-                          return newSet;
-                        });
-                        toast.success('Bookmark restored');
-                      } catch (error) {
-                        console.error('Failed to restore bookmark:', error);
-                        toast.error('Failed to restore bookmark');
-                        await loadBookmarks();
-                      }
-                    }}
-                    title="Undo delete"
-                  >
-                    <RotateCcw className="h-3.5 w-3.5" />
-                  </Button>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0 hover:bg-red-100 hover:text-red-600"
-                    onClick={(e) => {e.stopPropagation(); handleDeleteBookmark(bookmark.id);}}
-                    title="Delete bookmark"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-            </Card>
-          </BookmarkContextMenu>
-        </div>
-      </div>
-    );
-  };
-
-  const BookmarkListItem = ({ bookmark }: { bookmark: Bookmark }) => {
-    const {
-      attributes,
-      listeners,
-      setNodeRef,
-      transform,
-      isDragging,
-    } = useDraggable({ 
-      id: bookmark.id,
-      data: { 
-        type: 'bookmark',
-        bookmark 
-      }
-    });
-
-
-    const isSelected = selectedBookmarks.has(bookmark.id);
-    const isMultiDrag = selectedBookmarks.size > 1 && activeId;
-    const isDraggedItem = bookmark.id === activeId;
-    
-    // Apply ghost effect to all selected items when multi-dragging, except the dragged item
-    const shouldShowGhost = isDragging || (isSelected && isMultiDrag && !isDraggedItem);
-    
-    // For other selected items in multi-drag, we want them to animate toward the dragged item
-    // But ONLY after a delay (when collectAnimationComplete becomes true)
-    const shouldCollect = isCollecting && collectAnimationComplete && isSelected && isMultiDrag && !isDraggedItem && !isDragging;
-    
-    
-    let finalTransform: string;
-    if (isDragging || (isSelected && isMultiDrag)) {
-      // ALL placeholders (dragged item AND other selected items) stay in place
-      // No transforms, no animations for any placeholders - floating overlay handles animation
-      finalTransform = 'none';
-    } else {
-      // Normal positioning for non-selected items only
-      finalTransform = CSS.Transform.toString(transform) || '';
-    }
-    
-    const style = {
-      transform: finalTransform,
-      opacity: shouldShowGhost ? 0.3 : 1,
-      filter: shouldShowGhost ? 'grayscale(100%)' : 'none',
-      transition: shouldCollect ? 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)' : undefined,
-      zIndex: shouldCollect ? 50 : undefined,
-    };
-
-    return (
-      <div className="relative">
-        <input
-          type="checkbox"
-          checked={isSelected}
-          onChange={(e) => {
-            e.stopPropagation();
-            const isChecked = e.target.checked;
-            const action = isChecked ? 'select' : 'deselect';
-            const shiftKey = (e.nativeEvent as MouseEvent).shiftKey;
-
-            if (shiftKey && lastClickedBookmarkId && lastAction) {
-              // Handle range selection
-              handleRangeSelection(lastClickedBookmarkId, bookmark.id, action);
-            } else {
-              // Handle single selection
-              if (isChecked) {
-                setSelectedBookmarks(prev => new Set([...prev, bookmark.id]));
-              } else {
-                setSelectedBookmarks(prev => {
-                  const newSet = new Set(prev);
-                  newSet.delete(bookmark.id);
-                  return newSet;
-                });
-              }
-            }
-            
-            // Update tracking state
-            setLastClickedBookmarkId(bookmark.id);
-            setLastAction(action);
-          }}
-          className={`absolute left-3 top-1/2 -translate-y-1/2 z-10 w-4 h-4 cursor-pointer ${isDragging ? 'opacity-30' : ''}`}
-          onClick={(e) => e.stopPropagation()}
-          onContextMenu={(e) => {
-            // Prevent right-click from triggering checkbox
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-        />
-        <BookmarkContextMenu bookmark={bookmark}>
-          <div 
-            ref={setNodeRef}
-            style={style}
-            data-bookmark-id={bookmark.id}
-            className={`group flex items-center gap-3 p-3 pl-10 rounded-lg hover:bg-muted/50 transition-colors select-none cursor-grab ${isDragging ? 'cursor-grabbing' : ''} ${
-              recentlyDeletedIds.has(bookmark.id) ? 'opacity-60' : ''
-            } ${isDragging ? 'shadow-lg' : ''} ${isSelected ? 'ring-2 ring-primary' : ''}`}
-            {...listeners}
-            {...attributes}
-          >
-            <div className="flex items-center gap-2 flex-1 min-w-0">
-          {bookmark.favicon && (
-            <img src={bookmark.favicon} alt="" className="w-4 h-4 rounded-sm flex-shrink-0" />
-          )}
-          <div className="flex-1 min-w-0 pr-2">
-            <div className="flex items-center gap-2">
-              <h3 
-                className="font-medium text-sm truncate hover:text-primary cursor-pointer" 
-                onClick={() => handleOpenBookmark(bookmark)}
-              >
-                {bookmark.title}
-              </h3>
-              {bookmark.labels && bookmark.labels.length > 0 && (
-                <div className="flex gap-1">
-                  {bookmark.labels.slice(0, 2).map((label, index) => (
-                    <Badge key={index} variant="secondary" className="text-xs">
-                      {label.label}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </div>
-            <p 
-              className="text-xs text-muted-foreground flex-1 break-all"
-              style={{ 
-                wordBreak: 'break-all',
-                overflowWrap: 'break-word',
-                lineHeight: '1.3'
-              }}
-              title={bookmark.url}
-            >
-              {formatUrlForDisplay(bookmark.url, 80)}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span>{new Date(bookmark.dateAdded).toLocaleDateString()}</span>
-          <span>{bookmark.visitCount || 0} visits</span>
-        </div>
-
-        <div className={`flex items-center gap-1 ${isDragging ? 'opacity-30 pointer-events-none' : ''}`} onClick={(e) => e.stopPropagation()}>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="h-7 w-7 p-0 hover:bg-blue-100 hover:text-blue-600"
-            onClick={(e) => {e.stopPropagation(); handleOpenBookmark(bookmark);}}
-            title="Open bookmark"
-          >
-            <ExternalLink className="h-3.5 w-3.5" />
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="h-7 w-7 p-0 hover:bg-green-100 hover:text-green-600"
-            onClick={(e) => {
-              e.stopPropagation();
-              navigator.clipboard.writeText(bookmark.url);
-              toast.success('URL copied to clipboard');
-            }}
-            title="Copy URL"
-          >
-            <Link className="h-3.5 w-3.5" />
-          </Button>
-          {isAIEnabled && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="h-7 w-7 p-0 hover:bg-yellow-100 hover:text-yellow-600"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleAnalyzeBookmark(bookmark);
-              }}
-              title="AI Analyze"
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-            </Button>
-          )}
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="h-7 w-7 p-0 hover:bg-gray-100 hover:text-gray-600"
-            onClick={(e) => {
-              e.stopPropagation();
-              toast.info('Edit functionality coming soon!');
-            }}
-            title="Edit bookmark"
-          >
-            <Edit3 className="h-3.5 w-3.5" />
-          </Button>
-          <HoverCard>
-            <HoverCardTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-7 w-7 p-0 hover:bg-yellow-100 hover:text-yellow-600"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleShowInfoPanel(bookmark);
-                }}
-                title="Show bookmark info"
-              >
-                <Info className="h-3.5 w-3.5" />
-              </Button>
-            </HoverCardTrigger>
-            <HoverCardContent>
-              <div className="space-y-2">
-                <h4 className="text-sm font-semibold">{bookmark.title}</h4>
-                <p className="text-xs text-muted-foreground break-all">{bookmark.url}</p>
-                <div className="flex justify-between text-xs">
-                  <span>Added: {new Date(bookmark.dateAdded).toLocaleDateString()}</span>
-                  <span>{bookmark.visitCount || 0} visits</span>
-                </div>
-                {bookmark.description && (
-                  <p className="text-xs text-muted-foreground">{bookmark.description}</p>
-                )}
-              </div>
-            </HoverCardContent>
-          </HoverCard>
-          {showDeleted ? (
-            <>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-7 w-7 p-0 hover:bg-blue-100 hover:text-blue-600"
-                onClick={(e) => {e.stopPropagation(); handleRestoreBookmark(bookmark.id);}}
-                title="Restore bookmark"
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-7 w-7 p-0 hover:bg-red-100 hover:text-red-600"
-                onClick={(e) => {e.stopPropagation(); handlePermanentlyDeleteBookmark(bookmark.id);}}
-                title="Delete forever"
-              >
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            </>
-          ) : recentlyDeletedIds.has(bookmark.id) ? (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="h-7 w-7 p-0 hover:bg-blue-100 hover:text-blue-600"
-              onClick={async (e) => {
-                e.stopPropagation();
-                try {
-                  await flow.bookmarks.restore(bookmark.id);
-                  setRecentlyDeletedIds(prev => {
-                    const newSet = new Set(prev);
-                    newSet.delete(bookmark.id);
-                    return newSet;
-                  });
-                  toast.success('Bookmark restored');
-                } catch (error) {
-                  console.error('Failed to restore bookmark:', error);
-                  toast.error('Failed to restore bookmark');
-                  await loadBookmarks();
-                }
-              }}
-              title="Undo delete"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-            </Button>
-          ) : (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="h-7 w-7 p-0 hover:bg-red-100 hover:text-red-600"
-              onClick={(e) => {e.stopPropagation(); handleDeleteBookmark(bookmark.id);}}
-              title="Delete bookmark"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          )}
-        </div>
-          </div>
-        </BookmarkContextMenu>
-      </div>
-    );
-  };
-
-  // Draggable Bookmark Grid Item Component
-  const BookmarkGridItem = ({ bookmark }: { bookmark: Bookmark }) => {
-    const {
-      attributes,
-      listeners,
-      setNodeRef,
-      transform,
-      isDragging,
-    } = useDraggable({ 
-      id: bookmark.id,
-      data: { 
-        type: 'bookmark',
-        bookmark 
-      }
-    });
-
-
-    const isSelected = selectedBookmarks.has(bookmark.id);
-    const isMultiDrag = selectedBookmarks.size > 1 && activeId;
-    const isDraggedItem = bookmark.id === activeId;
-    
-    // Apply ghost effect to all selected items when multi-dragging, except the dragged item
-    const shouldShowGhost = isDragging || (isSelected && isMultiDrag && !isDraggedItem);
-    
-    // For other selected items in multi-drag, we want them to animate toward the dragged item
-    // But ONLY after a delay (when collectAnimationComplete becomes true)
-    const shouldCollect = isCollecting && collectAnimationComplete && isSelected && isMultiDrag && !isDraggedItem && !isDragging;
-    
-    
-    let finalTransform: string;
-    if (isDragging || (isSelected && isMultiDrag)) {
-      // ALL placeholders (dragged item AND other selected items) stay in place
-      // No transforms, no animations for any placeholders - floating overlay handles animation
-      finalTransform = 'none';
-    } else {
-      // Normal positioning for non-selected items only
-      finalTransform = CSS.Transform.toString(transform) || '';
-    }
-    
-    const style = {
-      transform: finalTransform,
-      opacity: shouldShowGhost ? 0.3 : 1,
-      filter: shouldShowGhost ? 'grayscale(100%)' : 'none',
-      transition: shouldCollect ? 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)' : undefined,
-      zIndex: shouldCollect ? 50 : undefined,
-    };
-
-    return (
-      <div className="relative">
-        <input
-          type="checkbox"
-          checked={isSelected}
-          onChange={(e) => {
-            e.stopPropagation();
-            const isChecked = e.target.checked;
-            const action = isChecked ? 'select' : 'deselect';
-            const shiftKey = (e.nativeEvent as MouseEvent).shiftKey;
-
-            if (shiftKey && lastClickedBookmarkId && lastAction) {
-              // Handle range selection
-              handleRangeSelection(lastClickedBookmarkId, bookmark.id, action);
-            } else {
-              // Handle single selection
-              if (isChecked) {
-                setSelectedBookmarks(prev => new Set([...prev, bookmark.id]));
-              } else {
-                setSelectedBookmarks(prev => {
-                  const newSet = new Set(prev);
-                  newSet.delete(bookmark.id);
-                  return newSet;
-                });
-              }
-            }
-            
-            // Update tracking state
-            setLastClickedBookmarkId(bookmark.id);
-            setLastAction(action);
-          }}
-          className={`absolute top-1 left-1 z-10 w-3 h-3 cursor-pointer ${isDragging ? 'opacity-30' : ''}`}
-          onClick={(e) => e.stopPropagation()}
-          onContextMenu={(e) => {
-            // Prevent right-click from triggering checkbox
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-        />
-        <BookmarkContextMenu bookmark={bookmark}>
-          <div 
-            ref={setNodeRef}
-            style={style}
-            data-bookmark-id={bookmark.id}
-            className={`group aspect-square bg-card border border-border rounded-lg p-3 hover:shadow-lg transition-all flex flex-col relative select-none cursor-grab ${isDragging ? 'cursor-grabbing' : ''} ${
-              recentlyDeletedIds.has(bookmark.id) ? 'opacity-60' : ''
-            } ${isDragging ? 'shadow-lg' : ''} ${isSelected ? 'ring-2 ring-primary' : ''}`}
-            {...listeners}
-            {...attributes}
-          >
-            <div className="flex items-center mb-2">
-              {bookmark.favicon && (
-                <img src={bookmark.favicon} alt="" className="w-6 h-6 rounded" />
-              )}
-            </div>
-            
-            <h3 className="font-medium text-sm line-clamp-2 mb-1">{bookmark.title}</h3>
-            <p 
-              className="text-xs text-muted-foreground break-all mb-1"
-              style={{ 
-                wordBreak: 'break-all',
-                overflowWrap: 'break-word',
-                lineHeight: '1.3'
-              }}
-              title={bookmark.url}
-            >
-              {(() => {
-                try {
-                  return new URL(bookmark.url).hostname;
-                } catch {
-                  return formatUrlForDisplay(bookmark.url, 25);
-                }
-              })()}
-            </p>
-            
-            <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
-              <span>{bookmark.visitCount || 0} visits</span>
-            </div>
-            
-            {bookmark.labels && bookmark.labels.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
-                {bookmark.labels.slice(0, 2).map((label, index) => (
-                  <Badge key={index} variant="secondary" className="text-xs">
-                    {label.label}
-                  </Badge>
-                ))}
-              </div>
-            )}
-
-            {/* Action Buttons */}
-            <div className={`absolute bottom-2 left-0 right-0 flex items-center justify-center gap-1 ${isDragging ? 'opacity-50 pointer-events-none' : ''}`} onClick={(e) => e.stopPropagation()}>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-6 w-6 p-0 hover:bg-blue-100 hover:text-blue-600"
-                onClick={(e) => {e.stopPropagation(); handleOpenBookmark(bookmark);}}
-                title="Open bookmark"
-              >
-                <ExternalLink className="h-3 w-3" />
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-6 w-6 p-0 hover:bg-green-100 hover:text-green-600"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigator.clipboard.writeText(bookmark.url);
-                  toast.success('URL copied to clipboard', {
-                    // Enhanced green styling to match copy success (was default green but now more vibrant)
-                    className: 'bg-green-50 border-green-200 text-green-800',
-                    style: {
-                      backgroundColor: '#f0fdf4',
-                      borderColor: '#bbf7d0',
-                      color: '#166534'
-                    }
-                  });
-                }}
-                title="Copy URL"
-              >
-                <Link className="h-3 w-3" />
-              </Button>
-              {isAIEnabled && (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-6 w-6 p-0 hover:bg-yellow-100 hover:text-yellow-600"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleAnalyzeBookmark(bookmark);
-                  }}
-                  title="AI Analyze"
-                >
-                  <Sparkles className="h-3 w-3" />
-                </Button>
-              )}
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-6 w-6 p-0 hover:bg-gray-100 hover:text-gray-600"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toast.info('Edit functionality coming soon!');
-                }}
-                title="Edit bookmark"
-              >
-                <Edit3 className="h-3 w-3" />
-              </Button>
-              <HoverCard>
-                <HoverCardTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-6 w-6 p-0 hover:bg-yellow-100 hover:text-yellow-600"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleShowInfoPanel(bookmark);
-                    }}
-                    title="Show bookmark info"
-                  >
-                    <Info className="h-3 w-3" />
-                  </Button>
-                </HoverCardTrigger>
-                <HoverCardContent>
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-semibold">{bookmark.title}</h4>
-                    <p className="text-xs text-muted-foreground break-all">{bookmark.url}</p>
-                    <div className="flex justify-between text-xs">
-                      <span>Added: {new Date(bookmark.dateAdded).toLocaleDateString()}</span>
-                      <span>{bookmark.visitCount || 0} visits</span>
-                    </div>
-                    {bookmark.description && (
-                      <p className="text-xs text-muted-foreground">{bookmark.description}</p>
-                    )}
-                  </div>
-                </HoverCardContent>
-              </HoverCard>
-              {showDeleted ? (
-                <>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-6 w-6 p-0 hover:bg-blue-100 hover:text-blue-600"
-                    onClick={(e) => {e.stopPropagation(); handleRestoreBookmark(bookmark.id);}}
-                    title="Restore bookmark"
-                  >
-                    <RotateCcw className="h-3 w-3" />
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-6 w-6 p-0 hover:bg-red-100 hover:text-red-600"
-                    onClick={(e) => {e.stopPropagation(); handlePermanentlyDeleteBookmark(bookmark.id);}}
-                    title="Delete forever"
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </>
-              ) : recentlyDeletedIds.has(bookmark.id) ? (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-6 w-6 p-0 hover:bg-blue-100 hover:text-blue-600"
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    try {
-                      await flow.bookmarks.restore(bookmark.id);
-                      setRecentlyDeletedIds(prev => {
-                        const newSet = new Set(prev);
-                        newSet.delete(bookmark.id);
-                        return newSet;
-                      });
-                      toast.success('Bookmark restored');
-                    } catch (error) {
-                      console.error('Failed to restore bookmark:', error);
-                      toast.error('Failed to restore bookmark');
-                      await loadBookmarks();
-                    }
-                  }}
-                  title="Undo delete"
-                >
-                  <RotateCcw className="h-3 w-3" />
-                </Button>
-              ) : (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-6 w-6 p-0 hover:bg-red-100 hover:text-red-600"
-                  onClick={(e) => {e.stopPropagation(); handleDeleteBookmark(bookmark.id);}}
-                  title="Delete bookmark"
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              )}
-            </div>
-          </div>
-        </BookmarkContextMenu>
-      </div>
-    );
+  // Shared props for the hoisted (module-scope) bookmark item components
+  const bookmarkItemProps: BookmarkItemProps = {
+    selectedBookmarks,
+    activeId,
+    isCollecting,
+    collectAnimationComplete,
+    lastClickedBookmarkId,
+    lastAction,
+    handleRangeSelection,
+    setSelectedBookmarks,
+    setLastClickedBookmarkId,
+    setLastAction,
+    recentlyDeletedIds,
+    setRecentlyDeletedIds,
+    loadBookmarks,
+    handleShowInfoPanel,
+    isAIEnabled,
+    showDeleted,
+    handleOpenBookmark,
+    handleAnalyzeBookmark,
+    handleGenerateDescription,
+    handleRestoreBookmark,
+    handlePermanentlyDeleteBookmark,
+    handleDeleteBookmark,
   };
 
   return (
@@ -2118,7 +2272,6 @@ function BookmarksPage() {
       sensors={sensors}
       collisionDetection={pointerWithin}
       onDragStart={handleDragStart}
-      onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
     >
     <div className="h-screen bg-background flex">
@@ -2521,16 +2674,31 @@ function BookmarksPage() {
                         const toastId = toast.loading(`Analyzing ${remaining} bookmarks...`);
 
                         try {
-                          const analyzedBookmarks = [];
+                          const analyzedBookmarks: typeof dashboardBookmarks = [];
                           for (let i = 0; i < selectedBookmarksArray.length; i++) {
                             const bookmark = selectedBookmarksArray[i];
                             // Suppress individual toasts during bulk analysis - dashboard provides feedback
                             const result = await aiAnalysis.analyzeBookmark(bookmark, { suppressToast: true });
                             if (result) {
+                              const { autoApplied, remaining: remainingLabels } = aiAnalysis.findLabelsToAutoApply(
+                                result.analysis.labels,
+                                aiAnalysis.aiSettings,
+                                bookmark
+                              );
+                              if (autoApplied.length > 0) {
+                                await flow.bookmarks.update(bookmark.id, {
+                                  addLabels: autoApplied.map(l => ({
+                                    label: l.label,
+                                    source: 'ai' as const,
+                                    confidence: l.confidence,
+                                    category: l.category
+                                  }))
+                                });
+                              }
                               const analyzed = {
                                 bookmark,
-                                analysis: result.analysis,
-                                autoAppliedLabels: []
+                                analysis: { ...result.analysis, labels: remainingLabels },
+                                autoAppliedLabels: autoApplied
                               };
                               analyzedBookmarks.push(analyzed);
                               // Update dashboard incrementally as each bookmark is analyzed
@@ -2949,19 +3117,19 @@ function BookmarksPage() {
               viewMode === 'list' ? (
                 <div className="space-y-1">
                   {filteredBookmarks.map((bookmark) => (
-                    <BookmarkListItem key={bookmark.id} bookmark={bookmark} />
+                    <BookmarkListItem key={bookmark.id} bookmark={bookmark} {...bookmarkItemProps} />
                   ))}
                 </div>
               ) : viewMode === 'card' ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {filteredBookmarks.map((bookmark) => (
-                    <BookmarkCard key={bookmark.id} bookmark={bookmark} />
+                    <BookmarkCard key={bookmark.id} bookmark={bookmark} {...bookmarkItemProps} />
                   ))}
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
                   {filteredBookmarks.map((bookmark) => (
-                    <BookmarkGridItem key={bookmark.id} bookmark={bookmark} />
+                    <BookmarkGridItem key={bookmark.id} bookmark={bookmark} {...bookmarkItemProps} />
                   ))}
                 </div>
               )
@@ -3242,10 +3410,12 @@ function BookmarksPage() {
             // Target the center of the screen where the dragged item typically appears
             let targetX, targetY;
             if (collectAnimationComplete) {
-              // Use live drag position if available, otherwise center of viewport
-              if (dragPosition) {
-                targetX = dragPosition.x;
-                targetY = dragPosition.y;
+              // Fly toward the dragged item's origin placeholder (it stays in place during drag)
+              const targetEl = document.querySelector(`[data-bookmark-id="${activeId}"]`);
+              if (targetEl) {
+                const targetRect = targetEl.getBoundingClientRect();
+                targetX = targetRect.left;
+                targetY = targetRect.top;
               } else {
                 targetX = window.innerWidth / 2;
                 targetY = window.innerHeight / 2;
