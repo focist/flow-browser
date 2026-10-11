@@ -16,7 +16,8 @@
   },
   "enabledPlugins": {
     "atlas@coding-octopus-marketplace": true,
-    "atomic-commit@coding-octopus-marketplace": true
+    "atomic-commit@coding-octopus-marketplace": true,
+    "clickup@anthropic-plugin-directory": true
   },
   "extraKnownMarketplaces": {
     "coding-octopus-marketplace": {
