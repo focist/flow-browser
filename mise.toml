@@ -2,6 +2,10 @@
 # .githooks/commit-msg enforces Conventional Commits via commitlint.
 # mise [hooks] are experimental; scoped opt-in here so teammates don't need
 # a global `mise settings experimental=true`.
+[tools]
+bun = "1.4.2"
+node = "lts"
+
 [settings]
 experimental = true
 
