@@ -16,12 +16,13 @@ validate = 'bun run typecheck'
 mode = 'external'
 system = 'clickup'
 url = 'https://app.clickup.com/8538476'
-project = '901412857705'   # Oasis list — https://app.clickup.com/8538476/v/li/901412857705
+project = '901412857705'   # Oasis "Dev" list — https://app.clickup.com/8538476/v/li/901412857705
 
-# Atlas file statuses to ClickUp statuses (ADR 0010).
+# ClickUp statuses to atlas work statuses (ADR 0010). Read during
+# reconciliation to translate the ticket status you set back onto the file.
 [ticketing.status_map]
-in-progress = 'in progress'
-complete = 'complete'
+'in progress' = 'in-progress'
+'done' = 'complete'
 
 # /atlas:implement's confirm step (ADR 0008). true: show the per-task
 # confirm plan, build only on approval.
