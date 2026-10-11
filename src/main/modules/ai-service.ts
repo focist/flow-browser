@@ -1,5 +1,7 @@
 import { SettingsDataStore } from '@/saving/settings';
 import { ProviderRegistry } from './ai/provider-registry';
+import { SelectionCore } from './ai/selection-core';
+import { normalizeProviderId, getDefaultModelId } from './ai/model-catalog';
 import { LLMRequest } from './ai/providers/base-provider';
 import type {
   AISettings,
@@ -10,154 +12,49 @@ import type {
 } from '~/flow/interfaces/ai';
 
 /**
- * AI Service - Refactored to use Provider Abstraction
+ * AI Service
  *
- * This service now uses the Provider Registry for unified LLM provider management.
- * Maintains full backward compatibility with existing code while enabling:
- * - Dynamic model discovery
- * - Provider switching without code changes
- * - Extensible architecture for new providers
+ * Bookmark analysis on top of the provider abstraction. Which provider and
+ * model a run uses is owned by SelectionCore (settings persistence, selection
+ * resolution, explicit connection validation); this service owns the analysis
+ * prompts, response parsing, and the local (no-API) analysis path.
  */
 class AIService {
   private registry: ProviderRegistry;
-  private settings: AISettings = {
-    enabled: true,
-    provider: 'openai',
-    model: 'gpt-5-nano',
-    autoAnalyze: false,
-    confidenceThreshold: 0.7,
-    autoApply: {
-      enabled: false,
-      maxLabels: 1,
-      notifications: true,
-    },
-    categories: {
-      topics: true,
-      types: true,
-      priority: false,
-    }
-  };
-  private initialized = false;
-  private initPromise: Promise<void>;
-
-  private getDefaultModel(provider: string): string {
-    switch (provider) {
-      case 'openai':
-        return 'gpt-5-nano';
-      case 'claude':
-      case 'anthropic':
-        return 'claude-3-5-sonnet-20241022';
-      default:
-        return 'gpt-5-nano';
-    }
-  }
+  private core: SelectionCore;
 
   constructor() {
     this.registry = new ProviderRegistry();
-    this.initPromise = this.loadSettings()
-      .then(() => {
-        this.initialized = true;
-      })
-      .catch((error) => {
-        console.error('AIService initialization failed:', error);
-        // Mark as initialized even on failure to prevent blocking
-        this.initialized = true;
-      });
+    void this.registry.initializeDefaults();
+    this.core = new SelectionCore({ store: SettingsDataStore, registry: this.registry });
   }
 
-  private async ensureInitialized() {
-    if (!this.initialized) {
-      await this.initPromise;
-    }
+  public async getSettings(): Promise<AISettings> {
+    return this.core.getSettings();
   }
 
-  private async loadSettings() {
-    try {
-      const savedSettings = await SettingsDataStore.get<AISettings>('ai-settings');
-      if (savedSettings) {
-        this.settings = { ...this.settings, ...savedSettings };
-        console.log('🔧 AI Settings loaded:', this.settings);
-
-        // Initialize registry with defaults
-        await this.registry.initializeDefaults();
-
-        // Configure the active provider if we have an API key
-        if (this.settings.apiKey && this.settings.provider !== 'local') {
-          const providerId = this.normalizeProviderId(this.settings.provider);
-          await this.registry.configureProvider(providerId, {
-            apiKey: this.settings.apiKey
-          });
-        }
-      } else {
-        console.log('🔧 No saved AI settings found, using defaults');
-        await this.registry.initializeDefaults();
-      }
-    } catch (error) {
-      console.error('Failed to load AI settings:', error);
-      await this.registry.initializeDefaults();
-    }
-  }
-
-  /**
-   * Normalize provider ID to match registry (claude -> anthropic)
-   */
-  private normalizeProviderId(provider: string): string {
-    return provider === 'claude' ? 'anthropic' : provider;
-  }
-
-  public async updateSettings(newSettings: Partial<AISettings>) {
-    this.settings = { ...this.settings, ...newSettings };
-
-    // Set default model if provider changed but no model specified
-    if (newSettings.provider && !newSettings.model) {
-      this.settings.model = this.getDefaultModel(newSettings.provider);
-    }
-
-    // Configure provider in registry if we have an API key
-    if (this.settings.apiKey && this.settings.provider !== 'local') {
-      try {
-        const providerId = this.normalizeProviderId(this.settings.provider);
-        await this.registry.configureProvider(providerId, {
-          apiKey: this.settings.apiKey
-        });
-        console.log(`🔧 Configured ${providerId} provider in registry`);
-      } catch (error) {
-        console.error('Failed to configure provider:', error);
-      }
-    }
-
-    // Save settings to persistent storage
-    try {
-      await SettingsDataStore.set('ai-settings', this.settings);
-      console.log('🔧 AI Settings saved:', this.settings);
-    } catch (error) {
-      console.error('Failed to save AI settings:', error);
-    }
+  public async updateSettings(newSettings: Partial<AISettings>): Promise<void> {
+    await this.core.updateSettings(newSettings);
   }
 
   public async isEnabled(): Promise<boolean> {
-    await this.ensureInitialized();
-
-    if (!this.settings.enabled) {
+    const settings = await this.core.getSettings();
+    if (!settings.enabled) {
       return false;
     }
 
-    if (this.settings.provider === 'local') {
+    if (normalizeProviderId(settings.provider) === 'local') {
       return true;
     }
 
-    const providerId = this.normalizeProviderId(this.settings.provider);
-    const provider = this.registry.getProvider(providerId);
+    const provider = this.registry.getProvider(normalizeProviderId(settings.provider));
     return provider !== null;
   }
 
   public async analyzeBookmark(request: BookmarkAnalysisRequest): Promise<CategoryAnalysis> {
     console.log(`AI-SERVICE: Starting bookmark analysis for "${request.title}"`);
-    console.log(`AI-SERVICE: URL: ${request.url}`);
-    console.log(`AI-SERVICE: Content length: ${request.content?.length || 0}`);
 
-    await this.ensureInitialized();
-    console.log(`AI-SERVICE: Provider: ${this.settings.provider}, Enabled: ${this.settings.enabled}`);
+    const settings = await this.core.getSettings();
 
     if (!(await this.isEnabled())) {
       console.error('AI-SERVICE: AI service is not enabled or configured');
@@ -165,31 +62,13 @@ class AIService {
     }
 
     // Use local analysis if local provider is selected
-    if (this.settings.provider === 'local') {
+    if (normalizeProviderId(settings.provider) === 'local') {
       console.log('AI-SERVICE: Using local analysis');
-      return this.analyzeLocally(request);
+      return this.analyzeLocally(request, settings);
     }
-
-    // Use provider abstraction for API-based analysis
-    const providerId = this.normalizeProviderId(this.settings.provider);
-    const provider = this.registry.getProvider(providerId);
-
-    if (!provider) {
-      console.error(`AI-SERVICE: Provider ${providerId} not configured`);
-      throw new Error(`Provider ${providerId} not configured`);
-    }
-
-    console.log(`AI-SERVICE: Using ${providerId} provider for analysis`);
 
     try {
-      const prompt = this.buildAnalysisPrompt(request);
-      const model = this.settings.model || this.getDefaultModel(this.settings.provider);
-
-      // Determine max tokens based on model type
-      const isNanoModel = model.includes('nano');
-      const maxTokens = isNanoModel ? 5000 : 500;
-
-      console.log(`AI-SERVICE: Model: ${model}, Max tokens: ${maxTokens}`);
+      const prompt = this.buildAnalysisPrompt(request, settings);
 
       const llmRequest: LLMRequest = {
         messages: [
@@ -198,36 +77,36 @@ class AIService {
             content: prompt
           }
         ],
-        temperature: 0.7,
-        maxTokens: maxTokens
+        // Reasoning models spend completion budget on internal reasoning
+        // before emitting text; a tight cap returns empty content.
+        maxTokens: 8000
       };
 
       console.log('AI-SERVICE: Sending request to provider...');
-      const startTime = Date.now();
-      const response = await provider.complete(llmRequest, model);
-      const duration = Date.now() - startTime;
+      const { response, model, providerId } = await this.core.runCompletion(llmRequest);
 
-      console.log(`AI-SERVICE: Provider request completed in ${duration}ms`);
-      console.log(`AI-SERVICE: Response received (${response.content?.length || 0} chars)`);
-      console.log(`AI-SERVICE: Cost: $${response.cost.totalCost.toFixed(6)}`);
-      console.log(`AI-SERVICE: Tokens: ${response.usage.totalTokens}`);
+      console.log(`AI-SERVICE: ${providerId}/${model} completed in ${response.latencyMs}ms`);
+      console.log(`AI-SERVICE: Cost: $${response.cost.totalCost.toFixed(6)}, Tokens: ${response.usage.totalTokens}`);
 
       if (!response.content) {
-        console.error('AI-SERVICE: No content in provider response');
+        if (response.finishReason === 'length') {
+          console.error('AI-SERVICE: Completion budget exhausted before any text was emitted (reasoning model hit maxTokens)');
+          throw new Error(`${model} hit the completion token cap before emitting text — raise maxTokens`);
+        }
+        console.error(`AI-SERVICE: No content in provider response (finishReason: ${response.finishReason})`);
         throw new Error('No response from provider');
       }
 
-      console.log('AI-SERVICE: Parsing AI response...');
-      const result = this.parseAIResponse(response.content, request);
+      const result = this.parseAIResponse(response.content, request, settings);
       console.log(`AI-SERVICE: Successfully parsed ${result.labels.length} labels`);
-      console.log(`AI-SERVICE: Labels: ${result.labels.map(l => `${l.label} (${Math.round(l.confidence * 100)}%)`).join(', ')}`);
 
       return result;
     } catch (error) {
       console.error('AI-SERVICE: Provider analysis failed:', error);
 
       // Return detailed error info in the analysis response
-      let errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const providerId = normalizeProviderId(settings.provider);
 
       const errorResult: CategoryAnalysis = {
         labels: [],
@@ -235,13 +114,12 @@ class AIService {
         suggestedDescription: `${providerId.toUpperCase()} API Error: ${errorMessage}`,
       };
 
-      console.log('AI-SERVICE: Returning error result:', errorResult);
       return errorResult;
     }
   }
 
-  private buildAnalysisPrompt(request: BookmarkAnalysisRequest): string {
-    const categoriesConfig = this.settings.categories;
+  private buildAnalysisPrompt(request: BookmarkAnalysisRequest, settings: AISettings): string {
+    const categoriesConfig = settings.categories;
     const enabledCategories = Object.entries(categoriesConfig)
       .filter(([, enabled]) => enabled)
       .map(([category]) => category);
@@ -270,7 +148,7 @@ IMPORTANT RULES:
 - Focus on what makes this bookmark useful and discoverable
 - Consider URL patterns (github.com = Technology, news sites = News, etc.)
 - Don't duplicate existing labels: ${request.existingLabels?.join(', ') || 'None'}
-- Minimum confidence threshold: ${this.settings.confidenceThreshold}
+- Minimum confidence threshold: ${settings.confidenceThreshold}
 - Include both specific and general labels (e.g., "React" and "JavaScript", "Machine Learning" and "Technology")
 
 OUTPUT FORMAT (valid JSON only):
@@ -301,42 +179,29 @@ OUTPUT FORMAT (valid JSON only):
 `.trim();
   }
 
-  private parseAIResponse(content: string, request: BookmarkAnalysisRequest): CategoryAnalysis {
-    console.log('AI-SERVICE: Starting response parsing');
-    console.log(`AI-SERVICE: Raw content length: ${content.length}`);
-
+  private parseAIResponse(content: string, request: BookmarkAnalysisRequest, settings: AISettings): CategoryAnalysis {
     try {
       // Remove markdown code blocks if present
       let cleanContent = content;
       if (content.includes('```json')) {
-        console.log('AI-SERVICE: Removing markdown code blocks');
         cleanContent = content.replace(/```json\s*|\s*```/g, '');
-        console.log(`AI-SERVICE: Cleaned content length: ${cleanContent.length}`);
       }
 
-      console.log('AI-SERVICE: Parsing JSON...');
       const parsed = JSON.parse(cleanContent);
-      console.log('AI-SERVICE: JSON parsed successfully');
 
       // Validate and clean the response
-      console.log('AI-SERVICE: Validating response structure...');
       const analysis: CategoryAnalysis = {
         labels: [],
         suggestedDescription: parsed.suggestedDescription,
         language: parsed.language || 'en'
       };
 
-      console.log(`AI-SERVICE: Suggested description: ${parsed.suggestedDescription}`);
-      console.log(`AI-SERVICE: Language: ${parsed.language || 'en'}`);
-
       if (Array.isArray(parsed.labels)) {
-        console.log(`AI-SERVICE: Found ${parsed.labels.length} raw labels`);
-
         const filteredLabels = parsed.labels.filter((label: unknown) => {
           const isValid = typeof label === 'object' && label !== null &&
             'label' in label && 'category' in label && 'confidence' in label &&
             typeof (label as { confidence: unknown }).confidence === 'number' &&
-            (label as { confidence: number }).confidence >= this.settings.confidenceThreshold;
+            (label as { confidence: number }).confidence >= settings.confidenceThreshold;
 
           if (!isValid) {
             console.log('AI-SERVICE: Filtered out invalid label:', label);
@@ -344,41 +209,28 @@ OUTPUT FORMAT (valid JSON only):
           return isValid;
         });
 
-        console.log(`AI-SERVICE: ${filteredLabels.length} labels passed validation and confidence threshold (${this.settings.confidenceThreshold})`);
-
         // Additional filtering to exclude labels that already exist on the bookmark
         const newLabels = filteredLabels.filter((label: unknown) => {
           const l = label as { label: string; category: string; confidence: number; reasoning?: string };
           const existingLabels = request.existingLabels || [];
-          const isDuplicate = existingLabels.some((existing: string) =>
+          return !existingLabels.some((existing: string) =>
             existing.toLowerCase() === l.label.toLowerCase()
           );
-
-          if (isDuplicate) {
-            console.log(`AI-SERVICE: Skipping existing label: ${l.label}`);
-          }
-          return !isDuplicate;
         });
-
-        console.log(`AI-SERVICE: ${newLabels.length} new labels after filtering existing ones`);
 
         analysis.labels = newLabels.map((label: unknown) => {
           const l = label as { label: string; category: string; confidence: number; reasoning?: string };
-          const processedLabel = {
+          return {
             label: l.label,
-            category: l.category,
+            category: l.category as BookmarkLabel['category'],
             confidence: Math.min(Math.max(l.confidence, 0), 1),
             reasoning: l.reasoning
           };
-
-          console.log(`AI-SERVICE: Processed new label: ${processedLabel.label} (${processedLabel.category}, ${Math.round(processedLabel.confidence * 100)}%)`);
-          return processedLabel;
         });
       } else {
         console.warn('AI-SERVICE: No labels array found in response');
       }
 
-      console.log(`AI-SERVICE: Final analysis contains ${analysis.labels.length} labels`);
       return analysis;
     } catch (error) {
       console.error('AI-SERVICE: Failed to parse AI response:', error);
@@ -387,7 +239,7 @@ OUTPUT FORMAT (valid JSON only):
     }
   }
 
-  private async analyzeLocally(request: BookmarkAnalysisRequest): Promise<CategoryAnalysis> {
+  private async analyzeLocally(request: BookmarkAnalysisRequest, settings: AISettings): Promise<CategoryAnalysis> {
     // Simple local analysis using keywords and URL patterns
     const labels: BookmarkLabel[] = [];
     const url = request.url.toLowerCase();
@@ -396,7 +248,7 @@ OUTPUT FORMAT (valid JSON only):
     const text = `${title} ${content}`;
 
     // Topic categorization
-    if (this.settings.categories.topics) {
+    if (settings.categories.topics) {
       const topicKeywords = {
         'Technology': ['tech', 'programming', 'code', 'software', 'dev', 'api', 'framework'],
         'Business': ['business', 'marketing', 'finance', 'startup', 'company', 'strategy'],
@@ -419,7 +271,7 @@ OUTPUT FORMAT (valid JSON only):
     }
 
     // Type categorization
-    if (this.settings.categories.types) {
+    if (settings.categories.types) {
       const typePatterns = {
         'Documentation': ['docs', 'documentation', 'readme', 'wiki'],
         'Tutorial': ['tutorial', 'how-to', 'guide', 'walkthrough'],
@@ -441,7 +293,7 @@ OUTPUT FORMAT (valid JSON only):
     }
 
     // Filter by confidence threshold
-    const filteredLabels = labels.filter(label => label.confidence >= this.settings.confidenceThreshold);
+    const filteredLabels = labels.filter(label => label.confidence >= settings.confidenceThreshold);
 
     return {
       labels: filteredLabels.slice(0, 5), // Limit to 5 labels
@@ -451,20 +303,13 @@ OUTPUT FORMAT (valid JSON only):
   }
 
   public async generateDescription(request: BookmarkAnalysisRequest): Promise<string> {
-    await this.ensureInitialized();
+    const settings = await this.core.getSettings();
     if (!(await this.isEnabled())) {
       throw new Error('AI service is not enabled or configured');
     }
 
-    if (this.settings.provider === 'local') {
+    if (normalizeProviderId(settings.provider) === 'local') {
       throw new Error('Description generation requires AI provider (OpenAI or Anthropic)');
-    }
-
-    const providerId = this.normalizeProviderId(this.settings.provider);
-    const provider = this.registry.getProvider(providerId);
-
-    if (!provider) {
-      throw new Error('AI provider not properly configured');
     }
 
     const prompt = `
@@ -489,12 +334,11 @@ Please provide a 1-2 sentence description that explains what this bookmark is ab
             content: prompt
           }
         ],
-        temperature: 0.3,
-        maxTokens: 200
+        // Sized for reasoning overhead, not just the visible description.
+        maxTokens: 4000
       };
 
-      const model = this.settings.model || this.getDefaultModel(this.settings.provider);
-      const response = await provider.complete(llmRequest, model);
+      const { response } = await this.core.runCompletion(llmRequest);
 
       return response.content.trim();
     } catch (error) {
@@ -504,7 +348,7 @@ Please provide a 1-2 sentence description that explains what this bookmark is ab
   }
 
   public async findDuplicates(request: BookmarkAnalysisRequest, existingBookmarks: { id: string; url: string; title: string; description?: string; }[]): Promise<DuplicateCandidate[]> {
-    if (!this.isEnabled()) {
+    if (!(await this.isEnabled())) {
       throw new Error('AI service is not enabled');
     }
 
@@ -640,20 +484,10 @@ Please provide a 1-2 sentence description that explains what this bookmark is ab
     return differences;
   }
 
-  public async getSettings(): Promise<AISettings> {
-    await this.ensureInitialized();
-    return { ...this.settings };
-  }
-
-  /**
-   * NEW METHODS - Provider Abstraction Integration
-   */
-
   /**
    * List all available providers
    */
   public async listProviders(): Promise<Array<{ id: string; name: string; description: string }>> {
-    await this.ensureInitialized();
     const providers = this.registry.listProviders();
     return providers.map(p => ({
       id: p.id,
@@ -666,23 +500,20 @@ Please provide a 1-2 sentence description that explains what this bookmark is ab
    * List available models for a provider (or all providers)
    */
   public async listModels(providerId?: string) {
-    await this.ensureInitialized();
-
     if (providerId) {
-      return this.registry.getProviderModels(providerId);
+      return this.registry.getProviderModels(normalizeProviderId(providerId));
     }
     return this.registry.listAllModels();
   }
 
   /**
-   * Test API connection for a provider
+   * Explicitly validate a provider + API key pair (non-billable).
    */
   public async testConnection(
     providerId: string,
     apiKey: string
-  ): Promise<{ success: boolean; models?: any[]; error?: string }> {
-    await this.ensureInitialized();
-    return this.registry.testConnection(providerId, apiKey);
+  ): Promise<{ success: boolean; models?: unknown[]; error?: string }> {
+    return this.core.testConnection(providerId, apiKey);
   }
 
   /**
@@ -692,9 +523,8 @@ Please provide a 1-2 sentence description that explains what this bookmark is ab
     bookmarkCount: number,
     model?: string
   ): Promise<{ inputCost: number; outputCost: number; totalCost: number }> {
-    await this.ensureInitialized();
-
-    const providerId = this.normalizeProviderId(this.settings.provider);
+    const settings = await this.core.getSettings();
+    const providerId = normalizeProviderId(settings.provider);
     const provider = this.registry.getProvider(providerId);
 
     if (!provider) {
@@ -705,7 +535,7 @@ Please provide a 1-2 sentence description that explains what this bookmark is ab
     const avgInputTokens = 200;
     const avgOutputTokens = 150;
 
-    const modelId = model || this.settings.model || this.getDefaultModel(this.settings.provider);
+    const modelId = model || settings.model || getDefaultModelId(settings.provider);
     const modelMeta = await provider.getModel(modelId);
 
     if (!modelMeta) {
