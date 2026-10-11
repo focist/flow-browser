@@ -93,7 +93,7 @@ const BookmarkItem: React.FC<{
                 shiftKey: false
               },
               shiftKey: false
-            } as React.ChangeEvent<HTMLInputElement>;
+            } as unknown as React.ChangeEvent<HTMLInputElement>;
 
             onToggle(syntheticEvent);
           }
@@ -144,10 +144,7 @@ const BookmarkGroup: React.FC<BookmarkGroupProps> = ({
   expanded = true,
   onToggleExpanded,
   hoveredPatternId,
-  onBookmarkHover,
-  lastClickedId,
-  onSetLastClickedId,
-  allBookmarks
+  onBookmarkHover
 }) => {
   if (count === 0) return null;
 
