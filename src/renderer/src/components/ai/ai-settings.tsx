@@ -16,17 +16,23 @@ interface AISettingsProps {
   className?: string;
 }
 
-interface ProviderInfo {
-  id: string;
-  name: string;
-  description: string;
-}
-
 interface ModelCardProps {
   model: ModelMetadata;
   selected: boolean;
   onSelect: () => void;
 }
+
+const formatContextWindow = (tokens: number): string => {
+  if (tokens >= 1_000_000) {
+    const millions = tokens / 1_000_000;
+    return `${Number.isInteger(millions) ? millions : millions.toFixed(1)}M`;
+  }
+  return `${Math.round(tokens / 1000)}K`;
+};
+
+/** The provider's preferred model: the catalog's default tag, else the first entry. */
+const pickDefaultModel = (models: ModelMetadata[]): string =>
+  (models.find((m) => m.tags.includes('default')) ?? models[0])?.id ?? '';
 
 const ModelCard: React.FC<ModelCardProps> = ({ model, selected, onSelect }) => {
   return (
@@ -84,7 +90,7 @@ const ModelCard: React.FC<ModelCardProps> = ({ model, selected, onSelect }) => {
           </span>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
-          <span>{(model.contextWindow / 1000).toFixed(0)}K context</span>
+          <span>{formatContextWindow(model.contextWindow)} context</span>
           {model.capabilities.vision && (
             <span className="flex items-center gap-1">
               <Eye className="h-3 w-3" /> Vision
@@ -108,7 +114,7 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
   const [settings, setSettings] = useState<AISettings>({
     enabled: false,
     provider: 'openai',
-    model: 'gpt-5-nano',
+    model: 'gpt-6-luna',
     autoAnalyze: false,
     confidenceThreshold: 0.7,
     autoApply: {
@@ -124,36 +130,19 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
   });
 
   const [apiKey, setApiKey] = useState('');
-  const [lastTestedApiKey, setLastTestedApiKey] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
-  const [availableModels, setAvailableModels] = useState<string[]>([]);
 
-  // Dynamic provider and model data
-  // Note: providers and isLoadingProviders are available for future provider selection UI
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [models, setModels] = useState<ModelMetadata[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [isLoadingProviders, setIsLoadingProviders] = useState(false);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
 
-  const getDefaultModel = (provider: 'openai' | 'claude' | 'local') => {
-    switch (provider) {
-      case 'openai': return 'gpt-5-nano';
-      case 'claude': return 'claude-3-5-sonnet-20241022';
-      default: return '';
-    }
-  };
-
-  // Load settings and providers on mount
+  // Load settings on mount
   useEffect(() => {
     loadSettings();
-    loadProviders();
   }, []);
 
-  // Load models when provider changes
+  // Load models when provider changes (the catalog is served without an API key)
   useEffect(() => {
     if (settings.provider && settings.provider !== 'local') {
       loadModelsForProvider(settings.provider);
@@ -161,6 +150,15 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
       setModels([]);
     }
   }, [settings.provider]);
+
+  // Keep the selection valid: once the provider's models arrive, a missing or
+  // cross-provider model lands on the provider's default.
+  useEffect(() => {
+    if (settings.provider === 'local' || models.length === 0) return;
+    if (!settings.model || !models.some((m) => m.id === settings.model)) {
+      setSettings((prev) => ({ ...prev, model: pickDefaultModel(models) }));
+    }
+  }, [models, settings.provider, settings.model]);
 
   const loadSettings = async () => {
     try {
@@ -177,26 +175,10 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
         };
         setSettings(loadedSettings);
         setApiKey(result.data.apiKey || '');
-        setLastTestedApiKey(result.data.apiKey || '');
       }
     } catch (error) {
       console.error('Failed to load AI settings:', error);
       toast.error('Failed to load AI settings');
-    }
-  };
-
-  const loadProviders = async () => {
-    setIsLoadingProviders(true);
-    try {
-      const result = await flow.ai['ai:listProviders']();
-      if (result.success && result.data) {
-        setProviders(result.data);
-      }
-    } catch (error) {
-      console.error('Failed to load providers:', error);
-      toast.error('Failed to load AI providers');
-    } finally {
-      setIsLoadingProviders(false);
     }
   };
 
@@ -234,11 +216,8 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
         setSettings(updatedSettings);
         onSettingsChange?.(updatedSettings);
         toast.success('AI settings saved');
-        
-        // Test connection if enabled, API key provided, and key has changed since last test
-        if (updatedSettings.enabled && updatedSettings.apiKey && updatedSettings.apiKey !== lastTestedApiKey) {
-          testConnection();
-        }
+        // Saving never issues a provider request — connection validation
+        // happens only via the explicit Test button.
       } else {
         throw new Error(result.error || 'Failed to save settings');
       }
@@ -260,32 +239,19 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
     setConnectionStatus('idle');
 
     try {
-      // Save settings first to ensure AI service is configured
-      const testSettings = { ...settings, enabled: true, apiKey: apiKey.trim() };
-      await flow.ai['ai:updateSettings'](testSettings);
+      // Explicit, non-billable validation: the key is verified against the
+      // provider's model-list endpoint. Settings are not saved here.
+      const result = await flow.ai['ai:testConnection'](settings.provider, apiKey.trim());
+      const outcome = result.success ? result.data : undefined;
 
-      // Normalize provider ID (claude -> anthropic)
-      const normalizedProviderId = settings.provider === 'claude' ? 'anthropic' : settings.provider;
-
-      // Test by listing available models
-      const modelsResult = await flow.ai['ai:listModels'](normalizedProviderId);
-
-      if (modelsResult.success && modelsResult.data) {
+      if (outcome?.success) {
         setConnectionStatus('success');
-        setLastTestedApiKey(apiKey.trim());
-
-        // Store models with full metadata
-        setModels(modelsResult.data);
-
-        // Store model IDs for backward compatibility
-        const modelNames = modelsResult.data
-          .map((m: any) => m.id)
-          .filter((id: string) => id && id.trim().length > 0);
-        setAvailableModels(modelNames);
-
-        toast.success(`AI connection successful! ${modelsResult.data.length} models available.`);
+        if (outcome.models?.length) {
+          setModels(outcome.models as ModelMetadata[]);
+        }
+        toast.success('Connection verified — your API key works.');
       } else {
-        throw new Error(modelsResult.error || 'Connection test failed');
+        throw new Error(outcome?.error || result.error || 'Connection test failed');
       }
     } catch (error) {
       console.error('AI connection test failed:', error);
@@ -301,12 +267,13 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
     value: AISettings[K]
   ) => {
     const newSettings = { ...settings, [key]: value };
-    
-    // If provider changed, update model to default for that provider
+
+    // A provider switch clears the model; the new provider's default is
+    // selected as soon as its models load, so no cross-provider model lingers.
     if (key === 'provider') {
-      newSettings.model = getDefaultModel(value as 'openai' | 'claude' | 'local');
+      newSettings.model = '';
     }
-    
+
     setSettings(newSettings);
   };
 
@@ -369,7 +336,7 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="openai">OpenAI (GPT-4)</SelectItem>
+                      <SelectItem value="openai">OpenAI (GPT)</SelectItem>
                       <SelectItem value="claude">Anthropic (Claude)</SelectItem>
                       <SelectItem value="local">Local Analysis</SelectItem>
                     </SelectContent>
@@ -395,10 +362,20 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
                       )}
                     </div>
 
+                    {!apiKey.trim() && (
+                      <div className="p-4 bg-amber-50 border border-amber-200 rounded-md">
+                        <p className="text-sm text-amber-800">
+                          You can choose a model now, but analysis needs a{' '}
+                          {settings.provider === 'openai' ? 'OpenAI' : 'Anthropic'} API key — add one below
+                          to run it.
+                        </p>
+                      </div>
+                    )}
+
                     {models.length === 0 && !isLoadingModels ? (
                       <div className="p-4 bg-amber-50 border border-amber-200 rounded-md">
                         <p className="text-sm text-amber-800">
-                          Enter your API key and test the connection to load available models
+                          Models couldn&apos;t be loaded — try reopening Settings.
                         </p>
                       </div>
                     ) : models.length > 0 ? (
@@ -478,7 +455,7 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
                   <div>
                     <Label htmlFor="auto-analyze">Auto-analyze new bookmarks</Label>
                     <p className="text-sm text-muted-foreground">
-                      Automatically analyze bookmarks when they're created
+                      Automatically analyze bookmarks when they&apos;re created
                       {settings.provider === 'local' && ' (limited analysis without API)'}
                     </p>
                   </div>
