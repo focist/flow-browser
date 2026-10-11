@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, AlertCircle, Clock, CheckCircle2, RotateCcw, Zap, Sparkles, ArrowRight, SkipForward, Tag } from 'lucide-react';
+import { X, Check, AlertCircle, CheckCircle2, RotateCcw, Zap, Sparkles, ArrowRight, SkipForward, Tag } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { motion, AnimatePresence } from 'motion/react';

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useCallback, useState, useRef } from 'react';
 import { X, Sparkles, Check, RefreshCw } from 'lucide-react';
 import { Button } from '../ui/button';
+import { Progress } from '../ui/progress';
 import { useDashboardState, type DashboardBookmark } from '../../hooks/use-dashboard-state';
 import { usePatternDetection } from '../../hooks/use-pattern-detection';
 import { useBulkOperations } from '../../hooks/use-bulk-operations';
@@ -38,7 +39,7 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
   // Hover state management for bidirectional highlighting
   const [hoveredPatternId, setHoveredPatternId] = useState<string | null>(null);
   const [hoveredBookmarkId, setHoveredBookmarkId] = useState<string | null>(null);
-  const [isColumn3Hovered, setIsColumn3Hovered] = useState(false);
+  const [, setIsColumn3Hovered] = useState(false);
 
   // State for shift-click range selection
   const [lastClickedBookmarkId, setLastClickedBookmarkId] = useState<string | null>(null);
@@ -273,9 +274,12 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
 
       if (label) {
         try {
-          await window.flow.bookmarks.addLabel(selectedBookmark.bookmark.id, {
-            label: label.label,
-            category: label.category as 'topic' | 'type' | 'priority'
+          await flow.bookmarks.update(selectedBookmark.bookmark.id, {
+            addLabels: [{
+              label: label.label,
+              source: 'ai' as const,
+              category: label.category as 'topic' | 'type' | 'priority'
+            }]
           });
         } catch (error) {
           console.error('Failed to apply label:', error);
@@ -352,9 +356,12 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
 
         if (label) {
           try {
-            await window.flow.bookmarks.addLabel(bookmark.bookmark.id, {
-              label: label.label,
-              category: label.category as 'topic' | 'type' | 'priority'
+            await flow.bookmarks.update(bookmark.bookmark.id, {
+              addLabels: [{
+                label: label.label,
+                source: 'ai' as const,
+                category: label.category as 'topic' | 'type' | 'priority'
+              }]
             });
             successCount++;
           } catch (error) {
@@ -550,6 +557,22 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
 
           {/* Action Buttons - Bottom of entire dashboard */}
           <div className="p-4 border-t bg-background flex-shrink-0">
+            {bulkOps.isProcessing && bulkOps.progress && (
+              <div className="mb-3">
+                <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                  <span className="truncate max-w-[60%]">
+                    {bulkOps.progress.current ?? 'Processing...'}
+                  </span>
+                  <span className="ml-2 flex-shrink-0">
+                    {bulkOps.progress.completed} of {bulkOps.progress.total}
+                  </span>
+                </div>
+                <Progress
+                  value={Math.round((bulkOps.progress.completed / bulkOps.progress.total) * 100)}
+                  className="h-2"
+                />
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
                 {selectedBookmarks.length > 0

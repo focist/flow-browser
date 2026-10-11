@@ -1,9 +1,8 @@
 import React from 'react';
-import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { ScrollArea } from '../ui/scroll-area';
 import { Progress } from '../ui/progress';
-import { Zap, Check, X, Sparkles, BarChart3, Package, RefreshCw } from 'lucide-react';
+import { Sparkles, BarChart3, Package } from 'lucide-react';
 import type { BulkOperationProgress } from '../../hooks/use-bulk-operations';
 import type { DashboardBookmark } from '../../hooks/use-dashboard-state';
 
@@ -26,38 +25,6 @@ interface BulkActionsColumnProps {
   };
 }
 
-interface QuickActionButtonProps {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  onClick: () => void;
-  disabled?: boolean;
-  variant?: 'default' | 'destructive';
-}
-
-const QuickActionButton: React.FC<QuickActionButtonProps> = ({
-  icon,
-  title,
-  description,
-  onClick,
-  disabled = false,
-  variant = 'default'
-}) => {
-  return (
-    <Button
-      onClick={onClick}
-      disabled={disabled}
-      variant="outline"
-      title={description}
-      className={`h-auto px-4 py-2 flex items-center gap-2 justify-start hover:bg-accent/50 ${
-        variant === 'destructive' ? 'border-red-200 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950/30' : ''
-      }`}
-    >
-      {icon}
-      <span className="font-medium text-sm">{title}</span>
-    </Button>
-  );
-};
 
 interface StatItemProps {
   label: string;
@@ -81,10 +48,6 @@ export const BulkActionsColumn: React.FC<BulkActionsColumnProps> = ({
   selectedBookmarks,
   isProcessing,
   progress,
-  onAcceptHighConfidence,
-  onAcceptAll,
-  onRejectAll,
-  onReprocess,
   stats
 }) => {
   const selectedCount = selectedBookmarks.length;

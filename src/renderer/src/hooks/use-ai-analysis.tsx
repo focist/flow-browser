@@ -1067,6 +1067,7 @@ Labels: ${bookmark.labels?.map(l => l.label).join(', ') || 'none'}
     // Getters
     getPendingAnalysis,
     getAllPendingAnalyses,
+    findLabelsToAutoApply,
     
     // Computed state
     hasPendingAnalyses: state.pendingAnalyses.size > 0,

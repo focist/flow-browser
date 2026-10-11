@@ -152,7 +152,7 @@ export const useDashboardState = () => {
         filtered.sort((a, b) => a.bookmark.title.localeCompare(b.bookmark.title));
         break;
       case 'added':
-        filtered.sort((a, b) => (b.bookmark.createdAt || 0) - (a.bookmark.createdAt || 0));
+        filtered.sort((a, b) => new Date(b.bookmark.dateAdded || 0).getTime() - new Date(a.bookmark.dateAdded || 0).getTime());
         break;
     }
 

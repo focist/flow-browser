@@ -30,7 +30,6 @@ export function BulkImpactView({
   // Use shared selection hook for bookmark selection
   const {
     selectedIds: selectedBookmarkIds,
-    setSelectedIds: setSelectedBookmarkIds,
     handleToggle: handleBookmarkToggle,
     selectAll,
     deselectAll
