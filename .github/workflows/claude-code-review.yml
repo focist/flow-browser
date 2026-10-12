@@ -1,0 +1,159 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+    # Optional: Only run on specific file changes
+    # paths:
+    #   - "src/**/*.ts"
+    #   - "src/**/*.tsx"
+    #   - "src/**/*.js"
+    #   - "src/**/*.jsx"
+
+jobs:
+  claude-review:
+    # Optional: Filter by PR author
+    # if: |
+    #   github.event.pull_request.user.login == 'external-contributor' ||
+    #   github.event.pull_request.user.login == 'new-developer' ||
+    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
+
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: latest
+
+      - name: Run Claude Code Review
+        uses: anthropics/claude-code-action@74eedf1a1892082d619c3edb66b9402da6520e7f # v1.0.156
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          track_progress: true
+          plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
+          plugins: 'code-review@claude-code-plugins'
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Review this pull request by following these steps precisely. Create a todo list before starting.
+
+            ## CRITICAL — Ground every claim; never assert from training memory (read first)
+
+            THE CORE RULE: Every factual claim in your review must be grounded in something you
+            directly observed in THIS run — code you actually read in the diff or repo, or the
+            output of a command you actually ran. Your training memory is NOT a source of truth
+            for the current state of ANYTHING: this codebase, its dependencies, any library /
+            framework / tool, an API's behavior, defaults, CLI flags, config schemas, file
+            layouts, security advisories, or "best practice". All of these change over time and
+            your knowledge has a cutoff that the world has moved past — this repo and its
+            dependencies have been updated since. If a claim cannot be backed by observed
+            evidence or a verification command, DO NOT make it and DO NOT block the PR on it.
+
+            Before writing ANY finding, ask: "Did I see this with my own eyes in this run, or am
+            I recalling it?" If recalling — verify or drop it. This is non-negotiable and applies
+            to every section (bugs, security, performance, suggestions).
+
+            This includes, but is NOT limited to:
+            - Versions / releases / SHAs: never claim from memory that something is "the latest",
+              "current major", "doesn't exist", "deprecated", or "removed", and never recall or
+              invent a commit SHA. A version, tag, or pin that looks NEWER than you remember just
+              means a release happened after your cutoff — that is NEVER a finding. Treat "I
+              don't think this exists / this looks too new" as proof your knowledge is stale.
+            - Library / framework / API behavior: do not claim a function, method, option, env
+              var, flag, or import exists, doesn't exist, behaves a certain way, or "won't work"
+              from memory. Read the dependency's actual installed source/types under
+              `node_modules` (or its current docs) before asserting.
+            - "Best practice" / "the recommended way": recommendations change. Only invoke one if
+              you can cite current evidence; otherwise present it as an option, not a defect, and
+              never gate the PR on it.
+            - The codebase itself: never state what the code does, imports, or exports without
+              having READ those exact lines in this run.
+
+            HOW TO GROUND A CLAIM before you flag it (use the tools you have):
+            - GitHub tags / releases / Actions:
+              `git ls-remote --tags https://github.com/<owner>/<repo> refs/tags/<tag>`
+              (proves a tag exists and gives its commit SHA), `gh api repos/<owner>/<repo>/tags`,
+              or `gh release view <tag> -R <owner>/<repo>`. For a SHA-pinned dependency, confirm
+              the pinned SHA maps to the tag in its comment, and report it CORRECT when it does.
+            - npm registry packages (this repo uses bun): `bun info <pkg> version` /
+              `bun info <pkg>` (full metadata, all versions).
+            - Anything in this repo or an installed dependency: read the actual file.
+            - Any other ecosystem: query its registry/CLI — never answer from memory.
+
+            HARD FALLBACK: if you cannot verify a claim with evidence available in this run, you
+            MUST omit it — silence over a guess. An unverified assertion presented as a finding
+            is itself a defect in the review and must never drive a "CHANGES REQUESTED".
+
+            1. Gather context: read the PR title, description, and list of changed files using `gh pr view` and `gh pr diff`
+            2. For each changed file, read and analyze the file
+            3. Review each changed file for: code quality and best practices, potential bugs or issues, security concerns, performance considerations
+            4. Assess overall test coverage implications
+            5. Post a comprehensive review comment using `gh pr comment` using EXACTLY this format:
+
+            ### PR Review Analysis
+
+            **Todo List:**
+            - [x] Read repository guidelines (CLAUDE.md)
+            - [x] Analyze changed files for code quality
+            - [x] Check for potential bugs and issues
+            - [x] Review performance considerations
+            - [x] Assess security concerns
+            - [x] Evaluate test coverage needs
+            - [x] Provide comprehensive review feedback
+
+            ### Code Review Summary
+
+            [1-2 sentence summary of what the PR does and the overall quality]
+
+            ### Detailed Analysis
+
+            #### **✅ Code Quality & Best Practices**
+
+            [Per-file breakdown of code quality observations]
+
+            #### **🐛 Potential Issues**
+
+            [Numbered list of bugs, logic errors, or concerns. Omit section if none.]
+
+            #### **⚡ Performance Considerations**
+
+            [Performance observations]
+
+            #### **🔒 Security Assessment**
+
+            [Security observations]
+
+            #### **🧪 Test Coverage Recommendations**
+
+            [Numbered list of suggested tests]
+
+            #### **🎯 Suggestions for Improvement**
+
+            [Numbered list of optional improvements with code snippets where helpful]
+
+            #### **🏆 What This PR Does Well**
+
+            [Bulleted list of positive observations]
+
+            ### Overall Assessment: **[APPROVED ✅ | CHANGES REQUESTED ❌]**
+
+            [One sentence justification]
+
+            Only post GitHub comments — do not submit review text as messages.
+
+          claude_args: >-
+            --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(git ls-remote:*),Bash(gh api:*),Bash(gh release:*),Bash(bun info:*)"
+            --disallowedTools "Edit,Write,MultiEdit,NotebookEdit,Bash(git add:*),Bash(git commit:*),Bash(git rm:*),Bash(git push:*),Bash(git-push.sh:*)"
