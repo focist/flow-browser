@@ -8,10 +8,20 @@ import { cn } from "@/lib/utils";
 function ScrollArea({ className, children, ...props }: React.ComponentProps<typeof ScrollAreaPrimitive.Root>) {
   return (
     <ScrollAreaPrimitive.Root data-slot="scroll-area" className={cn("relative overflow-hidden", className)} {...props}>
+      {/*
+       * [&>div]:!block — Radix wraps viewport children in an anonymous
+       * <div style="min-width:100%; display:table"> (inline, so !important is
+       * required). A table sizes to its content's intrinsic width, so any
+       * nowrap descendant (e.g. a truncated bookmark title — even inside a
+       * collapsed, height:0 section) widens it past the pane, and every
+       * w-full/percentage below then resolves against that wider table.
+       * Forcing block keeps children constrained to the viewport width.
+       * Do NOT re-add an inline overflow style here: props.style overrides
+       * Radix's managed overflowY and breaks wheel scrolling.
+       */}
       <ScrollAreaPrimitive.Viewport
         data-slot="scroll-area-viewport"
-        className="ring-ring/10 dark:ring-ring/20 dark:outline-ring/40 outline-ring/50 h-full w-full rounded-[inherit] transition-[color,box-shadow] focus-visible:ring-4 focus-visible:outline-1"
-        style={{ overflow: 'hidden', maxWidth: '100%' }}
+        className="ring-ring/10 dark:ring-ring/20 dark:outline-ring/40 outline-ring/50 h-full w-full rounded-[inherit] transition-[color,box-shadow] focus-visible:ring-4 focus-visible:outline-1 [&>div]:!block [&>div]:w-full"
       >
         {children}
       </ScrollAreaPrimitive.Viewport>
