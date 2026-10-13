@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { Progress } from '../ui/progress';
-import { CheckCircle, XCircle, Brain, ExternalLink, Info, AlertTriangle } from 'lucide-react';
-import type { DuplicateCandidate } from '~/flow/interfaces/ai';
+import React, { useState } from "react";
+import { Button } from "../ui/button";
+import { Badge } from "../ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
+import { Progress } from "../ui/progress";
+import { CheckCircle, XCircle, Brain, ExternalLink, Info, AlertTriangle } from "lucide-react";
+import type { DuplicateCandidate } from "~/flow/interfaces/ai";
 
 interface AIDuplicateCardProps {
   newBookmark: {
@@ -24,18 +24,18 @@ const formatPercentage = (value: number) => {
 };
 
 const getSimilarityColor = (similarity: number) => {
-  if (similarity >= 0.9) return 'text-red-600';
-  if (similarity >= 0.8) return 'text-orange-600';
-  if (similarity >= 0.7) return 'text-yellow-600';
-  return 'text-gray-600';
+  if (similarity >= 0.9) return "text-red-600";
+  if (similarity >= 0.8) return "text-orange-600";
+  if (similarity >= 0.7) return "text-yellow-600";
+  return "text-gray-600";
 };
 
 const getSimilarityLabel = (similarity: number) => {
-  if (similarity >= 0.95) return 'Nearly Identical';
-  if (similarity >= 0.9) return 'Very Similar';
-  if (similarity >= 0.8) return 'Similar';
-  if (similarity >= 0.7) return 'Somewhat Similar';
-  return 'Different';
+  if (similarity >= 0.95) return "Nearly Identical";
+  if (similarity >= 0.9) return "Very Similar";
+  if (similarity >= 0.8) return "Similar";
+  if (similarity >= 0.7) return "Somewhat Similar";
+  return "Different";
 };
 
 export const AIDuplicateCard: React.FC<AIDuplicateCardProps> = ({
@@ -44,10 +44,10 @@ export const AIDuplicateCard: React.FC<AIDuplicateCardProps> = ({
   onIgnore,
   onCancel,
   onViewExisting,
-  className = ''
+  className = ""
 }) => {
   const [selectedDuplicateIndex, setSelectedDuplicateIndex] = useState(0);
-  
+
   const highestSimilarity = duplicates.length > 0 ? duplicates[0].similarity.overall : 0;
   const selectedDuplicate = duplicates[selectedDuplicateIndex];
 
@@ -61,14 +61,14 @@ export const AIDuplicateCard: React.FC<AIDuplicateCardProps> = ({
           <CardTitle className="text-lg">Possible Duplicates Found</CardTitle>
           <Brain className="h-4 w-4 text-blue-500" />
         </div>
-        
+
         <CardDescription>
           <div className="space-y-1">
             <div className="font-medium text-sm">Adding: {newBookmark.title}</div>
             <div className="text-xs text-muted-foreground truncate">{newBookmark.url}</div>
             <div className="flex items-center gap-2 mt-2">
               <Badge variant="outline" className="text-orange-700 bg-orange-100">
-                {duplicates.length} duplicate{duplicates.length !== 1 ? 's' : ''} found
+                {duplicates.length} duplicate{duplicates.length !== 1 ? "s" : ""} found
               </Badge>
               <Badge variant="outline" className={getSimilarityColor(highestSimilarity)}>
                 {formatPercentage(highestSimilarity)}% similar
@@ -82,18 +82,16 @@ export const AIDuplicateCard: React.FC<AIDuplicateCardProps> = ({
         {/* Duplicate Selection */}
         {duplicates.length > 1 && (
           <div className="bg-white rounded-lg p-3 border">
-            <div className="font-medium text-sm mb-2">
-              Multiple duplicates found - showing most similar:
-            </div>
+            <div className="font-medium text-sm mb-2">Multiple duplicates found - showing most similar:</div>
             <div className="flex gap-2 flex-wrap">
               {duplicates.map((duplicate, index) => (
                 <button
                   key={duplicate.existingBookmark.id}
                   onClick={() => setSelectedDuplicateIndex(index)}
                   className={`px-2 py-1 text-xs rounded border ${
-                    index === selectedDuplicateIndex 
-                      ? 'bg-orange-100 border-orange-300 text-orange-800' 
-                      : 'bg-gray-50 border-gray-200 text-gray-600'
+                    index === selectedDuplicateIndex
+                      ? "bg-orange-100 border-orange-300 text-orange-800"
+                      : "bg-gray-50 border-gray-200 text-gray-600"
                   }`}
                 >
                   {formatPercentage(duplicate.similarity.overall)}% match
@@ -123,23 +121,17 @@ export const AIDuplicateCard: React.FC<AIDuplicateCardProps> = ({
 
             {/* Existing bookmark info */}
             <div className="space-y-2 mb-4">
-              <div className="text-sm font-medium truncate">
-                {selectedDuplicate.existingBookmark.title}
-              </div>
-              <div className="text-xs text-muted-foreground truncate">
-                {selectedDuplicate.existingBookmark.url}
-              </div>
+              <div className="text-sm font-medium truncate">{selectedDuplicate.existingBookmark.title}</div>
+              <div className="text-xs text-muted-foreground truncate">{selectedDuplicate.existingBookmark.url}</div>
               {selectedDuplicate.existingBookmark.description && (
-                <div className="text-xs text-muted-foreground">
-                  {selectedDuplicate.existingBookmark.description}
-                </div>
+                <div className="text-xs text-muted-foreground">{selectedDuplicate.existingBookmark.description}</div>
               )}
             </div>
 
             {/* Similarity breakdown */}
             <div className="space-y-2">
               <div className="text-xs font-medium mb-1">Similarity Breakdown:</div>
-              
+
               <div className="flex items-center justify-between text-xs">
                 <span>URL Match</span>
                 <div className="flex items-center gap-2">
@@ -147,7 +139,7 @@ export const AIDuplicateCard: React.FC<AIDuplicateCardProps> = ({
                   <span className="w-8 text-right">{formatPercentage(selectedDuplicate.similarity.url)}%</span>
                 </div>
               </div>
-              
+
               <div className="flex items-center justify-between text-xs">
                 <span>Title Match</span>
                 <div className="flex items-center gap-2">
@@ -155,7 +147,7 @@ export const AIDuplicateCard: React.FC<AIDuplicateCardProps> = ({
                   <span className="w-8 text-right">{formatPercentage(selectedDuplicate.similarity.title)}%</span>
                 </div>
               </div>
-              
+
               {selectedDuplicate.similarity.content > 0 && (
                 <div className="flex items-center justify-between text-xs">
                   <span>Content Match</span>
@@ -185,22 +177,12 @@ export const AIDuplicateCard: React.FC<AIDuplicateCardProps> = ({
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2 pt-2 border-t">
-          <Button 
-            onClick={onIgnore}
-            variant="outline"
-            size="sm"
-            className="flex-1"
-          >
+          <Button onClick={onIgnore} variant="outline" size="sm" className="flex-1">
             <CheckCircle className="h-4 w-4 mr-2" />
             Ignore & Add Anyway
           </Button>
-          
-          <Button 
-            onClick={onCancel}
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground"
-          >
+
+          <Button onClick={onCancel} variant="ghost" size="sm" className="text-muted-foreground">
             <XCircle className="h-4 w-4 mr-2" />
             Cancel
           </Button>
@@ -209,7 +191,8 @@ export const AIDuplicateCard: React.FC<AIDuplicateCardProps> = ({
         {/* Help text */}
         <div className="text-xs text-muted-foreground bg-gray-50 p-2 rounded">
           <Info className="h-3 w-3 inline mr-1" />
-          Duplicates are detected using URL, title, and content similarity. You can still add the bookmark if you believe it's different enough.
+          Duplicates are detected using URL, title, and content similarity. You can still add the bookmark if you
+          believe it&apos;s different enough.
         </div>
       </CardContent>
     </Card>

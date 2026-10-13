@@ -42,7 +42,7 @@ export function SidebarTab({ tab, isFocused }: { tab: TabData; isFocused: boolea
     flow.tabs.switchToTab(tab.id);
   };
 
-  const handleCloseTab = (e: React.MouseEvent) => {
+  const handleCloseTab = (e: React.SyntheticEvent) => {
     if (!tab.id) return;
     e.preventDefault();
     flow.tabs.closeTab(tab.id);
@@ -61,7 +61,7 @@ export function SidebarTab({ tab, isFocused }: { tab: TabData; isFocused: boolea
     setIsPressed(true);
   };
 
-  const handleToggleMute = (e: React.MouseEvent) => {
+  const handleToggleMute = (e: React.SyntheticEvent) => {
     e.stopPropagation();
     if (!tab.id) return;
     const newMutedState = !tab.muted;
@@ -157,9 +157,9 @@ export function SidebarTab({ tab, isFocused }: { tab: TabData; isFocused: boolea
                     className="size-5 bg-transparent rounded-sm hover:bg-black/10 dark:hover:bg-white/10 flex items-center justify-center cursor-pointer"
                     onMouseDown={(event) => event.stopPropagation()}
                     onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
+                      if (event.key === "Enter" || event.key === " ") {
                         event.preventDefault();
-                        handleToggleMute(event as any);
+                        handleToggleMute(event);
                       }
                     }}
                   >
@@ -183,9 +183,9 @@ export function SidebarTab({ tab, isFocused }: { tab: TabData; isFocused: boolea
                   className="size-5 bg-transparent rounded-sm hover:bg-black/10 dark:hover:bg-white/10 flex items-center justify-center cursor-pointer"
                   onMouseDown={(event) => event.stopPropagation()}
                   onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
+                    if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
-                      handleCloseTab(event as any);
+                      handleCloseTab(event);
                     }
                   }}
                 >

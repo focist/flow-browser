@@ -1,23 +1,25 @@
-import React, { useEffect, useMemo, useCallback, useState, useRef } from 'react';
-import { X, Sparkles, Check, RefreshCw } from 'lucide-react';
-import { Button } from '../ui/button';
-import { Progress } from '../ui/progress';
-import { useDashboardState, type DashboardBookmark } from '../../hooks/use-dashboard-state';
-import { usePatternDetection } from '../../hooks/use-pattern-detection';
-import { useBulkOperations } from '../../hooks/use-bulk-operations';
-import { useAIAnalysis } from '../../hooks/use-ai-analysis';
-import { BookmarkOverviewColumn } from './bookmark-overview-column';
-import { LabelSuggestionsColumn } from './label-suggestions-column';
-import { ContextPreviewColumn, type PreviewMode } from './context-preview-column';
-import type { Bookmark } from '~/types/bookmarks';
-import type { CategoryAnalysis } from '~/flow/interfaces/ai';
-import { toast } from 'sonner';
+import React, { useEffect, useMemo, useCallback, useState, useRef } from "react";
+import { X, Sparkles, Check, RefreshCw } from "lucide-react";
+import { Button } from "../ui/button";
+import { Progress } from "../ui/progress";
+import { useDashboardState, type DashboardBookmark } from "../../hooks/use-dashboard-state";
+import { usePatternDetection } from "../../hooks/use-pattern-detection";
+import { useBulkOperations } from "../../hooks/use-bulk-operations";
+import { useAIAnalysis } from "../../hooks/use-ai-analysis";
+import { BookmarkOverviewColumn } from "./bookmark-overview-column";
+import { LabelSuggestionsColumn } from "./label-suggestions-column";
+import { ContextPreviewColumn, type PreviewMode } from "./context-preview-column";
+import type { Bookmark } from "~/types/bookmarks";
+import type { CategoryAnalysis } from "~/flow/interfaces/ai";
+import { toast } from "sonner";
+import type { AutoAppliedLabel } from "../../hooks/use-ai-analysis";
+import type { LabelPattern, CategoryPattern } from "../../hooks/use-pattern-detection";
 
 export interface AILabelingDashboardProps {
   bookmarks: Array<{
     bookmark: Bookmark;
     analysis: CategoryAnalysis;
-    autoAppliedLabels?: any[];
+    autoAppliedLabels?: AutoAppliedLabel[];
   }>;
   isOpen: boolean;
   onClose: () => void;
@@ -51,7 +53,7 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
   // Initialize dashboard with bookmarks
   useEffect(() => {
     if (isOpen && initialBookmarks.length > 0) {
-      const dashboardBookmarks: DashboardBookmark[] = initialBookmarks.map(item => ({
+      const dashboardBookmarks: DashboardBookmark[] = initialBookmarks.map((item) => ({
         bookmark: item.bookmark,
         analysis: item.analysis,
         autoAppliedLabels: item.autoAppliedLabels || [],
@@ -150,7 +152,7 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
   const selectedBookmark = useMemo(() => {
     // If hovering over a specific bookmark, show that one
     if (hoveredBookmarkId) {
-      return dashboardState.bookmarks.find(b => b.bookmark.id === hoveredBookmarkId);
+      return dashboardState.bookmarks.find((b) => b.bookmark.id === hoveredBookmarkId);
     }
 
     // If exactly one bookmark is selected (and not hovering), show that one
@@ -165,15 +167,15 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
   // This is a pure calculation, no delays or timers
   const previewMode = useMemo<PreviewMode>(() => {
     // Priority 1: Active hover states (label or bookmark)
-    if (hoveredPatternId) return 'label';
-    if (hoveredBookmarkId) return 'bookmark';
+    if (hoveredPatternId) return "label";
+    if (hoveredBookmarkId) return "bookmark";
 
     // Priority 2: Selection-based views (these persist when column 3 is hovered)
-    if (selectedBookmarks.length > 1) return 'bulk-impact';
-    if (selectedBookmarks.length === 1) return 'bookmark';
+    if (selectedBookmarks.length > 1) return "bulk-impact";
+    if (selectedBookmarks.length === 1) return "bookmark";
 
     // Priority 3: Default to stats
-    return 'stats';
+    return "stats";
   }, [hoveredPatternId, hoveredBookmarkId, selectedBookmarks.length]);
 
   // Memoize button disabled state to prevent flashing
@@ -184,9 +186,7 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
 
   // Bulk operation handlers
   const handleAcceptHighConfidence = async () => {
-    const bookmarksToProcess = selectedBookmarks.length > 0
-      ? selectedBookmarks
-      : dashboardState.bookmarks;
+    const bookmarksToProcess = selectedBookmarks.length > 0 ? selectedBookmarks : dashboardState.bookmarks;
 
     await bulkOps.acceptHighConfidenceLabels(bookmarksToProcess);
 
@@ -197,9 +197,7 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
   };
 
   const handleAcceptAll = async () => {
-    const bookmarksToProcess = selectedBookmarks.length > 0
-      ? selectedBookmarks
-      : dashboardState.bookmarks;
+    const bookmarksToProcess = selectedBookmarks.length > 0 ? selectedBookmarks : dashboardState.bookmarks;
 
     await bulkOps.acceptAllLabels(bookmarksToProcess);
 
@@ -210,17 +208,13 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
   };
 
   const handleRejectAll = async () => {
-    const bookmarksToProcess = selectedBookmarks.length > 0
-      ? selectedBookmarks
-      : dashboardState.bookmarks;
+    const bookmarksToProcess = selectedBookmarks.length > 0 ? selectedBookmarks : dashboardState.bookmarks;
 
     await bulkOps.rejectAllLabels(bookmarksToProcess);
   };
 
-  const handleApplyPattern = async (pattern: any) => {
-    const bookmarksToProcess = selectedBookmarks.length > 0
-      ? selectedBookmarks
-      : dashboardState.bookmarks;
+  const handleApplyPattern = async (pattern: LabelPattern) => {
+    const bookmarksToProcess = selectedBookmarks.length > 0 ? selectedBookmarks : dashboardState.bookmarks;
 
     await bulkOps.applyPattern(pattern, bookmarksToProcess);
 
@@ -230,10 +224,8 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
     }
   };
 
-  const handleApplyCategory = async (category: any) => {
-    const bookmarksToProcess = selectedBookmarks.length > 0
-      ? selectedBookmarks
-      : dashboardState.bookmarks;
+  const handleApplyCategory = async (category: CategoryPattern) => {
+    const bookmarksToProcess = selectedBookmarks.length > 0 ? selectedBookmarks : dashboardState.bookmarks;
 
     // Apply all patterns in this category
     for (const pattern of category.labels) {
@@ -250,9 +242,7 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
   const handleApplyPatternPreview = async (bookmarkIds: string[]) => {
     if (!selectedPattern) return;
 
-    const bookmarksToApply = dashboardState.bookmarks.filter(b =>
-      bookmarkIds.includes(b.bookmark.id)
-    );
+    const bookmarksToApply = dashboardState.bookmarks.filter((b) => bookmarkIds.includes(b.bookmark.id));
 
     await bulkOps.applyPattern(selectedPattern, bookmarksToApply);
 
@@ -267,22 +257,22 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
 
     // Apply each selected label
     for (const labelId of labelIds) {
-      const [labelName, category] = labelId.split('::');
-      const label = selectedBookmark.remainingLabels.find(
-        l => l.label === labelName && l.category === category
-      );
+      const [labelName, category] = labelId.split("::");
+      const label = selectedBookmark.remainingLabels.find((l) => l.label === labelName && l.category === category);
 
       if (label) {
         try {
           await flow.bookmarks.update(selectedBookmark.bookmark.id, {
-            addLabels: [{
-              label: label.label,
-              source: 'ai' as const,
-              category: label.category as 'topic' | 'type' | 'priority'
-            }]
+            addLabels: [
+              {
+                label: label.label,
+                source: "ai" as const,
+                category: label.category as "topic" | "type" | "priority"
+              }
+            ]
           });
         } catch (error) {
-          console.error('Failed to apply label:', error);
+          console.error("Failed to apply label:", error);
           toast.error(`Failed to apply label: ${label.label}`);
         }
       }
@@ -292,54 +282,54 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
       onBookmarkUpdated();
     }
 
-    toast.success(`Applied ${labelIds.length} label${labelIds.length !== 1 ? 's' : ''} to ${selectedBookmark.bookmark.title}`);
+    toast.success(
+      `Applied ${labelIds.length} label${labelIds.length !== 1 ? "s" : ""} to ${selectedBookmark.bookmark.title}`
+    );
   };
 
   // Shift-click handler for bookmark selection
-  const handleBookmarkToggle = useCallback((bookmarkId: string, event?: React.ChangeEvent<HTMLInputElement>) => {
-    // Determine action based on checkbox state (what we're transitioning TO)
-    const action = event?.target.checked ? 'select' : 'deselect';
+  const handleBookmarkToggle = useCallback(
+    (bookmarkId: string, event?: React.ChangeEvent<HTMLInputElement>) => {
+      // Determine action based on checkbox state (what we're transitioning TO)
+      const action = event?.target.checked ? "select" : "deselect";
 
-    if ((event?.nativeEvent as any)?.shiftKey && lastClickedBookmarkId) {
-      // Find indices in the bookmarks array
-      const allBookmarks = dashboardState.getFilteredBookmarks();
-      const allIds = allBookmarks.map(b => b.bookmark.id);
-      const lastIndex = allIds.indexOf(lastClickedBookmarkId);
-      const currentIndex = allIds.indexOf(bookmarkId);
+      if ((event?.nativeEvent as MouseEvent | undefined)?.shiftKey && lastClickedBookmarkId) {
+        // Find indices in the bookmarks array
+        const allBookmarks = dashboardState.getFilteredBookmarks();
+        const allIds = allBookmarks.map((b) => b.bookmark.id);
+        const lastIndex = allIds.indexOf(lastClickedBookmarkId);
+        const currentIndex = allIds.indexOf(bookmarkId);
 
-      if (lastIndex !== -1 && currentIndex !== -1) {
-        // Apply the action to all items in the range
-        const start = Math.min(lastIndex, currentIndex);
-        const end = Math.max(lastIndex, currentIndex);
+        if (lastIndex !== -1 && currentIndex !== -1) {
+          // Apply the action to all items in the range
+          const start = Math.min(lastIndex, currentIndex);
+          const end = Math.max(lastIndex, currentIndex);
 
-        const newSelected = new Set(dashboardState.selectedBookmarkIds);
-        for (let i = start; i <= end; i++) {
-          const id = allIds[i];
-          if (action === 'select') {
-            newSelected.add(id);
-          } else {
-            newSelected.delete(id);
+          const newSelected = new Set(dashboardState.selectedBookmarkIds);
+          for (let i = start; i <= end; i++) {
+            const id = allIds[i];
+            if (action === "select") {
+              newSelected.add(id);
+            } else {
+              newSelected.delete(id);
+            }
           }
+          dashboardState.setSelectedBookmarkIds(newSelected);
         }
-        dashboardState.setSelectedBookmarkIds(newSelected);
+      } else {
+        // Normal click - toggle
+        dashboardState.toggleBookmarkSelection(bookmarkId);
       }
-    } else {
-      // Normal click - toggle
-      dashboardState.toggleBookmarkSelection(bookmarkId);
-    }
 
-    // Update last clicked ID
-    setLastClickedBookmarkId(bookmarkId);
-  }, [lastClickedBookmarkId, dashboardState]);
+      // Update last clicked ID
+      setLastClickedBookmarkId(bookmarkId);
+    },
+    [lastClickedBookmarkId, dashboardState]
+  );
 
   // Handler for bulk impact apply
-  const handleApplyBulk = async (
-    bookmarkIds: string[],
-    labelSelections: Map<string, Set<string>>
-  ) => {
-    const bookmarksToApply = dashboardState.bookmarks.filter(b =>
-      bookmarkIds.includes(b.bookmark.id)
-    );
+  const handleApplyBulk = async (bookmarkIds: string[], labelSelections: Map<string, Set<string>>) => {
+    const bookmarksToApply = dashboardState.bookmarks.filter((b) => bookmarkIds.includes(b.bookmark.id));
 
     let successCount = 0;
     let failCount = 0;
@@ -349,23 +339,23 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
       if (!selectedLabelIds || selectedLabelIds.size === 0) continue;
 
       for (const labelId of selectedLabelIds) {
-        const [labelName, category] = labelId.split('::');
-        const label = bookmark.remainingLabels.find(
-          l => l.label === labelName && l.category === category
-        );
+        const [labelName, category] = labelId.split("::");
+        const label = bookmark.remainingLabels.find((l) => l.label === labelName && l.category === category);
 
         if (label) {
           try {
             await flow.bookmarks.update(bookmark.bookmark.id, {
-              addLabels: [{
-                label: label.label,
-                source: 'ai' as const,
-                category: label.category as 'topic' | 'type' | 'priority'
-              }]
+              addLabels: [
+                {
+                  label: label.label,
+                  source: "ai" as const,
+                  category: label.category as "topic" | "type" | "priority"
+                }
+              ]
             });
             successCount++;
           } catch (error) {
-            console.error('Failed to apply label:', error);
+            console.error("Failed to apply label:", error);
             failCount++;
           }
         }
@@ -379,17 +369,17 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
     if (failCount > 0) {
       toast.error(`Applied ${successCount} labels, ${failCount} failed`);
     } else {
-      toast.success(`Applied ${successCount} label${successCount !== 1 ? 's' : ''} to ${bookmarkIds.length} bookmark${bookmarkIds.length !== 1 ? 's' : ''}`);
+      toast.success(
+        `Applied ${successCount} label${successCount !== 1 ? "s" : ""} to ${bookmarkIds.length} bookmark${bookmarkIds.length !== 1 ? "s" : ""}`
+      );
     }
   };
 
   const handleReprocess = async () => {
-    const bookmarksToProcess = selectedBookmarks.length > 0
-      ? selectedBookmarks
-      : dashboardState.bookmarks;
+    const bookmarksToProcess = selectedBookmarks.length > 0 ? selectedBookmarks : dashboardState.bookmarks;
 
     if (bookmarksToProcess.length === 0) {
-      toast.error('No bookmarks selected');
+      toast.error("No bookmarks selected");
       return;
     }
 
@@ -413,21 +403,21 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
 
       // Update bookmarks in dashboard state
       dashboardState.setBookmarks(
-        dashboardState.bookmarks.map(b => {
-          const reanalyzed = reanalyzedBookmarks.find(r => r.bookmark.id === b.bookmark.id);
+        dashboardState.bookmarks.map((b) => {
+          const reanalyzed = reanalyzedBookmarks.find((r) => r.bookmark.id === b.bookmark.id);
           return reanalyzed || b;
         })
       );
 
-      toast.success('Reprocessing complete', {
+      toast.success("Reprocessing complete", {
         id: toastId,
         description: `${reanalyzedBookmarks.length} bookmarks reanalyzed`,
         duration: 2000
       });
     } catch (error) {
-      toast.error('Reprocessing failed', {
+      toast.error("Reprocessing failed", {
         id: toastId,
-        description: error instanceof Error ? error.message : 'Unknown error',
+        description: error instanceof Error ? error.message : "Unknown error",
         duration: 5000
       });
     }
@@ -436,13 +426,13 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
   // Handle Escape key to close dashboard
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
+      if (e.key === "Escape" && isOpen) {
         onClose();
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
   // Cleanup state and timeouts when dashboard closes
@@ -474,10 +464,7 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
   return (
     <>
       {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/20 z-40 transition-opacity"
-        onClick={onClose}
-      />
+      <div className="fixed inset-0 bg-black/20 z-40 transition-opacity" onClick={onClose} />
 
       {/* Dashboard */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -489,8 +476,7 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
               <p className="text-sm text-muted-foreground">
                 {isAnalyzing
                   ? `Analyzing ${dashboardState.totalCount} bookmarks...`
-                  : `Review and apply AI-suggested labels • ${dashboardState.totalCount} ${dashboardState.totalCount === 1 ? 'bookmark' : 'bookmarks'} • ${dashboardState.selectedCount} selected`
-                }
+                  : `Review and apply AI-suggested labels • ${dashboardState.totalCount} ${dashboardState.totalCount === 1 ? "bookmark" : "bookmarks"} • ${dashboardState.selectedCount} selected`}
               </p>
             </div>
             <Button
@@ -560,9 +546,7 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
             {bulkOps.isProcessing && bulkOps.progress && (
               <div className="mb-3">
                 <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                  <span className="truncate max-w-[60%]">
-                    {bulkOps.progress.current ?? 'Processing...'}
-                  </span>
+                  <span className="truncate max-w-[60%]">{bulkOps.progress.current ?? "Processing..."}</span>
                   <span className="ml-2 flex-shrink-0">
                     {bulkOps.progress.completed} of {bulkOps.progress.total}
                   </span>
@@ -576,8 +560,8 @@ export const AILabelingDashboard: React.FC<AILabelingDashboardProps> = ({
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
                 {selectedBookmarks.length > 0
-                  ? `Apply actions to ${selectedBookmarks.length} selected ${selectedBookmarks.length === 1 ? 'bookmark' : 'bookmarks'}`
-                  : 'Select bookmarks to perform bulk actions'}
+                  ? `Apply actions to ${selectedBookmarks.length} selected ${selectedBookmarks.length === 1 ? "bookmark" : "bookmarks"}`
+                  : "Select bookmarks to perform bulk actions"}
               </p>
               <div className="flex gap-2">
                 <Button

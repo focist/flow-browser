@@ -1,11 +1,11 @@
-import React from 'react';
-import { Checkbox } from '../ui/checkbox';
-import { Badge } from '../ui/badge';
-import { ScrollArea } from '../ui/scroll-area';
-import { motion, AnimatePresence } from 'motion/react';
-import { CheckCircle2, AlertCircle, Clock, Zap, Sparkles, Loader2 } from 'lucide-react';
-import type { DashboardBookmark } from '../../hooks/use-dashboard-state';
-import { getCategoryStyles } from '../../lib/label-styles';
+import React from "react";
+import { Checkbox } from "../ui/checkbox";
+import { Badge } from "../ui/badge";
+import { ScrollArea } from "../ui/scroll-area";
+import { motion, AnimatePresence } from "motion/react";
+import { CheckCircle2, AlertCircle, Clock, Zap, Sparkles, Loader2 } from "lucide-react";
+import type { DashboardBookmark } from "../../hooks/use-dashboard-state";
+import { getCategoryStyles } from "../../lib/label-styles";
 
 interface BookmarkOverviewColumnProps {
   bookmarks: DashboardBookmark[];
@@ -13,7 +13,7 @@ interface BookmarkOverviewColumnProps {
   onToggleSelection: (id: string, event?: React.ChangeEvent<HTMLInputElement>) => void;
   onSelectAll: () => void;
   onClearSelection: () => void;
-  getConfidenceLevel: (confidence: number) => 'high' | 'medium' | 'low';
+  getConfidenceLevel: (confidence: number) => "high" | "medium" | "low";
   isAnalyzing?: boolean;
   hoveredPatternId?: string | null;
   onBookmarkHover?: (bookmarkId: string | null) => void;
@@ -56,11 +56,9 @@ const BookmarkItem: React.FC<{
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -10 }}
       className={`flex items-start gap-2 p-2 rounded border hover:bg-accent/50 transition-all duration-200 overflow-hidden ${
-        isSelected ? 'bg-accent border-primary' : 'bg-card'
-      } ${
-        isHighlighted ? 'ring-2 ring-blue-500/50 bg-blue-50 dark:bg-blue-950/20' : ''
-      } ${
-        isDimmed ? 'opacity-40' : 'opacity-100'
+        isSelected ? "bg-accent border-primary" : "bg-card"
+      } ${isHighlighted ? "ring-2 ring-blue-500/50 bg-blue-50 dark:bg-blue-950/20" : ""} ${
+        isDimmed ? "opacity-40" : "opacity-100"
       }`}
       onMouseDown={(e) => {
         // Prevent text selection on shift-click by stopping the mousedown event early
@@ -122,7 +120,10 @@ const BookmarkItem: React.FC<{
           )}
           {/* Show auto-applied indicator */}
           {autoAppliedCount > 0 && (
-            <Badge variant="outline" className="text-xs h-5 flex-shrink-0 bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800">
+            <Badge
+              variant="outline"
+              className="text-xs h-5 flex-shrink-0 bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800"
+            >
               <Sparkles className="h-3 w-3 mr-0.5 flex-shrink-0" />
               {autoAppliedCount} auto
             </Badge>
@@ -160,24 +161,16 @@ const BookmarkGroup: React.FC<BookmarkGroupProps> = ({
         className="w-full flex items-center justify-between p-2 rounded hover:bg-accent/50 transition-colors group"
       >
         <div className="flex items-center gap-2">
-          <div className={`p-1.5 rounded-full ${color}`}>
-            {icon}
-          </div>
+          <div className={`p-1.5 rounded-full ${color}`}>{icon}</div>
           <div className="text-left">
             <h3 className="font-medium text-sm">{title}</h3>
-            <p className="text-xs text-muted-foreground">{count} bookmark{count !== 1 ? 's' : ''}</p>
+            <p className="text-xs text-muted-foreground">
+              {count} bookmark{count !== 1 ? "s" : ""}
+            </p>
           </div>
         </div>
-        <motion.div
-          animate={{ rotate: expanded ? 180 : 0 }}
-          transition={{ duration: 0.2 }}
-        >
-          <svg
-            className="h-4 w-4 text-muted-foreground"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
+        <motion.div animate={{ rotate: expanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
+          <svg className="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </motion.div>
@@ -187,16 +180,17 @@ const BookmarkGroup: React.FC<BookmarkGroupProps> = ({
         {expanded && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
+            animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="space-y-1.5 pl-2"
           >
             {bookmarks.map((bookmark) => {
               // Check if this bookmark should be highlighted
-              const isHighlighted = hoveredPatternId &&
+              const isHighlighted =
+                hoveredPatternId &&
                 [...bookmark.autoAppliedLabels, ...bookmark.remainingLabels].some(
-                  l => `${l.label}::${l.category}` === hoveredPatternId
+                  (l) => `${l.label}::${l.category}` === hoveredPatternId
                 );
               const isDimmed = hoveredPatternId && !isHighlighted;
 
@@ -252,7 +246,7 @@ export const BookmarkOverviewColumn: React.FC<BookmarkOverviewColumnProps> = ({
       if (b.remainingLabels.length === 0 && b.autoAppliedLabels.length === 0) {
         result.none.push(b);
       } else {
-        const maxConfidence = Math.max(...b.remainingLabels.map(l => l.confidence), 0);
+        const maxConfidence = Math.max(...b.remainingLabels.map((l) => l.confidence), 0);
         const level = getConfidenceLevel(maxConfidence);
         result[level].push(b);
       }
@@ -262,7 +256,7 @@ export const BookmarkOverviewColumn: React.FC<BookmarkOverviewColumnProps> = ({
   }, [bookmarks, getConfidenceLevel]);
 
   const toggleGroup = (group: keyof typeof expandedGroups) => {
-    setExpandedGroups(prev => ({ ...prev, [group]: !prev[group] }));
+    setExpandedGroups((prev) => ({ ...prev, [group]: !prev[group] }));
   };
 
   const selectedCount = selectedIds.size;
@@ -308,7 +302,7 @@ export const BookmarkOverviewColumn: React.FC<BookmarkOverviewColumnProps> = ({
             selectedIds={selectedIds}
             onToggleSelection={onToggleSelection}
             expanded={expandedGroups.high}
-            onToggleExpanded={() => toggleGroup('high')}
+            onToggleExpanded={() => toggleGroup("high")}
             hoveredPatternId={hoveredPatternId}
             onBookmarkHover={onBookmarkHover}
             lastClickedId={lastClickedId}
@@ -325,7 +319,7 @@ export const BookmarkOverviewColumn: React.FC<BookmarkOverviewColumnProps> = ({
             selectedIds={selectedIds}
             onToggleSelection={onToggleSelection}
             expanded={expandedGroups.medium}
-            onToggleExpanded={() => toggleGroup('medium')}
+            onToggleExpanded={() => toggleGroup("medium")}
             hoveredPatternId={hoveredPatternId}
             onBookmarkHover={onBookmarkHover}
             lastClickedId={lastClickedId}
@@ -342,7 +336,7 @@ export const BookmarkOverviewColumn: React.FC<BookmarkOverviewColumnProps> = ({
             selectedIds={selectedIds}
             onToggleSelection={onToggleSelection}
             expanded={expandedGroups.low}
-            onToggleExpanded={() => toggleGroup('low')}
+            onToggleExpanded={() => toggleGroup("low")}
             hoveredPatternId={hoveredPatternId}
             onBookmarkHover={onBookmarkHover}
             lastClickedId={lastClickedId}
@@ -359,7 +353,7 @@ export const BookmarkOverviewColumn: React.FC<BookmarkOverviewColumnProps> = ({
             selectedIds={selectedIds}
             onToggleSelection={onToggleSelection}
             expanded={expandedGroups.none}
-            onToggleExpanded={() => toggleGroup('none')}
+            onToggleExpanded={() => toggleGroup("none")}
             hoveredPatternId={hoveredPatternId}
             onBookmarkHover={onBookmarkHover}
             lastClickedId={lastClickedId}
@@ -373,7 +367,7 @@ export const BookmarkOverviewColumn: React.FC<BookmarkOverviewColumnProps> = ({
                 <>
                   <Loader2 className="h-12 w-12 mx-auto mb-3 opacity-50 animate-spin" />
                   <p className="text-sm font-medium">Analyzing bookmarks...</p>
-                  <p className="text-xs mt-1">Results will appear as they're processed</p>
+                  <p className="text-xs mt-1">Results will appear as they&apos;re processed</p>
                 </>
               ) : (
                 <p className="text-sm">No bookmarks to display</p>

@@ -1,4 +1,5 @@
-import { BarChart3, Package } from 'lucide-react';
+import type { ReactNode } from "react";
+import { BarChart3, Package } from "lucide-react";
 
 interface StatsViewProps {
   stats: {
@@ -15,10 +16,10 @@ interface StatsViewProps {
 interface StatItemProps {
   label: string;
   value: string | number;
-  icon?: React.ReactNode;
+  icon?: ReactNode;
 }
 
-const StatItem: React.FC<StatItemProps> = ({ label, value, icon }) => {
+const StatItem = ({ label, value, icon }: StatItemProps) => {
   return (
     <div className="flex items-center justify-between p-3 rounded border bg-card">
       <div className="flex items-center gap-2">
@@ -36,9 +37,7 @@ export function StatsView({ stats }: StatsViewProps) {
       {/* Header */}
       <div>
         <h3 className="text-lg font-semibold mb-2">Overview</h3>
-        <p className="text-sm text-muted-foreground">
-          Statistics across all analyzed bookmarks
-        </p>
+        <p className="text-sm text-muted-foreground">Statistics across all analyzed bookmarks</p>
       </div>
 
       {/* Overall Stats */}
@@ -48,15 +47,8 @@ export function StatsView({ stats }: StatsViewProps) {
           <h4 className="font-medium text-sm">Statistics</h4>
         </div>
         <div className="space-y-2">
-          <StatItem
-            label="Unique Labels"
-            value={stats.uniqueLabels}
-            icon={<Package className="h-4 w-4" />}
-          />
-          <StatItem
-            label="Avg Labels/Bookmark"
-            value={stats.avgLabelsPerBookmark.toFixed(1)}
-          />
+          <StatItem label="Unique Labels" value={stats.uniqueLabels} icon={<Package className="h-4 w-4" />} />
+          <StatItem label="Avg Labels/Bookmark" value={stats.avgLabelsPerBookmark.toFixed(1)} />
           <StatItem
             label="High Conf. Patterns"
             value={stats.highConfidencePatterns}
@@ -72,10 +64,7 @@ export function StatsView({ stats }: StatsViewProps) {
             value={stats.lowConfidencePatterns}
             icon={<div className="h-2 w-2 rounded-full bg-slate-500" />}
           />
-          <StatItem
-            label="Domains"
-            value={stats.totalDomains}
-          />
+          <StatItem label="Domains" value={stats.totalDomains} />
         </div>
       </div>
     </div>

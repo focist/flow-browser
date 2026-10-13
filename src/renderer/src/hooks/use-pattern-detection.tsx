@@ -1,18 +1,18 @@
-import { useMemo, useCallback } from 'react';
-import type { DashboardBookmark } from './use-dashboard-state';
-import type { BookmarkLabel } from '~/flow/interfaces/ai';
+import { useMemo, useCallback } from "react";
+import type { DashboardBookmark } from "./use-dashboard-state";
+import type { BookmarkLabel } from "~/flow/interfaces/ai";
 
 export interface LabelPattern {
   label: string;
-  category: 'topic' | 'type' | 'priority';
+  category: "topic" | "type" | "priority";
   bookmarkIds: string[];
   count: number;
   avgConfidence: number;
-  confidenceLevel: 'high' | 'medium' | 'low';
+  confidenceLevel: "high" | "medium" | "low";
 }
 
 export interface CategoryPattern {
-  category: 'topic' | 'type' | 'priority';
+  category: "topic" | "type" | "priority";
   labels: LabelPattern[];
   totalBookmarks: number;
 }
@@ -27,18 +27,21 @@ export interface DomainPattern {
 export const usePatternDetection = (bookmarks: DashboardBookmark[]) => {
   // Detect all label patterns across bookmarks
   const labelPatterns = useMemo((): LabelPattern[] => {
-    const labelMap = new Map<string, {
-      label: string;
-      category: BookmarkLabel['category'];
-      bookmarkIds: Set<string>;
-      confidences: number[];
-    }>();
+    const labelMap = new Map<
+      string,
+      {
+        label: string;
+        category: BookmarkLabel["category"];
+        bookmarkIds: Set<string>;
+        confidences: number[];
+      }
+    >();
 
     // Aggregate all labels from both auto-applied and remaining
-    bookmarks.forEach(b => {
+    bookmarks.forEach((b) => {
       const allLabels = [...b.autoAppliedLabels, ...b.remainingLabels];
 
-      allLabels.forEach(label => {
+      allLabels.forEach((label) => {
         const key = `${label.label}::${label.category}`;
 
         if (!labelMap.has(key)) {
@@ -57,7 +60,7 @@ export const usePatternDetection = (bookmarks: DashboardBookmark[]) => {
     });
 
     // Convert to array and calculate statistics
-    const patterns: LabelPattern[] = Array.from(labelMap.values()).map(p => {
+    const patterns: LabelPattern[] = Array.from(labelMap.values()).map((p) => {
       const avgConfidence = p.confidences.reduce((a, b) => a + b, 0) / p.confidences.length;
 
       return {
@@ -66,7 +69,7 @@ export const usePatternDetection = (bookmarks: DashboardBookmark[]) => {
         bookmarkIds: Array.from(p.bookmarkIds),
         count: p.bookmarkIds.size,
         avgConfidence,
-        confidenceLevel: avgConfidence >= 0.85 ? 'high' : avgConfidence >= 0.60 ? 'medium' : 'low'
+        confidenceLevel: avgConfidence >= 0.85 ? "high" : avgConfidence >= 0.6 ? "medium" : "low"
       };
     });
 
@@ -76,9 +79,9 @@ export const usePatternDetection = (bookmarks: DashboardBookmark[]) => {
 
   // Group patterns by category
   const categoryPatterns = useMemo((): CategoryPattern[] => {
-    const categories = new Map<BookmarkLabel['category'], LabelPattern[]>();
+    const categories = new Map<BookmarkLabel["category"], LabelPattern[]>();
 
-    labelPatterns.forEach(pattern => {
+    labelPatterns.forEach((pattern) => {
       if (!categories.has(pattern.category)) {
         categories.set(pattern.category, []);
       }
@@ -87,7 +90,7 @@ export const usePatternDetection = (bookmarks: DashboardBookmark[]) => {
 
     return Array.from(categories.entries()).map(([category, labels]) => {
       const bookmarkIds = new Set<string>();
-      labels.forEach(l => l.bookmarkIds.forEach(id => bookmarkIds.add(id)));
+      labels.forEach((l) => l.bookmarkIds.forEach((id) => bookmarkIds.add(id)));
 
       return {
         category,
@@ -99,12 +102,15 @@ export const usePatternDetection = (bookmarks: DashboardBookmark[]) => {
 
   // Detect domain patterns
   const domainPatterns = useMemo((): DomainPattern[] => {
-    const domainMap = new Map<string, {
-      bookmarkIds: Set<string>;
-      labels: Map<string, number>;
-    }>();
+    const domainMap = new Map<
+      string,
+      {
+        bookmarkIds: Set<string>;
+        labels: Map<string, number>;
+      }
+    >();
 
-    bookmarks.forEach(b => {
+    bookmarks.forEach((b) => {
       try {
         const url = new URL(b.bookmark.url);
         const domain = url.hostname;
@@ -121,12 +127,12 @@ export const usePatternDetection = (bookmarks: DashboardBookmark[]) => {
 
         // Track labels for this domain
         const allLabels = [...b.autoAppliedLabels, ...b.remainingLabels];
-        allLabels.forEach(label => {
+        allLabels.forEach((label) => {
           pattern.labels.set(label.label, (pattern.labels.get(label.label) || 0) + 1);
         });
-      } catch (error) {
+      } catch {
         // Invalid URL, skip
-        console.warn('Invalid URL for domain pattern detection:', b.bookmark.url);
+        console.warn("Invalid URL for domain pattern detection:", b.bookmark.url);
       }
     });
 
@@ -151,93 +157,106 @@ export const usePatternDetection = (bookmarks: DashboardBookmark[]) => {
   }, [bookmarks]);
 
   // Get top N patterns
-  const getTopPatterns = useCallback((n: number = 10): LabelPattern[] => {
-    return labelPatterns.slice(0, n);
-  }, [labelPatterns]);
+  const getTopPatterns = useCallback(
+    (n: number = 10): LabelPattern[] => {
+      return labelPatterns.slice(0, n);
+    },
+    [labelPatterns]
+  );
 
   // Get patterns for a specific category
-  const getPatternsByCategory = useCallback((category: BookmarkLabel['category']): LabelPattern[] => {
-    return labelPatterns.filter(p => p.category === category);
-  }, [labelPatterns]);
+  const getPatternsByCategory = useCallback(
+    (category: BookmarkLabel["category"]): LabelPattern[] => {
+      return labelPatterns.filter((p) => p.category === category);
+    },
+    [labelPatterns]
+  );
 
   // Get patterns for specific bookmarks
-  const getPatternsForBookmarks = useCallback((bookmarkIds: string[]): LabelPattern[] => {
-    const idSet = new Set(bookmarkIds);
-    return labelPatterns.filter(p =>
-      p.bookmarkIds.some(id => idSet.has(id))
-    );
-  }, [labelPatterns]);
+  const getPatternsForBookmarks = useCallback(
+    (bookmarkIds: string[]): LabelPattern[] => {
+      const idSet = new Set(bookmarkIds);
+      return labelPatterns.filter((p) => p.bookmarkIds.some((id) => idSet.has(id)));
+    },
+    [labelPatterns]
+  );
 
   // Get bookmarks that share a specific label
-  const getBookmarksWithLabel = useCallback((label: string, category?: BookmarkLabel['category']): DashboardBookmark[] => {
-    return bookmarks.filter(b => {
-      const allLabels = [...b.autoAppliedLabels, ...b.remainingLabels];
-      return allLabels.some(l =>
-        l.label === label && (!category || l.category === category)
-      );
-    });
-  }, [bookmarks]);
+  const getBookmarksWithLabel = useCallback(
+    (label: string, category?: BookmarkLabel["category"]): DashboardBookmark[] => {
+      return bookmarks.filter((b) => {
+        const allLabels = [...b.autoAppliedLabels, ...b.remainingLabels];
+        return allLabels.some((l) => l.label === label && (!category || l.category === category));
+      });
+    },
+    [bookmarks]
+  );
 
   // Find similar bookmarks based on label overlap
-  const findSimilarBookmarks = useCallback((bookmarkId: string, minOverlap: number = 2): DashboardBookmark[] => {
-    const targetBookmark = bookmarks.find(b => b.bookmark.id === bookmarkId);
-    if (!targetBookmark) return [];
+  const findSimilarBookmarks = useCallback(
+    (bookmarkId: string, minOverlap: number = 2): DashboardBookmark[] => {
+      const targetBookmark = bookmarks.find((b) => b.bookmark.id === bookmarkId);
+      if (!targetBookmark) return [];
 
-    const targetLabels = new Set(
-      [...targetBookmark.autoAppliedLabels, ...targetBookmark.remainingLabels]
-        .map(l => `${l.label}::${l.category}`)
-    );
+      const targetLabels = new Set(
+        [...targetBookmark.autoAppliedLabels, ...targetBookmark.remainingLabels].map((l) => `${l.label}::${l.category}`)
+      );
 
-    const similar: { bookmark: DashboardBookmark; overlapCount: number }[] = [];
+      const similar: { bookmark: DashboardBookmark; overlapCount: number }[] = [];
 
-    bookmarks.forEach(b => {
-      if (b.bookmark.id === bookmarkId) return;
+      bookmarks.forEach((b) => {
+        if (b.bookmark.id === bookmarkId) return;
 
-      const labels = [...b.autoAppliedLabels, ...b.remainingLabels];
-      const overlap = labels.filter(l =>
-        targetLabels.has(`${l.label}::${l.category}`)
-      ).length;
+        const labels = [...b.autoAppliedLabels, ...b.remainingLabels];
+        const overlap = labels.filter((l) => targetLabels.has(`${l.label}::${l.category}`)).length;
 
-      if (overlap >= minOverlap) {
-        similar.push({ bookmark: b, overlapCount: overlap });
-      }
-    });
+        if (overlap >= minOverlap) {
+          similar.push({ bookmark: b, overlapCount: overlap });
+        }
+      });
 
-    // Sort by overlap count (highest first)
-    return similar
-      .sort((a, b) => b.overlapCount - a.overlapCount)
-      .map(s => s.bookmark);
-  }, [bookmarks]);
+      // Sort by overlap count (highest first)
+      return similar.sort((a, b) => b.overlapCount - a.overlapCount).map((s) => s.bookmark);
+    },
+    [bookmarks]
+  );
 
   // Get pattern by ID (key format: "label::category")
-  const getPatternById = useCallback((patternId: string): LabelPattern | undefined => {
-    return labelPatterns.find(p => `${p.label}::${p.category}` === patternId);
-  }, [labelPatterns]);
+  const getPatternById = useCallback(
+    (patternId: string): LabelPattern | undefined => {
+      return labelPatterns.find((p) => `${p.label}::${p.category}` === patternId);
+    },
+    [labelPatterns]
+  );
 
   // Get bookmarks affected by a specific pattern
-  const getBookmarksForPattern = useCallback((patternId: string): DashboardBookmark[] => {
-    const pattern = getPatternById(patternId);
-    if (!pattern) return [];
+  const getBookmarksForPattern = useCallback(
+    (patternId: string): DashboardBookmark[] => {
+      const pattern = getPatternById(patternId);
+      if (!pattern) return [];
 
-    return bookmarks.filter(b => pattern.bookmarkIds.includes(b.bookmark.id));
-  }, [bookmarks, getPatternById]);
+      return bookmarks.filter((b) => pattern.bookmarkIds.includes(b.bookmark.id));
+    },
+    [bookmarks, getPatternById]
+  );
 
   // Get patterns that would apply to a specific bookmark
-  const getPatternsForBookmark = useCallback((bookmarkId: string): LabelPattern[] => {
-    return labelPatterns.filter(p => p.bookmarkIds.includes(bookmarkId));
-  }, [labelPatterns]);
+  const getPatternsForBookmark = useCallback(
+    (bookmarkId: string): LabelPattern[] => {
+      return labelPatterns.filter((p) => p.bookmarkIds.includes(bookmarkId));
+    },
+    [labelPatterns]
+  );
 
   // Get statistics
   const stats = useMemo(() => {
     const totalLabels = labelPatterns.reduce((sum, p) => sum + p.count, 0);
     const uniqueLabels = labelPatterns.length;
-    const avgLabelsPerBookmark = bookmarks.length > 0
-      ? totalLabels / bookmarks.length
-      : 0;
+    const avgLabelsPerBookmark = bookmarks.length > 0 ? totalLabels / bookmarks.length : 0;
 
-    const highConfidencePatterns = labelPatterns.filter(p => p.confidenceLevel === 'high').length;
-    const mediumConfidencePatterns = labelPatterns.filter(p => p.confidenceLevel === 'medium').length;
-    const lowConfidencePatterns = labelPatterns.filter(p => p.confidenceLevel === 'low').length;
+    const highConfidencePatterns = labelPatterns.filter((p) => p.confidenceLevel === "high").length;
+    const mediumConfidencePatterns = labelPatterns.filter((p) => p.confidenceLevel === "medium").length;
+    const lowConfidencePatterns = labelPatterns.filter((p) => p.confidenceLevel === "low").length;
 
     return {
       totalLabels,

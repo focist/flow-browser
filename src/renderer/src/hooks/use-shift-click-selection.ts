@@ -1,4 +1,4 @@
-import { useState, useCallback, Dispatch, SetStateAction } from 'react';
+import { useState, useCallback, Dispatch, SetStateAction } from "react";
 
 interface UseShiftClickSelectionOptions<T> {
   items: T[];
@@ -32,55 +32,56 @@ export function useShiftClickSelection<T>({
   getId,
   initialSelection
 }: UseShiftClickSelectionOptions<T>): UseShiftClickSelectionReturn {
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(
-    initialSelection || new Set()
-  );
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(initialSelection || new Set());
   const [lastClickedId, setLastClickedId] = useState<string | null>(null);
 
-  const handleToggle = useCallback((id: string, event?: React.ChangeEvent<HTMLInputElement>) => {
-    // Determine action based on checkbox state (what we're transitioning TO)
-    const action = event?.target.checked ? 'select' : 'deselect';
+  const handleToggle = useCallback(
+    (id: string, event?: React.ChangeEvent<HTMLInputElement>) => {
+      // Determine action based on checkbox state (what we're transitioning TO)
+      const action = event?.target.checked ? "select" : "deselect";
 
-    if ((event?.nativeEvent as any)?.shiftKey && lastClickedId) {
-      // Find indices in the items array
-      const allIds = items.map(getId);
-      const lastIndex = allIds.indexOf(lastClickedId);
-      const currentIndex = allIds.indexOf(id);
+      if ((event?.nativeEvent as MouseEvent | undefined)?.shiftKey && lastClickedId) {
+        // Find indices in the items array
+        const allIds = items.map(getId);
+        const lastIndex = allIds.indexOf(lastClickedId);
+        const currentIndex = allIds.indexOf(id);
 
-      if (lastIndex !== -1 && currentIndex !== -1) {
-        // Apply the action to all items in the range
-        const start = Math.min(lastIndex, currentIndex);
-        const end = Math.max(lastIndex, currentIndex);
+        if (lastIndex !== -1 && currentIndex !== -1) {
+          // Apply the action to all items in the range
+          const start = Math.min(lastIndex, currentIndex);
+          const end = Math.max(lastIndex, currentIndex);
 
-        setSelectedIds(prev => {
-          const next = new Set(prev);
-          for (let i = start; i <= end; i++) {
-            const itemId = allIds[i];
-            if (action === 'select') {
-              next.add(itemId);
-            } else {
-              next.delete(itemId);
+          setSelectedIds((prev) => {
+            const next = new Set(prev);
+            for (let i = start; i <= end; i++) {
+              const itemId = allIds[i];
+              if (action === "select") {
+                next.add(itemId);
+              } else {
+                next.delete(itemId);
+              }
             }
+            return next;
+          });
+        }
+      } else {
+        // Normal click - apply action
+        setSelectedIds((prev) => {
+          const next = new Set(prev);
+          if (action === "select") {
+            next.add(id);
+          } else {
+            next.delete(id);
           }
           return next;
         });
       }
-    } else {
-      // Normal click - apply action
-      setSelectedIds(prev => {
-        const next = new Set(prev);
-        if (action === 'select') {
-          next.add(id);
-        } else {
-          next.delete(id);
-        }
-        return next;
-      });
-    }
 
-    // Update last clicked ID
-    setLastClickedId(id);
-  }, [items, getId, lastClickedId]);
+      // Update last clicked ID
+      setLastClickedId(id);
+    },
+    [items, getId, lastClickedId]
+  );
 
   const selectAll = useCallback(() => {
     setSelectedIds(new Set(items.map(getId)));
