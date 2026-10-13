@@ -1,4 +1,13 @@
-import { Bookmark, BookmarkCollection, CreateBookmarkInput, UpdateBookmarkInput, UpdateCollectionInput, BookmarkFilter, ImportStats } from "~/types/bookmarks";
+import {
+  Bookmark,
+  BookmarkCollection,
+  CreateBookmarkInput,
+  UpdateBookmarkInput,
+  UpdateCollectionInput,
+  BookmarkFilter,
+  ImportStats,
+  CollectionRules
+} from "~/types/bookmarks";
 
 export interface FlowBookmarksAPI {
   create(input: CreateBookmarkInput): Promise<Bookmark>;
@@ -13,8 +22,11 @@ export interface FlowBookmarksAPI {
   restore(id: string): Promise<boolean>;
   permanentlyDelete(id: string): Promise<boolean>;
   moveToCollection(bookmarkId: string, fromCollectionId: string | null, toCollectionId: string): Promise<void>;
-  addAILabels(bookmarkId: string, aiLabels: Array<{label: string; confidence: number; category: string}>): Promise<Bookmark | null>;
-  
+  addAILabels(
+    bookmarkId: string,
+    aiLabels: Array<{ label: string; confidence: number; category: string }>
+  ): Promise<Bookmark | null>;
+
   collections: {
     create(input: {
       name: string;
@@ -23,7 +35,7 @@ export interface FlowBookmarksAPI {
       spaceId?: string;
       parentId?: string;
       isAuto?: boolean;
-      rules?: any;
+      rules?: CollectionRules;
     }): Promise<BookmarkCollection>;
     update(id: string, input: UpdateCollectionInput): Promise<BookmarkCollection | null>;
     delete(id: string): Promise<boolean>;
@@ -35,6 +47,6 @@ export interface FlowBookmarksAPI {
     removeBookmark(bookmarkId: string, collectionId: string): Promise<void>;
     moveBookmark(bookmarkId: string, fromCollectionId: string | null, toCollectionId: string): Promise<void>;
   };
-  
+
   importChrome(htmlContent: string, profileId: string, spaceId: string): Promise<ImportStats>;
 }

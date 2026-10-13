@@ -18,10 +18,12 @@ export interface Bookmark {
 
 export interface BookmarkLabel {
   label: string;
-  source: 'user' | 'ai' | 'auto';
+  source: "user" | "ai" | "auto";
   confidence?: number;
-  category?: 'topic' | 'type' | 'project' | 'priority';
+  category?: "topic" | "type" | "project" | "priority";
 }
+
+export type CollectionRules = Record<string, unknown>;
 
 export interface BookmarkCollection {
   id: string;
@@ -31,7 +33,7 @@ export interface BookmarkCollection {
   spaceId?: string;
   parentId?: string;
   isAuto: boolean;
-  rules?: any;
+  rules?: CollectionRules | null;
   dateCreated: Date;
   dateModified?: Date;
   deletedAt?: Date;
@@ -77,9 +79,9 @@ export interface BookmarkFilter {
 }
 
 export interface BookmarkViewMode {
-  type: 'card' | 'list' | 'grid';
-  sortBy: 'dateAdded' | 'title' | 'visitCount' | 'lastVisited';
-  sortOrder: 'asc' | 'desc';
+  type: "card" | "list" | "grid";
+  sortBy: "dateAdded" | "title" | "visitCount" | "lastVisited";
+  sortOrder: "asc" | "desc";
 }
 
 export interface ImportStats {

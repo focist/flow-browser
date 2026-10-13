@@ -2,13 +2,30 @@ import path from "path";
 import { knex } from "knex";
 import { FLOW_DATA_DIR } from "./paths";
 import { randomUUID } from "crypto";
-import type { 
+import type {
   SnoozedItem,
   CreateSnoozedItemInput,
   SnoozeFilter,
   WakeUpNotification,
   WakeUpAction
 } from "~/types/snooze";
+
+// Raw database row for snoozed_items (dates stored as ISO strings, JSON as text)
+interface SnoozedItemRow {
+  id: string;
+  itemType: SnoozedItem["itemType"];
+  itemId: string;
+  profileId: string;
+  spaceId: string;
+  snoozeUntil: string;
+  snoozeType: SnoozedItem["snoozeType"];
+  snoozeLabel: string;
+  originalData: string | null;
+  snoozedAt: string;
+  snoozedFromSpaceId: string;
+  notificationSent: number | boolean;
+  wakeUpNotifiedAt?: string | null;
+}
 
 const dbPath = path.join(FLOW_DATA_DIR, "bookmarks.db"); // Reuse bookmarks database
 
@@ -32,7 +49,7 @@ class SnoozeService {
   async create(input: CreateSnoozedItemInput): Promise<SnoozedItem> {
     const id = randomUUID();
     const now = new Date();
-    
+
     const snoozedItem: SnoozedItem = {
       id,
       ...input,
@@ -40,7 +57,7 @@ class SnoozeService {
       notificationSent: false
     };
 
-    await db('snoozed_items').insert({
+    await db("snoozed_items").insert({
       id,
       itemType: input.itemType,
       itemId: input.itemId,
@@ -61,39 +78,39 @@ class SnoozeService {
 
   // Get all snoozed items with optional filtering
   async getAll(filter?: SnoozeFilter): Promise<SnoozedItem[]> {
-    let query = db('snoozed_items').select('*');
+    let query = db("snoozed_items").select("*");
 
     if (filter?.itemType) {
-      query = query.where('itemType', filter.itemType);
+      query = query.where("itemType", filter.itemType);
     }
 
     if (filter?.profileId) {
-      query = query.where('profileId', filter.profileId);
+      query = query.where("profileId", filter.profileId);
     }
 
     if (filter?.spaceId) {
-      query = query.where('spaceId', filter.spaceId);
+      query = query.where("spaceId", filter.spaceId);
     }
 
     if (filter?.isActive !== undefined) {
       if (filter.isActive) {
         // Active = not yet due or due but not processed
-        query = query.where('snoozeUntil', '>', new Date().toISOString());
+        query = query.where("snoozeUntil", ">", new Date().toISOString());
       } else {
         // Inactive = already due and processed
-        query = query.where('snoozeUntil', '<=', new Date().toISOString());
+        query = query.where("snoozeUntil", "<=", new Date().toISOString());
       }
     }
 
     if (filter?.dueBeforeDate) {
-      query = query.where('snoozeUntil', '<', filter.dueBeforeDate.toISOString());
+      query = query.where("snoozeUntil", "<", filter.dueBeforeDate.toISOString());
     }
 
     if (filter?.dueAfterDate) {
-      query = query.where('snoozeUntil', '>', filter.dueAfterDate.toISOString());
+      query = query.where("snoozeUntil", ">", filter.dueAfterDate.toISOString());
     }
 
-    query = query.orderBy('snoozeUntil', 'asc');
+    query = query.orderBy("snoozeUntil", "asc");
 
     const rows = await query;
     return rows.map(this.mapRowToSnoozedItem);
@@ -101,13 +118,13 @@ class SnoozeService {
 
   // Get a specific snoozed item by ID
   async getById(id: string): Promise<SnoozedItem | null> {
-    const row = await db('snoozed_items').where('id', id).first();
+    const row = await db("snoozed_items").where("id", id).first();
     return row ? this.mapRowToSnoozedItem(row) : null;
   }
 
   // Update a snoozed item
   async update(id: string, updates: Partial<SnoozedItem>): Promise<SnoozedItem | null> {
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
 
     if (updates.snoozeUntil) updateData.snoozeUntil = updates.snoozeUntil.toISOString();
     if (updates.snoozeType) updateData.snoozeType = updates.snoozeType;
@@ -116,8 +133,8 @@ class SnoozeService {
     if (updates.notificationSent !== undefined) updateData.notificationSent = updates.notificationSent;
     if (updates.wakeUpNotifiedAt) updateData.wakeUpNotifiedAt = updates.wakeUpNotifiedAt.toISOString();
 
-    const affected = await db('snoozed_items').where('id', id).update(updateData);
-    
+    const affected = await db("snoozed_items").where("id", id).update(updateData);
+
     if (affected === 0) {
       return null;
     }
@@ -127,7 +144,7 @@ class SnoozeService {
 
   // Delete a snoozed item
   async delete(id: string): Promise<boolean> {
-    const affected = await db('snoozed_items').where('id', id).del();
+    const affected = await db("snoozed_items").where("id", id).del();
     return affected > 0;
   }
 
@@ -141,9 +158,7 @@ class SnoozeService {
   // Check for items that are due to wake up
   async checkDueItems(): Promise<SnoozedItem[]> {
     const now = new Date();
-    const rows = await db('snoozed_items')
-      .where('snoozeUntil', '<=', now.toISOString())
-      .orderBy('snoozeUntil', 'asc');
+    const rows = await db("snoozed_items").where("snoozeUntil", "<=", now.toISOString()).orderBy("snoozeUntil", "asc");
 
     return rows.map(this.mapRowToSnoozedItem);
   }
@@ -186,12 +201,10 @@ class SnoozeService {
 
   // Mark that a wake-up notification has been sent
   async markNotificationSent(id: string): Promise<boolean> {
-    const affected = await db('snoozed_items')
-      .where('id', id)
-      .update({
-        notificationSent: true,
-        wakeUpNotifiedAt: new Date().toISOString()
-      });
+    const affected = await db("snoozed_items").where("id", id).update({
+      notificationSent: true,
+      wakeUpNotifiedAt: new Date().toISOString()
+    });
 
     return affected > 0;
   }
@@ -203,29 +216,29 @@ class SnoozeService {
     overdue: number;
     byType: Record<string, number>;
   }> {
-    let query = db('snoozed_items');
-    
+    let query = db("snoozed_items");
+
     if (profileId) {
-      query = query.where('profileId', profileId);
+      query = query.where("profileId", profileId);
     }
 
-    const allItems = await query.select('*');
+    const allItems = await query.select("*");
     const now = new Date();
     const endOfToday = new Date(now);
     endOfToday.setHours(23, 59, 59, 999);
 
     const totalSnoozed = allItems.length;
-    const dueToday = allItems.filter(item => {
+    const dueToday = allItems.filter((item) => {
       const dueDate = new Date(item.snoozeUntil);
       return dueDate >= now && dueDate <= endOfToday;
     }).length;
-    const overdue = allItems.filter(item => {
+    const overdue = allItems.filter((item) => {
       const dueDate = new Date(item.snoozeUntil);
       return dueDate < now;
     }).length;
 
     const byType: Record<string, number> = {};
-    allItems.forEach(item => {
+    allItems.forEach((item) => {
       byType[item.itemType] = (byType[item.itemType] || 0) + 1;
     });
 
@@ -238,7 +251,7 @@ class SnoozeService {
   }
 
   // Helper method to map database row to SnoozedItem
-  private mapRowToSnoozedItem(row: any): SnoozedItem {
+  private mapRowToSnoozedItem(row: SnoozedItemRow): SnoozedItem {
     return {
       id: row.id,
       itemType: row.itemType,
@@ -248,7 +261,7 @@ class SnoozeService {
       snoozeUntil: new Date(row.snoozeUntil),
       snoozeType: row.snoozeType,
       snoozeLabel: row.snoozeLabel,
-      originalData: JSON.parse(row.originalData || '{}'),
+      originalData: JSON.parse(row.originalData || "{}") as SnoozedItem["originalData"],
       snoozedAt: new Date(row.snoozedAt),
       snoozedFromSpaceId: row.snoozedFromSpaceId,
       notificationSent: Boolean(row.notificationSent),
@@ -260,33 +273,33 @@ class SnoozeService {
   private createWakeUpNotification(item: SnoozedItem): WakeUpNotification {
     const actions: WakeUpAction[] = [
       {
-        id: 'open',
-        label: 'Open',
-        type: 'open',
+        id: "open",
+        label: "Open",
+        type: "open",
         data: { itemId: item.itemId, spaceId: item.spaceId }
       },
       {
-        id: 'snooze_again',
-        label: 'Snooze Again',
-        type: 'snooze_again',
+        id: "snooze_again",
+        label: "Snooze Again",
+        type: "snooze_again",
         data: { originalSnoozeId: item.id }
       },
       {
-        id: 'dismiss',
-        label: 'Dismiss',
-        type: 'dismiss'
+        id: "dismiss",
+        label: "Dismiss",
+        type: "dismiss"
       }
     ];
 
-    let title = '';
-    let message = '';
+    let title = "";
+    let message = "";
 
-    if (item.itemType === 'bookmark') {
-      title = 'Snoozed Bookmark Ready';
-      message = `Your bookmark "${item.originalData.title || 'Untitled'}" is ready`;
-    } else if (item.itemType === 'tab') {
-      title = 'Snoozed Tab Ready';
-      message = `Your tab "${item.originalData.title || 'Untitled'}" is ready`;
+    if (item.itemType === "bookmark") {
+      title = "Snoozed Bookmark Ready";
+      message = `Your bookmark "${item.originalData.title || "Untitled"}" is ready`;
+    } else if (item.itemType === "tab") {
+      title = "Snoozed Tab Ready";
+      message = `Your tab "${item.originalData.title || "Untitled"}" is ready`;
     }
 
     return {

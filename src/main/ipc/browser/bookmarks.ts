@@ -31,6 +31,7 @@ import {
   type BookmarkFilter,
   type ImportStats
 } from "@/modules/bookmarks";
+import type { CollectionRules } from "~/types/bookmarks";
 
 // Bookmark CRUD operations
 ipcMain.handle("bookmarks:create", async (_, input: CreateBookmarkInput): Promise<Bookmark> => {
@@ -70,25 +71,34 @@ ipcMain.handle("bookmarks:getByUrl", async (_, url: string): Promise<Bookmark[]>
 });
 
 // Collection operations
-ipcMain.handle("bookmarks:collections:create", async (_, input: {
-  name: string;
-  description?: string;
-  profileId: string;
-  spaceId?: string;
-  parentId?: string;
-  isAuto?: boolean;
-  rules?: any;
-}): Promise<BookmarkCollection> => {
-  return await createCollection(input);
-});
+ipcMain.handle(
+  "bookmarks:collections:create",
+  async (
+    _,
+    input: {
+      name: string;
+      description?: string;
+      profileId: string;
+      spaceId?: string;
+      parentId?: string;
+      isAuto?: boolean;
+      rules?: CollectionRules;
+    }
+  ): Promise<BookmarkCollection> => {
+    return await createCollection(input);
+  }
+);
 
 ipcMain.handle("bookmarks:collections:getAll", async (_, profileId?: string): Promise<BookmarkCollection[]> => {
   return await getCollections(profileId);
 });
 
-ipcMain.handle("bookmarks:collections:update", async (_, id: string, input: UpdateCollectionInput): Promise<BookmarkCollection | null> => {
-  return await updateCollection(id, input);
-});
+ipcMain.handle(
+  "bookmarks:collections:update",
+  async (_, id: string, input: UpdateCollectionInput): Promise<BookmarkCollection | null> => {
+    return await updateCollection(id, input);
+  }
+);
 
 ipcMain.handle("bookmarks:collections:delete", async (_, id: string): Promise<boolean> => {
   return await deleteCollection(id);
@@ -106,17 +116,26 @@ ipcMain.handle("bookmarks:collections:getDeleted", async (_, profileId?: string)
   return await getDeletedCollections(profileId);
 });
 
-ipcMain.handle("bookmarks:collections:addBookmark", async (_, bookmarkId: string, collectionId: string): Promise<void> => {
-  return await addBookmarkToCollection(bookmarkId, collectionId);
-});
+ipcMain.handle(
+  "bookmarks:collections:addBookmark",
+  async (_, bookmarkId: string, collectionId: string): Promise<void> => {
+    return await addBookmarkToCollection(bookmarkId, collectionId);
+  }
+);
 
-ipcMain.handle("bookmarks:collections:removeBookmark", async (_, bookmarkId: string, collectionId: string): Promise<void> => {
-  return await removeBookmarkFromCollection(bookmarkId, collectionId);
-});
+ipcMain.handle(
+  "bookmarks:collections:removeBookmark",
+  async (_, bookmarkId: string, collectionId: string): Promise<void> => {
+    return await removeBookmarkFromCollection(bookmarkId, collectionId);
+  }
+);
 
-ipcMain.handle("bookmarks:collections:moveBookmark", async (_, bookmarkId: string, fromCollectionId: string | null, toCollectionId: string): Promise<void> => {
-  return await moveBookmarkToCollection(bookmarkId, fromCollectionId, toCollectionId);
-});
+ipcMain.handle(
+  "bookmarks:collections:moveBookmark",
+  async (_, bookmarkId: string, fromCollectionId: string | null, toCollectionId: string): Promise<void> => {
+    return await moveBookmarkToCollection(bookmarkId, fromCollectionId, toCollectionId);
+  }
+);
 
 // Trash/Restore operations
 ipcMain.handle("bookmarks:restore", async (_, id: string): Promise<boolean> => {
@@ -128,16 +147,29 @@ ipcMain.handle("bookmarks:permanentlyDelete", async (_, id: string): Promise<boo
 });
 
 // Import/Export operations
-ipcMain.handle("bookmarks:importChrome", async (_, htmlContent: string, profileId: string, spaceId: string): Promise<ImportStats> => {
-  return await importChromeBookmarks(htmlContent, profileId, spaceId);
-});
+ipcMain.handle(
+  "bookmarks:importChrome",
+  async (_, htmlContent: string, profileId: string, spaceId: string): Promise<ImportStats> => {
+    return await importChromeBookmarks(htmlContent, profileId, spaceId);
+  }
+);
 
 // Drag & Drop operations
-ipcMain.handle("bookmarks:moveToCollection", async (_, bookmarkId: string, fromCollectionId: string | null, toCollectionId: string): Promise<void> => {
-  return await moveBookmarkToCollection(bookmarkId, fromCollectionId, toCollectionId);
-});
+ipcMain.handle(
+  "bookmarks:moveToCollection",
+  async (_, bookmarkId: string, fromCollectionId: string | null, toCollectionId: string): Promise<void> => {
+    return await moveBookmarkToCollection(bookmarkId, fromCollectionId, toCollectionId);
+  }
+);
 
 // AI Labels operations
-ipcMain.handle("bookmarks:addAILabels", async (_, bookmarkId: string, aiLabels: Array<{label: string; confidence: number; category: string}>): Promise<Bookmark | null> => {
-  return await addAILabels(bookmarkId, aiLabels);
-});
+ipcMain.handle(
+  "bookmarks:addAILabels",
+  async (
+    _,
+    bookmarkId: string,
+    aiLabels: Array<{ label: string; confidence: number; category: string }>
+  ): Promise<Bookmark | null> => {
+    return await addAILabels(bookmarkId, aiLabels);
+  }
+);

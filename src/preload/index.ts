@@ -36,7 +36,7 @@ import { FlowUpdatesAPI } from "~/flow/interfaces/app/updates";
 import { FlowActionsAPI } from "~/flow/interfaces/app/actions";
 import { FlowShortcutsAPI, ShortcutsData } from "~/flow/interfaces/app/shortcuts";
 import { FlowBookmarksAPI } from "~/flow/interfaces/browser/bookmarks";
-import { CreateBookmarkInput, UpdateBookmarkInput, BookmarkFilter } from "~/types/bookmarks";
+import { CreateBookmarkInput, UpdateBookmarkInput, BookmarkFilter, CollectionRules } from "~/types/bookmarks";
 import { AIFlowInterface } from "~/flow/interfaces/ai";
 
 // API CHECKS //
@@ -622,7 +622,7 @@ const bookmarksAPI: FlowBookmarksAPI = {
   moveToCollection: async (bookmarkId: string, fromCollectionId: string | null, toCollectionId: string) => {
     return ipcRenderer.invoke("bookmarks:moveToCollection", bookmarkId, fromCollectionId, toCollectionId);
   },
-  addAILabels: async (bookmarkId: string, aiLabels: Array<{label: string; confidence: number; category: string}>) => {
+  addAILabels: async (bookmarkId: string, aiLabels: Array<{ label: string; confidence: number; category: string }>) => {
     return ipcRenderer.invoke("bookmarks:addAILabels", bookmarkId, aiLabels);
   },
   collections: {
@@ -633,14 +633,14 @@ const bookmarksAPI: FlowBookmarksAPI = {
       spaceId?: string;
       parentId?: string;
       isAuto?: boolean;
-      rules?: any;
+      rules?: CollectionRules;
     }) => {
       return ipcRenderer.invoke("bookmarks:collections:create", input);
     },
     getAll: async (profileId?: string) => {
       return ipcRenderer.invoke("bookmarks:collections:getAll", profileId);
     },
-    update: async (id: string, input: { name?: string; description?: string; }) => {
+    update: async (id: string, input: { name?: string; description?: string }) => {
       return ipcRenderer.invoke("bookmarks:collections:update", id, input);
     },
     delete: async (id: string) => {
@@ -672,41 +672,41 @@ const bookmarksAPI: FlowBookmarksAPI = {
 
 // AI API //
 const aiAPI: AIFlowInterface = {
-  'ai:getSettings': async () => {
-    return ipcRenderer.invoke('ai:getSettings');
+  "ai:getSettings": async () => {
+    return ipcRenderer.invoke("ai:getSettings");
   },
-  'ai:updateSettings': async (settings) => {
-    return ipcRenderer.invoke('ai:updateSettings', settings);
+  "ai:updateSettings": async (settings) => {
+    return ipcRenderer.invoke("ai:updateSettings", settings);
   },
-  'ai:isEnabled': async () => {
-    return ipcRenderer.invoke('ai:isEnabled');
+  "ai:isEnabled": async () => {
+    return ipcRenderer.invoke("ai:isEnabled");
   },
-  'ai:analyzeBookmark': async (request) => {
-    return ipcRenderer.invoke('ai:analyzeBookmark', request);
+  "ai:analyzeBookmark": async (request) => {
+    return ipcRenderer.invoke("ai:analyzeBookmark", request);
   },
-  'ai:generateDescription': async (request) => {
-    return ipcRenderer.invoke('ai:generateDescription', request);
+  "ai:generateDescription": async (request) => {
+    return ipcRenderer.invoke("ai:generateDescription", request);
   },
-  'ai:fetchPageContent': async (url, options) => {
-    return ipcRenderer.invoke('ai:fetchPageContent', url, options);
+  "ai:fetchPageContent": async (url, options) => {
+    return ipcRenderer.invoke("ai:fetchPageContent", url, options);
   },
-  'ai:extractBasicInfo': async (url, title) => {
-    return ipcRenderer.invoke('ai:extractBasicInfo', url, title);
+  "ai:extractBasicInfo": async (url, title) => {
+    return ipcRenderer.invoke("ai:extractBasicInfo", url, title);
   },
-  'ai:findDuplicates': async (request, existingBookmarks) => {
-    return ipcRenderer.invoke('ai:findDuplicates', request, existingBookmarks);
+  "ai:findDuplicates": async (request, existingBookmarks) => {
+    return ipcRenderer.invoke("ai:findDuplicates", request, existingBookmarks);
   },
-  'ai:listProviders': async () => {
-    return ipcRenderer.invoke('ai:listProviders');
+  "ai:listProviders": async () => {
+    return ipcRenderer.invoke("ai:listProviders");
   },
-  'ai:listModels': async (providerId) => {
-    return ipcRenderer.invoke('ai:listModels', providerId);
+  "ai:listModels": async (providerId) => {
+    return ipcRenderer.invoke("ai:listModels", providerId);
   },
-  'ai:testConnection': async (providerId, apiKey) => {
-    return ipcRenderer.invoke('ai:testConnection', providerId, apiKey);
+  "ai:testConnection": async (providerId, apiKey) => {
+    return ipcRenderer.invoke("ai:testConnection", providerId, apiKey);
   },
-  'ai:estimateCost': async (bookmarkCount, model) => {
-    return ipcRenderer.invoke('ai:estimateCost', bookmarkCount, model);
+  "ai:estimateCost": async (bookmarkCount, model) => {
+    return ipcRenderer.invoke("ai:estimateCost", bookmarkCount, model);
   }
 };
 
