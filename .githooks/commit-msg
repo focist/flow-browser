@@ -1,0 +1,15 @@
+#!/bin/sh
+#
+# Conventional-commit enforcement via commitlint (rules in commitlint.config.*).
+# No fallbacks: if commitlint is missing, the repo isn't set up — fail loudly.
+# GUI git clients invoke hooks with a bare PATH; resolve node via fixed paths.
+
+[ "$SKIP_COMMIT_HOOKS" = "1" ] && exit 0
+
+export PATH="node_modules/.bin:$HOME/.local/share/mise/shims:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+
+command -v commitlint >/dev/null 2>&1 || {
+  echo "commit-msg: commitlint not found — install dev dependencies first" >&2
+  exit 1
+}
+exec commitlint --edit "$1"

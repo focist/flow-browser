@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { Button } from '../ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { Textarea } from '../ui/textarea';
-import { CheckCircle, XCircle, Brain, Edit3, FileText } from 'lucide-react';
+import React, { useState } from "react";
+import { Button } from "../ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
+import { Textarea } from "../ui/textarea";
+import { CheckCircle, XCircle, Brain, Edit3, FileText } from "lucide-react";
 
 interface AIDescriptionCardProps {
   bookmarkTitle: string;
@@ -23,7 +23,7 @@ export const AIDescriptionCard: React.FC<AIDescriptionCardProps> = ({
   onApply,
   onReject,
   onDismiss,
-  className = ''
+  className = ""
 }) => {
   const [editedDescription, setEditedDescription] = useState(generatedDescription);
   const [isEditing, setIsEditing] = useState(false);
@@ -37,7 +37,7 @@ export const AIDescriptionCard: React.FC<AIDescriptionCardProps> = ({
         onDismiss();
       }
     } catch (error) {
-      console.error('Failed to apply AI description:', error);
+      console.error("Failed to apply AI description:", error);
     } finally {
       setIsApplying(false);
     }
@@ -69,7 +69,7 @@ export const AIDescriptionCard: React.FC<AIDescriptionCardProps> = ({
           <CardTitle className="text-lg">AI Description Ready</CardTitle>
           <Brain className="h-4 w-4 text-blue-500" />
         </div>
-        
+
         <CardDescription>
           <div className="space-y-1">
             <div className="font-medium text-sm">{bookmarkTitle}</div>
@@ -83,9 +83,7 @@ export const AIDescriptionCard: React.FC<AIDescriptionCardProps> = ({
         {existingDescription && (
           <div className="bg-white rounded-lg p-3 border">
             <div className="font-medium text-sm mb-2">Current Description</div>
-            <p className="text-sm text-muted-foreground">
-              {existingDescription}
-            </p>
+            <p className="text-sm text-muted-foreground">{existingDescription}</p>
           </div>
         )}
 
@@ -94,18 +92,13 @@ export const AIDescriptionCard: React.FC<AIDescriptionCardProps> = ({
           <div className="flex items-center justify-between mb-2">
             <span className="font-medium text-sm">AI-Generated Description</span>
             {!isEditing && (
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={handleEdit}
-                className="h-6 text-xs"
-              >
+              <Button variant="ghost" size="sm" onClick={handleEdit} className="h-6 text-xs">
                 <Edit3 className="h-3 w-3 mr-1" />
                 Edit
               </Button>
             )}
           </div>
-          
+
           {isEditing ? (
             <div className="space-y-2">
               <Textarea
@@ -115,28 +108,16 @@ export const AIDescriptionCard: React.FC<AIDescriptionCardProps> = ({
                 placeholder="Enter description..."
               />
               <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  onClick={handleSaveEdit}
-                  disabled={isEmpty}
-                  className="text-xs"
-                >
+                <Button size="sm" onClick={handleSaveEdit} disabled={isEmpty} className="text-xs">
                   Save Changes
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleCancelEdit}
-                  className="text-xs"
-                >
+                <Button variant="ghost" size="sm" onClick={handleCancelEdit} className="text-xs">
                   Cancel
                 </Button>
               </div>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">
-              {editedDescription}
-            </p>
+            <p className="text-sm text-muted-foreground">{editedDescription}</p>
           )}
         </div>
 
@@ -148,33 +129,17 @@ export const AIDescriptionCard: React.FC<AIDescriptionCardProps> = ({
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2 pt-2 border-t">
-          <Button 
-            onClick={handleApply}
-            disabled={isEmpty || isApplying}
-            size="sm"
-            className="flex-1"
-          >
+          <Button onClick={handleApply} disabled={isEmpty || isApplying} size="sm" className="flex-1">
             <CheckCircle className="h-4 w-4 mr-2" />
-            {isApplying ? 'Applying...' : 'Apply Description'}
+            {isApplying ? "Applying..." : "Apply Description"}
           </Button>
-          
-          <Button 
-            variant="outline" 
-            onClick={onReject}
-            size="sm"
-            disabled={isApplying}
-          >
+
+          <Button variant="outline" onClick={onReject} size="sm" disabled={isApplying}>
             <XCircle className="h-4 w-4 mr-2" />
             Reject
           </Button>
-          
-          <Button 
-            variant="ghost" 
-            onClick={onDismiss}
-            size="sm"
-            disabled={isApplying}
-            className="text-muted-foreground"
-          >
+
+          <Button variant="ghost" onClick={onDismiss} size="sm" disabled={isApplying} className="text-muted-foreground">
             Dismiss
           </Button>
         </div>

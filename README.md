@@ -60,6 +60,14 @@ https://flowbrowser.userjot.com/
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for more information.
 
+### Development Setup
+
+1. Install [mise](https://mise.jdx.dev)
+2. `cd` into the repo and run `mise trust`
+3. `mise run setup`
+
+Commit messages are validated by `.githooks/commit-msg` (conventional commits).
+
 ## License
 
 This project is licensed under the GNU General Public License v3.0 (GPL-3.0) - see the [LICENSE](./LICENSE) file for details.

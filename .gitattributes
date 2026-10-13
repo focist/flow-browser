@@ -1,0 +1,24 @@
+# Normalize line endings.
+#
+# Everything textual is stored as LF in the repository and checked out as LF.
+# Without this, a Windows clone or a CI release bot re-commits whole files with
+# CRLF, and those rewritten files then conflict on every subsequent merge even
+# though no real content disagrees. `eol=lf` (not a bare `text=auto`) is what
+# pins the working tree too, so a runner cannot reintroduce CRLF.
+* text=auto eol=lf
+
+# Must stay LF to stay executable under sh.
+*.sh        text eol=lf
+.githooks/* text eol=lf
+
+# Binary - never munge, never diff.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.webp  binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.pdf   binary

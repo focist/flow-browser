@@ -168,7 +168,7 @@ export function NavigationControls({
   const SidebarIcon = variant === "floating" && open ? SidebarOpenIcon : SidebarCloseIcon;
 
   const handleBookmarksClick = () => {
-    flow.tabs.newTab('flow://bookmarks', true);
+    flow.tabs.newTab("flow://bookmarks", true);
   };
 
   return (

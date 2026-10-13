@@ -2,15 +2,52 @@ import path from "path";
 import { knex } from "knex";
 import { FLOW_DATA_DIR } from "./paths";
 import { createHash } from "crypto";
-import type { 
+import type {
   Bookmark,
-  BookmarkFilter, 
-  BookmarkCollection, 
+  BookmarkFilter,
+  BookmarkCollection,
   CreateBookmarkInput,
   UpdateBookmarkInput,
   UpdateCollectionInput,
-  ImportStats 
+  ImportStats,
+  BookmarkLabel,
+  CollectionRules
 } from "~/types/bookmarks";
+
+// Raw database row shapes (knex queries are untyped)
+type BookmarkRow = Omit<Bookmark, "labels" | "collections">;
+
+interface LabelRow {
+  bookmarkId: string;
+  label: string;
+  source: BookmarkLabel["source"];
+  confidence?: number | null;
+  category?: BookmarkLabel["category"] | null;
+}
+
+type CollectionRow = Omit<BookmarkCollection, "rules" | "children" | "depth" | "bookmarkCount"> & {
+  rules: string | null;
+  bookmarkCount?: number | string;
+};
+
+type CollectionNode = Omit<BookmarkCollection, "children"> & { children: CollectionNode[] };
+
+function mapLabelRow(l: LabelRow): BookmarkLabel {
+  return {
+    label: l.label,
+    source: l.source,
+    confidence: l.confidence as BookmarkLabel["confidence"],
+    category: l.category as BookmarkLabel["category"]
+  };
+}
+
+function groupLabelsByBookmark(labels: LabelRow[]): Record<string, BookmarkLabel[]> {
+  return labels.reduce<Record<string, BookmarkLabel[]>>((acc, label) => {
+    if (!acc[label.bookmarkId]) acc[label.bookmarkId] = [];
+    acc[label.bookmarkId].push(mapLabelRow(label));
+    return acc;
+  }, {});
+}
 
 const dbPath = path.join(FLOW_DATA_DIR, "bookmarks.db");
 
@@ -127,7 +164,7 @@ async function initDatabase() {
         });
         console.log("BOOKMARKS: Added parentId column to bookmark_collections table");
       }
-      
+
       // Check if deletedAt column exists, add it if not (migration)
       const hasDeletedAtColumn = await db.schema.hasColumn("bookmark_collections", "deletedAt");
       if (!hasDeletedAtColumn) {
@@ -220,11 +257,11 @@ export type {
 
 export async function createBookmark(input: CreateBookmarkInput): Promise<Bookmark> {
   await whenDatabaseInitialized;
-  
+
   console.log(`BOOKMARKS: Creating bookmark for URL: ${input.url}`);
-  
+
   const id = createHash("md5").update(`${input.url}${input.profileId}${input.spaceId}${Date.now()}`).digest("hex");
-  
+
   return await db.transaction(async (trx) => {
     const bookmark = {
       id,
@@ -239,104 +276,92 @@ export async function createBookmark(input: CreateBookmarkInput): Promise<Bookma
       visitCount: 0,
       lastVisited: null
     };
-    
+
     console.log(`BOOKMARKS: Inserting bookmark with ID: ${id}`);
-    
+
     await trx("bookmarks").insert(bookmark);
-    
+
     if (input.labels && input.labels.length > 0) {
-      const labelRecords = input.labels.map(label => ({
+      const labelRecords = input.labels.map((label) => ({
         bookmarkId: id,
         label,
-        source: 'user' as const,
+        source: "user" as const,
         category: null,
         confidence: null
       }));
       await trx("bookmark_labels").insert(labelRecords);
     }
-    
+
     const result = await trx("bookmarks").where({ id }).first();
     const labels = await trx("bookmark_labels").where({ bookmarkId: id });
-    
+
     console.log(`BOOKMARKS: Bookmark created successfully: ${id}`);
-    
+
     return {
       ...result,
-      labels: labels.map((l: any) => ({
-        label: l.label,
-        source: l.source,
-        confidence: l.confidence,
-        category: l.category
-      }))
+      labels: labels.map(mapLabelRow)
     };
   });
 }
 
 export async function getBookmark(id: string): Promise<Bookmark | null> {
   await whenDatabaseInitialized;
-  
+
   const bookmark = await db("bookmarks").where({ id }).first();
   if (!bookmark) return null;
-  
+
   const labels = await db("bookmark_labels").where({ bookmarkId: id });
-  
+
   return {
     ...bookmark,
-    labels: labels.map((l: any) => ({
-      label: l.label,
-      source: l.source,
-      confidence: l.confidence,
-      category: l.category
-    }))
+    labels: labels.map(mapLabelRow)
   };
 }
 
 export async function updateBookmark(id: string, input: UpdateBookmarkInput): Promise<Bookmark | null> {
   await whenDatabaseInitialized;
-  
+
   return await db.transaction(async (trx) => {
     const exists = await trx("bookmarks").where({ id }).first();
     if (!exists) return null;
-    
-    const updates: any = {
+
+    const updates: Record<string, unknown> = {
       dateModified: new Date()
     };
-    
+
     if (input.title !== undefined) updates.title = input.title;
     if (input.description !== undefined) updates.description = input.description;
     if (input.favicon !== undefined) updates.favicon = input.favicon;
     if (input.isGlobal !== undefined) updates.isGlobal = input.isGlobal;
-    
+
     await trx("bookmarks").where({ id }).update(updates);
-    
+
     if (input.labels !== undefined) {
-      await trx("bookmark_labels").where({ bookmarkId: id, source: 'user' }).delete();
-      
+      await trx("bookmark_labels").where({ bookmarkId: id, source: "user" }).delete();
+
       if (input.labels.length > 0) {
-        const labelRecords = input.labels.map(label => ({
+        const labelRecords = input.labels.map((label) => ({
           bookmarkId: id,
           label,
-          source: 'user' as const,
+          source: "user" as const,
           category: null,
           confidence: null
         }));
         await trx("bookmark_labels").insert(labelRecords);
       }
     }
-    
+
     // Handle adding labels without replacing existing ones (for AI labels)
     if (input.addLabels !== undefined && input.addLabels.length > 0) {
       // Get existing labels to avoid duplicates
-      const existingLabels = await trx("bookmark_labels").where({ bookmarkId: id }).select('label');
-      const existingLabelNames = existingLabels.map(l => l.label);
-      
+      const existingLabels = await trx("bookmark_labels").where({ bookmarkId: id }).select("label");
+      const existingLabelNames = existingLabels.map((l) => l.label);
+
       // Filter out labels that already exist
-      const newLabels = input.addLabels.filter(newLabel => 
-        !existingLabelNames.includes(newLabel.label)
-      );
-      
+      const newLabels = input.addLabels.filter((newLabel) => !existingLabelNames.includes(newLabel.label));
+
       if (newLabels.length > 0) {
-        const labelRecords = newLabels.map(label => ({
+        const labelRecords = newLabels.map((label) => ({
           bookmarkId: id,
           label: label.label,
           source: label.source,
@@ -346,65 +371,56 @@ export async function updateBookmark(id: string, input: UpdateBookmarkInput): Pr
         await trx("bookmark_labels").insert(labelRecords);
       }
     }
-    
+
     const result = await trx("bookmarks").where({ id }).first();
     const labels = await trx("bookmark_labels").where({ bookmarkId: id });
-    
+
     return {
       ...result,
-      labels: labels.map((l: any) => ({
-        label: l.label,
-        source: l.source,
-        confidence: l.confidence,
-        category: l.category
-      }))
+      labels: labels.map(mapLabelRow)
     };
   });
 }
 
 export async function deleteBookmark(id: string): Promise<boolean> {
   await whenDatabaseInitialized;
-  
-  const updatedCount = await db("bookmarks")
-    .where({ id })
-    .update({ 
-      deletedAt: new Date(),
-      dateModified: new Date()
-    });
-  
+
+  const updatedCount = await db("bookmarks").where({ id }).update({
+    deletedAt: new Date(),
+    dateModified: new Date()
+  });
+
   return updatedCount > 0;
 }
 
 export async function restoreBookmark(id: string): Promise<boolean> {
   await whenDatabaseInitialized;
-  
-  const updatedCount = await db("bookmarks")
-    .where({ id })
-    .update({ 
-      deletedAt: null,
-      dateModified: new Date()
-    });
-  
+
+  const updatedCount = await db("bookmarks").where({ id }).update({
+    deletedAt: null,
+    dateModified: new Date()
+  });
+
   return updatedCount > 0;
 }
 
 export async function permanentlyDeleteBookmark(id: string): Promise<boolean> {
   await whenDatabaseInitialized;
-  
+
   const transaction = await db.transaction();
-  
+
   try {
     // Delete associated labels
     await transaction("bookmark_labels").where({ bookmarkId: id }).delete();
-    
+
     // Delete from collections
     await transaction("collection_items").where({ bookmarkId: id }).delete();
-    
+
     // Delete the bookmark
     const deletedCount = await transaction("bookmarks").where({ id }).delete();
-    
+
     await transaction.commit();
-    
+
     return deletedCount > 0;
   } catch (error) {
     await transaction.rollback();
@@ -414,46 +430,44 @@ export async function permanentlyDeleteBookmark(id: string): Promise<boolean> {
 
 export async function deleteBookmarks(ids: string[]): Promise<number> {
   await whenDatabaseInitialized;
-  
-  const updatedCount = await db("bookmarks")
-    .whereIn("id", ids)
-    .update({ 
-      deletedAt: new Date(),
-      dateModified: new Date()
-    });
-  
+
+  const updatedCount = await db("bookmarks").whereIn("id", ids).update({
+    deletedAt: new Date(),
+    dateModified: new Date()
+  });
+
   return updatedCount;
 }
 
 export async function getBookmarks(filter?: BookmarkFilter): Promise<Bookmark[]> {
   await whenDatabaseInitialized;
-  
+
   let query = db("bookmarks").select("bookmarks.*");
-  
+
   if (filter) {
     if (filter.profileId) {
-      query = query.where(function() {
+      query = query.where(function () {
         this.where("bookmarks.profileId", filter.profileId).orWhere("bookmarks.isGlobal", true);
       });
     }
-    
+
     if (filter.spaceId) {
       query = query.where("bookmarks.spaceId", filter.spaceId);
     }
-    
+
     if (filter.isGlobal !== undefined) {
       query = query.where("bookmarks.isGlobal", filter.isGlobal);
     }
-    
+
     if (filter.search) {
       const searchTerm = `%${filter.search}%`;
-      query = query.where(function() {
+      query = query.where(function () {
         this.where("bookmarks.title", "like", searchTerm)
           .orWhere("bookmarks.url", "like", searchTerm)
           .orWhere("bookmarks.description", "like", searchTerm);
       });
     }
-    
+
     if (filter.labels && filter.labels.length > 0) {
       query = query
         .join("bookmark_labels", "bookmarks.id", "bookmark_labels.bookmarkId")
@@ -461,7 +475,7 @@ export async function getBookmarks(filter?: BookmarkFilter): Promise<Bookmark[]>
         .groupBy("bookmarks.id")
         .having(db.raw("COUNT(DISTINCT bookmark_labels.label) = ?", [filter.labels.length]));
     }
-    
+
     if (filter.collectionId) {
       query = query
         .join("collection_items", "bookmarks.id", "collection_items.bookmarkId")
@@ -480,27 +494,18 @@ export async function getBookmarks(filter?: BookmarkFilter): Promise<Bookmark[]>
     // By default, exclude deleted bookmarks when no filter is provided
     query = query.whereNull("bookmarks.deletedAt");
   }
-  
+
   query = query.orderBy("bookmarks.dateAdded", "desc");
-  
+
   const bookmarks = await query;
-  
+
   // Fetch labels for all bookmarks
-  const bookmarkIds = bookmarks.map((b: any) => b.id);
+  const bookmarkIds = bookmarks.map((b: BookmarkRow) => b.id);
   const labels = await db("bookmark_labels").whereIn("bookmarkId", bookmarkIds);
-  
-  const labelsByBookmark = labels.reduce((acc: any, label: any) => {
-    if (!acc[label.bookmarkId]) acc[label.bookmarkId] = [];
-    acc[label.bookmarkId].push({
-      label: label.label,
-      source: label.source,
-      confidence: label.confidence,
-      category: label.category
-    });
-    return acc;
-  }, {});
-  
-  return bookmarks.map((b: any) => ({
+
+  const labelsByBookmark = groupLabelsByBookmark(labels);
+
+  return bookmarks.map((b: BookmarkRow) => ({
     ...b,
     labels: labelsByBookmark[b.id] || []
   }));
@@ -508,18 +513,15 @@ export async function getBookmarks(filter?: BookmarkFilter): Promise<Bookmark[]>
 
 export async function bookmarkExists(url: string, profileId: string, spaceId: string): Promise<boolean> {
   await whenDatabaseInitialized;
-  
-  const count = await db("bookmarks")
-    .where({ url, profileId, spaceId })
-    .count("* as count")
-    .first();
-  
+
+  const count = await db("bookmarks").where({ url, profileId, spaceId }).count("* as count").first();
+
   return (count && Number(count.count) > 0) ?? false;
 }
 
 export async function incrementVisitCount(id: string): Promise<void> {
   await whenDatabaseInitialized;
-  
+
   await db("bookmarks")
     .where({ id })
     .update({
@@ -537,12 +539,12 @@ export async function createCollection(input: {
   spaceId?: string;
   parentId?: string;
   isAuto?: boolean;
-  rules?: any;
+  rules?: CollectionRules;
 }): Promise<BookmarkCollection> {
   await whenDatabaseInitialized;
-  
+
   const id = createHash("md5").update(`${input.name}${input.profileId}${Date.now()}`).digest("hex");
-  
+
   const collection = {
     id,
     name: input.name,
@@ -554,9 +556,9 @@ export async function createCollection(input: {
     rules: input.rules ? JSON.stringify(input.rules) : null,
     dateCreated: new Date()
   };
-  
+
   await db("bookmark_collections").insert(collection);
-  
+
   const result = await db("bookmark_collections").where({ id }).first();
   return {
     ...result,
@@ -566,32 +568,30 @@ export async function createCollection(input: {
 
 export async function updateCollection(id: string, input: UpdateCollectionInput): Promise<BookmarkCollection | null> {
   await whenDatabaseInitialized;
-  
-  const updateData: any = {
+
+  const updateData: Record<string, unknown> = {
     dateModified: new Date()
   };
-  
+
   if (input.name !== undefined) {
     updateData.name = input.name;
   }
-  
+
   if (input.description !== undefined) {
     updateData.description = input.description;
   }
-  
-  const updatedRows = await db("bookmark_collections")
-    .where({ id })
-    .update(updateData);
-  
+
+  const updatedRows = await db("bookmark_collections").where({ id }).update(updateData);
+
   if (updatedRows === 0) {
     return null;
   }
-  
+
   const result = await db("bookmark_collections").where({ id }).first();
   if (!result) {
     return null;
   }
-  
+
   return {
     ...result,
     rules: result.rules ? JSON.parse(result.rules) : null
@@ -600,77 +600,77 @@ export async function updateCollection(id: string, input: UpdateCollectionInput)
 
 export async function deleteCollection(id: string): Promise<boolean> {
   await whenDatabaseInitialized;
-  
+
   return await db.transaction(async (trx) => {
     // First, check if this collection has child collections
     const childCollections = await trx("bookmark_collections")
       .where({ parentId: id })
       .whereNull("deletedAt") // Only consider non-deleted child collections
       .select("id");
-    
+
     // Move child collections to have the same parent as the deleted collection
     if (childCollections.length > 0) {
-      const parentCollection = await trx("bookmark_collections")
-        .where({ id })
-        .select("parentId")
-        .first();
-      
+      const parentCollection = await trx("bookmark_collections").where({ id }).select("parentId").first();
+
       const newParentId = parentCollection?.parentId || null;
-      
+
       await trx("bookmark_collections")
-        .whereIn("id", childCollections.map(c => c.id))
-        .update({ 
+        .whereIn(
+          "id",
+          childCollections.map((c) => c.id)
+        )
+        .update({
           parentId: newParentId,
           dateModified: new Date()
         });
     }
-    
+
     // Soft delete the collection by setting deletedAt timestamp
     const deletedRows = await trx("bookmark_collections")
       .where({ id })
       .whereNull("deletedAt") // Only delete if not already deleted
-      .update({ 
+      .update({
         deletedAt: new Date(),
         dateModified: new Date()
       });
-    
+
     return deletedRows > 0;
   });
 }
 
 export async function getCollections(profileId?: string): Promise<BookmarkCollection[]> {
   await whenDatabaseInitialized;
-  
+
   let query = db("bookmark_collections")
     .select("bookmark_collections.*", db.raw("COUNT(collection_items.id) as bookmarkCount"))
     .leftJoin("collection_items", "bookmark_collections.id", "collection_items.collectionId")
     .whereNull("bookmark_collections.deletedAt") // Only get non-deleted collections
     .groupBy("bookmark_collections.id");
-  
+
   if (profileId) {
     query = query.where("bookmark_collections.profileId", profileId);
   }
-  
+
   const collections = await query;
-  
-  const processedCollections = collections.map((c: any) => ({
+
+  const processedCollections = collections.map((c: CollectionRow) => ({
     ...c,
-    rules: c.rules ? JSON.parse(c.rules) : null,
+    rules: c.rules ? (JSON.parse(c.rules) as CollectionRules) : null,
     bookmarkCount: Number(c.bookmarkCount),
     children: []
   }));
-  
+
   // Build tree structure
-  const collectionsMap = new Map<string, any>();
-  const rootCollections: any[] = [];
-  
+  const collectionsMap = new Map<string, CollectionNode>();
+  const rootCollections: CollectionNode[] = [];
+
   // First pass: create map of all collections
-  processedCollections.forEach((collection: any) => {
+  processedCollections.forEach((collection) => {
     collectionsMap.set(collection.id, collection);
   });
-  
+
   // Second pass: build hierarchy
-  processedCollections.forEach((collection: any) => {
+  processedCollections.forEach((collection) => {
     if (collection.parentId) {
       const parent = collectionsMap.get(collection.parentId);
       if (parent) {
@@ -683,84 +683,67 @@ export async function getCollections(profileId?: string): Promise<BookmarkCollec
       rootCollections.push(collection);
     }
   });
-  
+
   // Flatten tree for current UI compatibility
-  const flattenedCollections: any[] = [];
-  
-  function addCollectionAndChildren(collection: any, depth = 0) {
+  const flattenedCollections: BookmarkCollection[] = [];
+
+  function addCollectionAndChildren(collection: CollectionNode, depth = 0) {
     flattenedCollections.push({
       ...collection,
       depth
     });
-    
+
     // Sort children by dateCreated
-    collection.children?.sort((a: any, b: any) => 
-      new Date(b.dateCreated).getTime() - new Date(a.dateCreated).getTime()
-    );
-    
-    collection.children?.forEach((child: any) => 
-      addCollectionAndChildren(child, depth + 1)
-    );
+    collection.children?.sort((a, b) => new Date(b.dateCreated).getTime() - new Date(a.dateCreated).getTime());
+
+    collection.children?.forEach((child) => addCollectionAndChildren(child, depth + 1));
   }
-  
+
   // Sort root collections by dateCreated
-  rootCollections.sort((a: any, b: any) => 
-    new Date(b.dateCreated).getTime() - new Date(a.dateCreated).getTime()
-  );
-  
-  rootCollections.forEach((collection: any) => 
-    addCollectionAndChildren(collection, 0)
-  );
-  
+  rootCollections.sort((a, b) => new Date(b.dateCreated).getTime() - new Date(a.dateCreated).getTime());
+
+  rootCollections.forEach((collection) => addCollectionAndChildren(collection, 0));
+
   return flattenedCollections;
 }
 
 export async function restoreCollection(id: string): Promise<boolean> {
   await whenDatabaseInitialized;
-  
-  const updatedCount = await db("bookmark_collections")
-    .where({ id })
-    .whereNotNull("deletedAt")
-    .update({ 
-      deletedAt: null,
-      dateModified: new Date()
-    });
-  
+
+  const updatedCount = await db("bookmark_collections").where({ id }).whereNotNull("deletedAt").update({
+    deletedAt: null,
+    dateModified: new Date()
+  });
+
   return updatedCount > 0;
 }
 
 export async function permanentlyDeleteCollection(id: string): Promise<boolean> {
   await whenDatabaseInitialized;
-  
+
   return await db.transaction(async (trx) => {
     // Delete collection_items relationships
-    await trx("collection_items")
-      .where({ collectionId: id })
-      .delete();
-    
+    await trx("collection_items").where({ collectionId: id }).delete();
+
     // Permanently delete the collection
-    const deletedRows = await trx("bookmark_collections")
-      .where({ id })
-      .delete();
-    
+    const deletedRows = await trx("bookmark_collections").where({ id }).delete();
+
     return deletedRows > 0;
   });
 }
 
 export async function getDeletedCollections(profileId?: string): Promise<BookmarkCollection[]> {
   await whenDatabaseInitialized;
-  
-  let query = db("bookmark_collections")
-    .select("*")
-    .whereNotNull("deletedAt");
-  
+
+  let query = db("bookmark_collections").select("*").whereNotNull("deletedAt");
+
   if (profileId) {
     query = query.where("profileId", profileId);
   }
-  
+
   const collections = await query;
-  
-  return collections.map((c: any) => ({
+
+  return collections.map((c: CollectionRow) => ({
     ...c,
     rules: c.rules ? JSON.parse(c.rules) : null,
     bookmarkCount: 0 // Deleted collections don't show bookmark counts
@@ -769,38 +752,38 @@ export async function getDeletedCollections(profileId?: string): Promise<Bookmar
 
 export async function addBookmarkToCollection(bookmarkId: string, collectionId: string): Promise<void> {
   await whenDatabaseInitialized;
-  
-  const maxPosition = await db("collection_items")
-    .where({ collectionId })
-    .max("position as max")
-    .first();
-  
+
+  const maxPosition = await db("collection_items").where({ collectionId }).max("position as max").first();
+
   const position = (maxPosition?.max || 0) + 1;
-  
-  await db("collection_items").insert({
-    bookmarkId,
-    collectionId,
-    position
-  }).onConflict(["collectionId", "bookmarkId"]).ignore();
+
+  await db("collection_items")
+    .insert({
+      bookmarkId,
+      collectionId,
+      position
+    })
+    .onConflict(["collectionId", "bookmarkId"])
+    .ignore();
 }
 
 export async function removeBookmarkFromCollection(bookmarkId: string, collectionId: string): Promise<void> {
   await whenDatabaseInitialized;
-  
-  await db("collection_items")
-    .where({ bookmarkId, collectionId })
-    .delete();
+
+  await db("collection_items").where({ bookmarkId, collectionId }).delete();
 }
 
-export async function moveBookmarkToCollection(bookmarkId: string, fromCollectionId: string | null, toCollectionId: string): Promise<void> {
+export async function moveBookmarkToCollection(
+  bookmarkId: string,
+  fromCollectionId: string | null,
+  toCollectionId: string
+): Promise<void> {
   await whenDatabaseInitialized;
 
   await db.transaction(async (trx) => {
     // Remove from the original collection if it exists
     if (fromCollectionId) {
-      await trx("collection_items")
-        .where({ bookmarkId, collectionId: fromCollectionId })
-        .delete();
+      await trx("collection_items").where({ bookmarkId, collectionId: fromCollectionId }).delete();
     }
 
     // Add to the new collection
@@ -811,34 +794,28 @@ export async function moveBookmarkToCollection(bookmarkId: string, fromCollectio
 
     const position = (maxPosition?.max || 0) + 1;
 
-    await trx("collection_items").insert({
-      bookmarkId,
-      collectionId: toCollectionId,
-      position
-    }).onConflict(["collectionId", "bookmarkId"]).ignore();
+    await trx("collection_items")
+      .insert({
+        bookmarkId,
+        collectionId: toCollectionId,
+        position
+      })
+      .onConflict(["collectionId", "bookmarkId"])
+      .ignore();
   });
 }
 
 export async function getBookmarksByUrl(url: string): Promise<Bookmark[]> {
   await whenDatabaseInitialized;
-  
+
   const bookmarks = await db("bookmarks").where({ url });
-  
-  const bookmarkIds = bookmarks.map((b: any) => b.id);
+
+  const bookmarkIds = bookmarks.map((b: BookmarkRow) => b.id);
   const labels = await db("bookmark_labels").whereIn("bookmarkId", bookmarkIds);
-  
-  const labelsByBookmark = labels.reduce((acc: any, label: any) => {
-    if (!acc[label.bookmarkId]) acc[label.bookmarkId] = [];
-    acc[label.bookmarkId].push({
-      label: label.label,
-      source: label.source,
-      confidence: label.confidence,
-      category: label.category
-    });
-    return acc;
-  }, {});
-  
-  return bookmarks.map((b: any) => ({
+
+  const labelsByBookmark = groupLabelsByBookmark(labels);
+
+  return bookmarks.map((b: BookmarkRow) => ({
     ...b,
     labels: labelsByBookmark[b.id] || []
   }));
@@ -846,14 +823,13 @@ export async function getBookmarksByUrl(url: string): Promise<Bookmark[]> {
 
 // Import functionality
 
-
 export async function importChromeBookmarks(
-  htmlContent: string, 
-  profileId: string, 
+  htmlContent: string,
+  profileId: string,
   spaceId: string
 ): Promise<ImportStats> {
   await whenDatabaseInitialized;
-  
+
   const stats: ImportStats = {
     total: 0,
     imported: 0,
@@ -865,9 +841,9 @@ export async function importChromeBookmarks(
     // Parse Chrome's HTML bookmark format
     const bookmarks = parseChromeBookmarkHtml(htmlContent);
     stats.total = bookmarks.length;
-    
+
     console.log(`BOOKMARKS: Starting import of ${stats.total} bookmarks`);
-    
+
     for (const bookmark of bookmarks) {
       try {
         // Check if bookmark already exists
@@ -876,7 +852,7 @@ export async function importChromeBookmarks(
           stats.skipped++;
           continue;
         }
-        
+
         // Create bookmark
         await createBookmark({
           url: bookmark.url,
@@ -886,20 +862,21 @@ export async function importChromeBookmarks(
           spaceId,
           labels: bookmark.labels
         });
-        
+
         stats.imported++;
       } catch (error) {
         console.error(`BOOKMARKS: Failed to import bookmark ${bookmark.url}:`, error);
         stats.errors++;
       }
     }
-    
-    console.log(`BOOKMARKS: Import completed - ${stats.imported} imported, ${stats.skipped} skipped, ${stats.errors} errors`);
+
+    console.log(
+      `BOOKMARKS: Import completed - ${stats.imported} imported, ${stats.skipped} skipped, ${stats.errors} errors`
+    );
     return stats;
-    
   } catch (error) {
-    console.error('BOOKMARKS: Failed to parse bookmark file:', error);
-    throw new Error('Failed to parse bookmark file');
+    console.error("BOOKMARKS: Failed to parse bookmark file:", error);
+    throw new Error("Failed to parse bookmark file");
   }
 }
 
@@ -912,25 +889,25 @@ interface ParsedBookmark {
 
 function parseChromeBookmarkHtml(htmlContent: string): ParsedBookmark[] {
   const bookmarks: ParsedBookmark[] = [];
-  
+
   // Chrome bookmark format uses <A> tags with HREF attributes
   // Match pattern: <A HREF="url" ADD_DATE="timestamp" ...>Title</A>
   const bookmarkRegex = /<A\s+HREF="([^"]+)"[^>]*>([^<]+)<\/A>/gi;
-  
+
   let match;
   while ((match = bookmarkRegex.exec(htmlContent)) !== null) {
     const [, url, title] = match;
-    
+
     // Skip empty or invalid URLs
-    if (!url || !title || url.trim() === '' || title.trim() === '') {
+    if (!url || !title || url.trim() === "" || title.trim() === "") {
       continue;
     }
-    
+
     // Skip javascript: and other non-http(s) URLs except for common protocols
     if (!url.match(/^(https?|ftp|file):/i)) {
       continue;
     }
-    
+
     bookmarks.push({
       url: url.trim(),
       title: title.trim(),
@@ -938,45 +915,42 @@ function parseChromeBookmarkHtml(htmlContent: string): ParsedBookmark[] {
       labels: []
     });
   }
-  
+
   return bookmarks;
 }
 
-export async function addAILabels(bookmarkId: string, aiLabels: Array<{label: string; confidence: number; category: string}>): Promise<Bookmark | null> {
+export async function addAILabels(
+  bookmarkId: string,
+  aiLabels: Array<{ label: string; confidence: number; category: string }>
+): Promise<Bookmark | null> {
   await whenDatabaseInitialized;
-  
+
   return await db.transaction(async (trx) => {
     const exists = await trx("bookmarks").where({ id: bookmarkId }).first();
     if (!exists) return null;
-    
+
     // Remove existing AI labels for this bookmark
-    await trx("bookmark_labels").where({ bookmarkId, source: 'ai' }).delete();
-    
+    await trx("bookmark_labels").where({ bookmarkId, source: "ai" }).delete();
+
     // Add new AI labels
     if (aiLabels.length > 0) {
-      const labelRecords = aiLabels.map(aiLabel => ({
+      const labelRecords = aiLabels.map((aiLabel) => ({
         bookmarkId,
         label: aiLabel.label,
-        source: 'ai' as const,
+        source: "ai" as const,
         category: aiLabel.category,
         confidence: aiLabel.confidence
       }));
       await trx("bookmark_labels").insert(labelRecords);
     }
-    
+
     // Return updated bookmark with all labels
     const result = await trx("bookmarks").where({ id: bookmarkId }).first();
     const labels = await trx("bookmark_labels").where({ bookmarkId });
-    
+
     return {
       ...result,
-      labels: labels.map((l: any) => ({
-        label: l.label,
-        source: l.source,
-        confidence: l.confidence,
-        category: l.category
-      }))
+      labels: labels.map(mapLabelRow)
     };
   });
 }
-

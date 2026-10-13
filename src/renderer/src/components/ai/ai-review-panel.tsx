@@ -1,10 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { X, Check, AlertCircle, Clock, CheckCircle2, RotateCcw, Zap, Sparkles, ArrowRight, SkipForward, Tag } from 'lucide-react';
-import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
-import { motion, AnimatePresence } from 'motion/react';
-import type { Bookmark } from '~/types/bookmarks';
-import type { CategoryAnalysis, BookmarkLabel, LabelReviewState } from '~/flow/interfaces/ai';
+import React, { useState, useEffect } from "react";
+import {
+  X,
+  Check,
+  AlertCircle,
+  CheckCircle2,
+  RotateCcw,
+  Zap,
+  Sparkles,
+  ArrowRight,
+  SkipForward,
+  Tag
+} from "lucide-react";
+import { Button } from "../ui/button";
+import { Badge } from "../ui/badge";
+import { motion, AnimatePresence } from "motion/react";
+import type { Bookmark, BookmarkLabel as StoredBookmarkLabel } from "~/types/bookmarks";
+import type { CategoryAnalysis, BookmarkLabel, LabelReviewState } from "~/flow/interfaces/ai";
 
 interface BulkReviewStats {
   total: number;
@@ -42,41 +53,31 @@ interface ConfidenceIndicatorProps {
   showPercentage?: boolean;
 }
 
-const ConfidenceIndicator: React.FC<ConfidenceIndicatorProps> = ({ 
-  confidence, 
-  showPercentage = true 
-}) => {
+const ConfidenceIndicator: React.FC<ConfidenceIndicatorProps> = ({ confidence, showPercentage = true }) => {
   const getConfidenceLevel = (score: number) => {
-    if (score >= 0.8) return 'high';
-    if (score >= 0.5) return 'medium';
-    return 'low';
+    if (score >= 0.8) return "high";
+    if (score >= 0.5) return "medium";
+    return "low";
   };
 
   const level = getConfidenceLevel(confidence);
   const dots = Math.ceil(confidence * 3); // 0-3 dots based on confidence
 
   const levelStyles = {
-    high: 'text-green-600 bg-green-100',
-    medium: 'text-amber-600 bg-amber-100', 
-    low: 'text-red-600 bg-red-100'
+    high: "text-green-600 bg-green-100",
+    medium: "text-amber-600 bg-amber-100",
+    low: "text-red-600 bg-red-100"
   };
 
   return (
     <div className="flex items-center gap-2">
       <div className="flex gap-0.5">
         {[1, 2, 3].map((i) => (
-          <div
-            key={i}
-            className={`w-1.5 h-1.5 rounded-full ${
-              i <= dots ? 'bg-current' : 'bg-gray-300'
-            }`}
-          />
+          <div key={i} className={`w-1.5 h-1.5 rounded-full ${i <= dots ? "bg-current" : "bg-gray-300"}`} />
         ))}
       </div>
       {showPercentage && (
-        <span className={`text-xs px-1.5 py-0.5 rounded ${levelStyles[level]}`}>
-          {Math.round(confidence * 100)}%
-        </span>
+        <span className={`text-xs px-1.5 py-0.5 rounded ${levelStyles[level]}`}>{Math.round(confidence * 100)}%</span>
       )}
     </div>
   );
@@ -97,13 +98,10 @@ const PendingLabelItem: React.FC<PendingLabelItemProps> = ({
   isApplying = false,
   isUndoneAutoApplied = false
 }) => {
-  
   return (
-    <motion.div 
+    <motion.div
       className={`flex items-center justify-between p-3 border rounded-lg bg-card border-l-4 ${
-        isUndoneAutoApplied 
-          ? 'border-l-blue-400 bg-blue-50/30 dark:bg-blue-950/20' 
-          : 'border-l-orange-400'
+        isUndoneAutoApplied ? "border-l-blue-400 bg-blue-50/30 dark:bg-blue-950/20" : "border-l-orange-400"
       }`}
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
@@ -126,11 +124,12 @@ const PendingLabelItem: React.FC<PendingLabelItemProps> = ({
           <ConfidenceIndicator confidence={label.confidence} />
         </div>
         {label.category && (
-          <Badge variant="outline" className={`text-xs ${
-            isUndoneAutoApplied 
-              ? 'border-blue-300 text-blue-700 dark:border-blue-600 dark:text-blue-300'
-              : ''
-          }`}>
+          <Badge
+            variant="outline"
+            className={`text-xs ${
+              isUndoneAutoApplied ? "border-blue-300 text-blue-700 dark:border-blue-600 dark:text-blue-300" : ""
+            }`}
+          >
             {label.category}
           </Badge>
         )}
@@ -148,7 +147,7 @@ const PendingLabelItem: React.FC<PendingLabelItemProps> = ({
         </Button>
         <Button
           size="sm"
-          variant="ghost" 
+          variant="ghost"
           className="h-7 w-7 p-0 bg-red-100 hover:bg-red-200 text-red-700"
           onClick={onReject}
           disabled={isApplying}
@@ -167,13 +166,9 @@ interface AcceptedLabelItemProps {
   isApplying?: boolean;
 }
 
-const AcceptedLabelItem: React.FC<AcceptedLabelItemProps> = ({
-  label,
-  onRemove,
-  isApplying = false
-}) => {
+const AcceptedLabelItem: React.FC<AcceptedLabelItemProps> = ({ label, onRemove, isApplying = false }) => {
   return (
-    <motion.div 
+    <motion.div
       className="flex items-center justify-between p-3 border rounded-lg bg-green-50/50 border-l-4 border-l-green-400 opacity-90"
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 0.9, x: 0 }}
@@ -221,14 +216,14 @@ const AutoAppliedLabelItem: React.FC<AutoAppliedLabelItemProps> = ({
   onReApply,
   isApplying = false
 }) => {
-  const isUndone = (label as any).isUndone;
-  
+  const isUndone = label.isUndone;
+
   return (
-    <motion.div 
+    <motion.div
       className={`flex items-center justify-between p-3 border rounded-lg border-l-4 ${
-        isUndone 
-          ? 'bg-gray-50/70 border-l-gray-400 dark:bg-gray-800/30 dark:border-l-gray-500' 
-          : 'bg-blue-50/70 border-l-blue-500 dark:bg-blue-950/30 dark:border-l-blue-400'
+        isUndone
+          ? "bg-gray-50/70 border-l-gray-400 dark:bg-gray-800/30 dark:border-l-gray-500"
+          : "bg-blue-50/70 border-l-blue-500 dark:bg-blue-950/30 dark:border-l-blue-400"
       }`}
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
@@ -243,30 +238,35 @@ const AutoAppliedLabelItem: React.FC<AutoAppliedLabelItemProps> = ({
             ) : (
               <Sparkles className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
             )}
-            <span className={`font-medium text-sm truncate ${
-              isUndone 
-                ? 'text-gray-600 dark:text-gray-400 line-through' 
-                : 'text-blue-900 dark:text-blue-100'
-            }`}>
+            <span
+              className={`font-medium text-sm truncate ${
+                isUndone ? "text-gray-600 dark:text-gray-400 line-through" : "text-blue-900 dark:text-blue-100"
+              }`}
+            >
               {label.label}
             </span>
           </div>
           <div className="flex items-center gap-1.5 ml-auto">
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${
-              isUndone
-                ? 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600'
-                : 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/50 dark:text-blue-200 dark:border-blue-700'
-            }`}>
-              {isUndone ? 'Undone' : `Auto ${Math.round(label.confidence * 100)}%`}
+            <span
+              className={`text-xs px-2 py-0.5 rounded-full font-medium border ${
+                isUndone
+                  ? "bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600"
+                  : "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/50 dark:text-blue-200 dark:border-blue-700"
+              }`}
+            >
+              {isUndone ? "Undone" : `Auto ${Math.round(label.confidence * 100)}%`}
             </span>
           </div>
         </div>
         {label.category && (
-          <Badge variant="outline" className={`text-xs ${
-            isUndone
-              ? 'border-gray-300 text-gray-600 dark:border-gray-600 dark:text-gray-400'
-              : 'border-blue-300 text-blue-700 dark:border-blue-600 dark:text-blue-300'
-          }`}>
+          <Badge
+            variant="outline"
+            className={`text-xs ${
+              isUndone
+                ? "border-gray-300 text-gray-600 dark:border-gray-600 dark:text-gray-400"
+                : "border-blue-300 text-blue-700 dark:border-blue-600 dark:text-blue-300"
+            }`}
+          >
             {label.category}
           </Badge>
         )}
@@ -301,12 +301,12 @@ const AutoAppliedLabelItem: React.FC<AutoAppliedLabelItemProps> = ({
 };
 
 interface ExistingLabelItemProps {
-  label: any; // Using any to match existing bookmark label structure
+  label: StoredBookmarkLabel;
 }
 
 const ExistingLabelItem: React.FC<ExistingLabelItemProps> = ({ label }) => {
   return (
-    <motion.div 
+    <motion.div
       className="flex items-center justify-between p-2 border rounded bg-gray-50/70 border-l-4 border-l-gray-400 dark:bg-gray-800/30 dark:border-l-gray-500"
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
@@ -323,7 +323,10 @@ const ExistingLabelItem: React.FC<ExistingLabelItemProps> = ({ label }) => {
           )}
         </div>
         {label.category && (
-          <Badge variant="outline" className="text-xs mt-1 border-gray-300 text-gray-600 dark:border-gray-600 dark:text-gray-400">
+          <Badge
+            variant="outline"
+            className="text-xs mt-1 border-gray-300 text-gray-600 dark:border-gray-600 dark:text-gray-400"
+          >
             {label.category}
           </Badge>
         )}
@@ -344,7 +347,6 @@ export const AIReviewPanel: React.FC<AIReviewPanelProps> = ({
   onRemoveAutoApplied,
   onReApplyAutoApplied,
   onApplyAll,
-  onRejectAll: _onRejectAll, // unused for now
   onClearAccepted,
   isApplying = false,
   // Bulk review props
@@ -366,7 +368,7 @@ export const AIReviewPanel: React.FC<AIReviewPanelProps> = ({
       const newStates: LabelReviewState[] = analysis.labels.map((label, index) => ({
         id: `${label.label}-${label.category}-${index}`,
         label,
-        status: 'pending',
+        status: "pending",
         timestamp: new Date()
       }));
       setLabelStates(newStates);
@@ -378,87 +380,93 @@ export const AIReviewPanel: React.FC<AIReviewPanelProps> = ({
     setUndoneAutoAppliedIds(new Set());
   }, [analysis]);
 
-  const pendingLabels = labelStates.filter(state => state.status === 'pending');
-  const acceptedLabels = labelStates.filter(state => state.status === 'accepted');
-  
+  const pendingLabels = labelStates.filter((state) => state.status === "pending");
+  const acceptedLabels = labelStates.filter((state) => state.status === "accepted");
+
   // Combine pending AI suggestions with undone auto-applied labels
   const allPendingLabels = [
-    ...pendingLabels,
+    ...pendingLabels.map((state) => ({ ...state, isUndoneAutoApplied: false })),
     ...undoneAutoAppliedLabels.map((label, index) => ({
       id: `undone-auto-${label.label}-${label.category}-${index}`,
       label,
-      status: 'pending' as const,
+      status: "pending" as const,
       timestamp: new Date(),
       isUndoneAutoApplied: true
     }))
   ];
 
   const handleApplyLabel = (label: BookmarkLabel) => {
-    setLabelStates(prev => prev.map(state => 
-      state.label.label === label.label && state.label.category === label.category
-        ? { ...state, status: 'accepted' as const, timestamp: new Date() }
-        : state
-    ));
+    setLabelStates((prev) =>
+      prev.map((state) =>
+        state.label.label === label.label && state.label.category === label.category
+          ? { ...state, status: "accepted" as const, timestamp: new Date() }
+          : state
+      )
+    );
     onApplyLabel(label);
   };
 
   const handleRejectLabel = (label: BookmarkLabel) => {
-    setLabelStates(prev => prev.map(state => 
-      state.label.label === label.label && state.label.category === label.category
-        ? { ...state, status: 'rejected' as const, timestamp: new Date() }
-        : state
-    ));
+    setLabelStates((prev) =>
+      prev.map((state) =>
+        state.label.label === label.label && state.label.category === label.category
+          ? { ...state, status: "rejected" as const, timestamp: new Date() }
+          : state
+      )
+    );
     onRejectLabel(label);
   };
 
   const handleRemoveLabel = (label: BookmarkLabel) => {
-    setLabelStates(prev => prev.map(state => 
-      state.label.label === label.label && state.label.category === label.category
-        ? { ...state, status: 'pending' as const, timestamp: new Date() }
-        : state
-    ));
+    setLabelStates((prev) =>
+      prev.map((state) =>
+        state.label.label === label.label && state.label.category === label.category
+          ? { ...state, status: "pending" as const, timestamp: new Date() }
+          : state
+      )
+    );
     onRemoveLabel(label);
   };
 
   const handleApplyAll = () => {
-    setLabelStates(prev => prev.map(state => 
-      state.status === 'pending'
-        ? { ...state, status: 'accepted' as const, timestamp: new Date() }
-        : state
-    ));
+    setLabelStates((prev) =>
+      prev.map((state) =>
+        state.status === "pending" ? { ...state, status: "accepted" as const, timestamp: new Date() } : state
+      )
+    );
     onApplyAll();
   };
 
   const handleClearAccepted = () => {
-    setLabelStates(prev => prev.map(state => 
-      state.status === 'accepted'
-        ? { ...state, status: 'pending' as const, timestamp: new Date() }
-        : state
-    ));
+    setLabelStates((prev) =>
+      prev.map((state) =>
+        state.status === "accepted" ? { ...state, status: "pending" as const, timestamp: new Date() } : state
+      )
+    );
     onClearAccepted();
   };
 
   const handleRemoveAutoApplied = (label: BookmarkLabel) => {
     const labelId = `${label.label}-${label.category}`;
-    
+
     // Only add to undone list if not already there (prevent duplicates)
     if (!undoneAutoAppliedIds.has(labelId)) {
-      setUndoneAutoAppliedLabels(prev => [...prev, label]);
-      setUndoneAutoAppliedIds(prev => new Set(prev).add(labelId));
+      setUndoneAutoAppliedLabels((prev) => [...prev, label]);
+      setUndoneAutoAppliedIds((prev) => new Set(prev).add(labelId));
     }
-    
+
     // Call the parent's onRemoveAutoApplied to handle the actual removal
     onRemoveAutoApplied?.(label);
   };
 
   const handleReapplyUndoneAutoApplied = (label: BookmarkLabel) => {
     const labelId = `${label.label}-${label.category}`;
-    
+
     // Remove from undone list and re-apply
-    setUndoneAutoAppliedLabels(prev => prev.filter(l => 
-      !(l.label === label.label && l.category === label.category)
-    ));
-    setUndoneAutoAppliedIds(prev => {
+    setUndoneAutoAppliedLabels((prev) =>
+      prev.filter((l) => !(l.label === label.label && l.category === label.category))
+    );
+    setUndoneAutoAppliedIds((prev) => {
       const newSet = new Set(prev);
       newSet.delete(labelId);
       return newSet;
@@ -468,12 +476,12 @@ export const AIReviewPanel: React.FC<AIReviewPanelProps> = ({
 
   const handleRejectUndoneAutoApplied = (label: BookmarkLabel) => {
     const labelId = `${label.label}-${label.category}`;
-    
+
     // Just remove from undone list (permanently reject)
-    setUndoneAutoAppliedLabels(prev => prev.filter(l => 
-      !(l.label === label.label && l.category === label.category)
-    ));
-    setUndoneAutoAppliedIds(prev => {
+    setUndoneAutoAppliedLabels((prev) =>
+      prev.filter((l) => !(l.label === label.label && l.category === label.category))
+    );
+    setUndoneAutoAppliedIds((prev) => {
       const newSet = new Set(prev);
       newSet.delete(labelId);
       return newSet;
@@ -485,22 +493,21 @@ export const AIReviewPanel: React.FC<AIReviewPanelProps> = ({
   return (
     <>
       {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-black/20 z-40 transition-opacity"
-        onClick={onClose}
-      />
-      
+      <div className="fixed inset-0 bg-black/20 z-40 transition-opacity" onClick={onClose} />
+
       {/* Panel */}
-      <div className={`fixed right-0 top-0 h-full w-80 bg-background border-l shadow-lg z-50 transform transition-transform duration-300 ${
-        isOpen ? 'translate-x-0' : 'translate-x-full'
-      }`}>
+      <div
+        className={`fixed right-0 top-0 h-full w-80 bg-background border-l shadow-lg z-50 transform transition-transform duration-300 ${
+          isOpen ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b bg-background">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold text-sm truncate">
-                  {bulkReviewMode ? 'Bulk AI Review' : 'AI Label Review'}
+                  {bulkReviewMode ? "Bulk AI Review" : "AI Label Review"}
                 </h3>
                 {bulkReviewMode && bulkReviewStats && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200 rounded-full border border-purple-200 dark:border-purple-700">
@@ -514,23 +521,14 @@ export const AIReviewPanel: React.FC<AIReviewPanelProps> = ({
                   </span>
                 )}
               </div>
-              {bookmark && (
-                <p className="text-xs text-muted-foreground truncate mt-0.5">
-                  {bookmark.title}
-                </p>
-              )}
+              {bookmark && <p className="text-xs text-muted-foreground truncate mt-0.5">{bookmark.title}</p>}
               {bulkReviewMode && bulkReviewStats && (
                 <p className="text-xs text-muted-foreground mt-1">
                   Progress: {bulkReviewStats.completed} completed, {bulkReviewStats.skipped} skipped
                 </p>
               )}
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0 ml-2"
-              onClick={onClose}
-            >
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 ml-2" onClick={onClose}>
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -549,7 +547,7 @@ export const AIReviewPanel: React.FC<AIReviewPanelProps> = ({
                 <AlertCircle className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                 <p className="text-sm font-medium mb-1">No Labels Found</p>
                 <p className="text-xs text-muted-foreground">
-                  AI couldn't find confident labels for this bookmark
+                  AI couldn&apos;t find confident labels for this bookmark
                 </p>
               </div>
             ) : (
@@ -561,7 +559,7 @@ export const AIReviewPanel: React.FC<AIReviewPanelProps> = ({
                       <AnimatePresence mode="popLayout">
                         {/* 1. Pending AI Suggestions (highest priority) */}
                         {allPendingLabels.map((state) => {
-                          const isUndoneAutoApplied = (state as any).isUndoneAutoApplied;
+                          const isUndoneAutoApplied = state.isUndoneAutoApplied;
                           return (
                             <PendingLabelItem
                               key={state.id}
@@ -612,17 +610,14 @@ export const AIReviewPanel: React.FC<AIReviewPanelProps> = ({
                         })}
 
                         {/* 4. Existing Labels (lowest priority) */}
-                        {bookmark?.labels && bookmark.labels.map((label, index) => (
-                          <ExistingLabelItem
-                            key={`existing-${label.label}-${label.source}-${index}`}
-                            label={label}
-                          />
-                        ))}
+                        {bookmark?.labels &&
+                          bookmark.labels.map((label, index) => (
+                            <ExistingLabelItem key={`existing-${label.label}-${label.source}-${index}`} label={label} />
+                          ))}
                       </AnimatePresence>
                     </div>
                   </div>
                 </div>
-
 
                 {/* Analysis Details */}
                 {analysis.suggestedDescription && (
@@ -654,13 +649,7 @@ export const AIReviewPanel: React.FC<AIReviewPanelProps> = ({
                       <Check className="h-3 w-3 mr-1" />
                       Apply & Next
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={onSkip}
-                      disabled={isApplying}
-                      className="text-xs"
-                    >
+                    <Button variant="outline" size="sm" onClick={onSkip} disabled={isApplying} className="text-xs">
                       <SkipForward className="h-3 w-3 mr-1" />
                       Skip This
                     </Button>
@@ -675,13 +664,7 @@ export const AIReviewPanel: React.FC<AIReviewPanelProps> = ({
                     >
                       Apply All
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={onNext}
-                      disabled={isApplying}
-                      className="text-xs"
-                    >
+                    <Button variant="ghost" size="sm" onClick={onNext} disabled={isApplying} className="text-xs">
                       Next
                       <ArrowRight className="h-3 w-3 ml-1" />
                     </Button>

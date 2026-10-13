@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/sluther/.claude/projects/**)",
+      "Bash(for f:*)",
+      "Bash(do)",
+      "Bash(echo \"=== FILE: $f ===\")",
+      "Bash(python3 -c \":*)",
+      "Bash(done)",
+      "Bash(/dev/null cat:*)",
+      "Bash(grep -A3 \"^---$\")",
+      "Bash(/usr/bin/git -C /Users/sluther/Projects/flow-browser log --oneline -30)",
+      "Bash(/usr/bin/git -C /Users/sluther/Projects/flow-browser diff HEAD -- src/renderer/src/components/ai/ai-settings.tsx src/renderer/src/components/ui/select.tsx src/preload/index.ts src/shared/flow/interfaces/ai.ts src/main/ipc/ai.ts src/main/modules/ai-service.ts)",
+      "Bash(/usr/bin/git -C /Users/sluther/Projects/flow-browser diff HEAD -- src/renderer/src/components/ai/ai-settings.tsx src/renderer/src/components/ui/select.tsx)"
+    ]
+  },
+  "enabledPlugins": {
+    "atlas@coding-octopus-marketplace": true,
+    "atomic-commit@coding-octopus-marketplace": true,
+    "clickup@anthropic-plugin-directory": true
+  },
+  "extraKnownMarketplaces": {
+    "coding-octopus-marketplace": {
+      "source": {
+        "source": "github",
+        "repo": "coding-octopus-llc/claude-marketplace"
+      }
+    }
+  }
+}

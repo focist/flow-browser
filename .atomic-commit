@@ -1,0 +1,4 @@
+# .atomic-commit
+format = conventional
+imperative = true
+blockedScopes = ci, cd, deploy, pipeline
