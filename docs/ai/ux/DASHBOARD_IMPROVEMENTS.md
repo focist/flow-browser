@@ -4,6 +4,7 @@
 **Date:** October 4, 2025
 **Component:** AI Labeling Dashboard
 **Files Reviewed:**
+
 - `src/renderer/src/components/ai/ai-labeling-dashboard.tsx`
 - `src/renderer/src/components/ai/bookmark-overview-column.tsx`
 - `src/renderer/src/components/ai/label-suggestions-column.tsx`
@@ -16,12 +17,14 @@
 The AI Labeling Dashboard is a complex interface for managing AI-generated bookmark labels in bulk. The current implementation demonstrates solid foundational UX patterns but suffers from several critical usability issues:
 
 **Key Strengths:**
+
 - Clear three-column layout with logical information architecture
 - Effective use of confidence-based grouping and visual hierarchy
 - Good progress feedback during bulk operations
 - Responsive animations and smooth transitions
 
 **Critical Issues:**
+
 1. **Broken functionality** - Action buttons at bottom don't execute (lines 247-250 in main dashboard)
 2. **Confusing dual action placement** - Same actions appear in both columns and bottom bar
 3. **Poor visual hierarchy** - Important actions buried, stats taking prime real estate
@@ -37,6 +40,7 @@ The AI Labeling Dashboard is a complex interface for managing AI-generated bookm
 ### 1. Information Hierarchy & Clarity
 
 #### 1.1 Critical Issue: Non-Functional Action Buttons
+
 **Location:** `ai-labeling-dashboard.tsx`, lines 247-250
 **Severity:** CRITICAL
 
@@ -52,6 +56,7 @@ onReprocess={() => {}}
 **User Impact:** Users who click actions in the third column get no response, creating confusion and eroding trust.
 
 **Recommendation:**
+
 ```tsx
 <BulkActionsColumn
   selectedBookmarks={selectedBookmarks}
@@ -66,13 +71,16 @@ onReprocess={() => {}}
 ```
 
 #### 1.2 Confusing Dual Action Placement
+
 **Severity:** HIGH
 
 **Problem:** The dashboard has two sets of action buttons for the same operations:
+
 - Bottom bar (lines 257-296): Fully functional
 - Third column: Non-functional (likely intended for contextual actions)
 
 **User Impact:**
+
 - Users don't know which buttons to use
 - Creates cognitive load determining if actions are different
 - Duplicate UI suggests different functionality when there isn't any
@@ -80,21 +88,25 @@ onReprocess={() => {}}
 **Recommendation:** Choose ONE action placement strategy:
 
 **Option A - Bottom Bar Primary (Recommended):**
+
 - Remove action buttons from BulkActionsColumn entirely
 - Keep bottom bar as the single source of truth for bulk actions
 - Use third column purely for stats and insights
 - Rename column to "Statistics & Insights"
 
 **Option B - Contextual Actions:**
+
 - Make third column actions work on selected items only
 - Keep bottom bar for global "Apply to All" actions
 - Add clear visual distinction (e.g., "Selected: X items" vs "All: Y items")
 
 #### 1.3 Dashboard Purpose Not Immediately Clear
+
 **Location:** `ai-labeling-dashboard.tsx`, line 196-202
 **Severity:** MEDIUM
 
 **Current header:**
+
 ```tsx
 <h1 className="text-xl font-bold">AI Labeling Dashboard</h1>
 <p className="text-sm text-muted-foreground">
@@ -105,24 +117,23 @@ onReprocess={() => {}}
 **Problem:** Title doesn't communicate the value proposition or guide users on what to do.
 
 **Recommendation:**
+
 ```tsx
 <div className="space-y-1">
   <h1 className="text-xl font-bold">Review & Apply AI Label Suggestions</h1>
   <p className="text-sm text-muted-foreground">
     {isAnalyzing
       ? `Analyzing ${count} bookmarks...`
-      : `Review ${totalSuggestions} label suggestions for ${count} bookmarks`
-    }
+      : `Review ${totalSuggestions} label suggestions for ${count} bookmarks`}
   </p>
   {!isAnalyzing && (
-    <p className="text-xs text-muted-foreground">
-      Select bookmarks to apply, reject, or regenerate suggestions
-    </p>
+    <p className="text-xs text-muted-foreground">Select bookmarks to apply, reject, or regenerate suggestions</p>
   )}
 </div>
 ```
 
 #### 1.4 Column Headers Lack Context
+
 **Severity:** MEDIUM
 
 **Problem:** Column titles are generic ("Analyzed Bookmarks", "Label Suggestions", "Bulk Actions")
@@ -130,34 +141,30 @@ onReprocess={() => {}}
 **Recommendations:**
 
 **Column 1 (Bookmarks):**
+
 ```tsx
 <div className="space-y-0.5">
   <h2 className="text-lg font-semibold">Bookmarks with Suggestions</h2>
-  <p className="text-xs text-muted-foreground">
-    Select items to apply labels in bulk
-  </p>
+  <p className="text-xs text-muted-foreground">Select items to apply labels in bulk</p>
 </div>
 ```
 
 **Column 2 (Suggestions):**
+
 ```tsx
 <div className="space-y-0.5">
   <h2 className="text-lg font-semibold">Suggested Labels</h2>
-  <p className="text-xs text-muted-foreground">
-    Apply patterns across multiple bookmarks
-  </p>
+  <p className="text-xs text-muted-foreground">Apply patterns across multiple bookmarks</p>
 </div>
 ```
 
 **Column 3 (Stats):**
+
 ```tsx
 <div className="space-y-0.5">
   <h2 className="text-lg font-semibold">Statistics</h2>
   <p className="text-xs text-muted-foreground">
-    {selectedCount > 0
-      ? `${selectedCount} selected`
-      : 'Overview of all suggestions'
-    }
+    {selectedCount > 0 ? `${selectedCount} selected` : "Overview of all suggestions"}
   </p>
 </div>
 ```
@@ -167,14 +174,17 @@ onReprocess={() => {}}
 ### 2. Visual Design & Consistency
 
 #### 2.1 Confidence Level Color System Issues
+
 **Severity:** MEDIUM
 
 **Current Implementation:**
+
 - High: Green (bg-green-100, text-green-600)
 - Medium: Amber (bg-amber-100, text-amber-600)
 - Low: Red (bg-red-100, text-red-600)
 
 **Problems:**
+
 1. Red for "low confidence" suggests error/danger, but it's just lower confidence
 2. Inconsistent color applications across components
 3. Poor dark mode contrast in some cases
@@ -182,39 +192,43 @@ onReprocess={() => {}}
 **Recommendations:**
 
 **Semantic Color Updates:**
+
 ```tsx
 const confidenceColors = {
   high: {
-    bg: 'bg-green-50 dark:bg-green-950/20',
-    text: 'text-green-700 dark:text-green-300',
-    border: 'border-green-200 dark:border-green-800',
-    icon: 'text-green-600 dark:text-green-400'
+    bg: "bg-green-50 dark:bg-green-950/20",
+    text: "text-green-700 dark:text-green-300",
+    border: "border-green-200 dark:border-green-800",
+    icon: "text-green-600 dark:text-green-400"
   },
   medium: {
-    bg: 'bg-blue-50 dark:bg-blue-950/20',  // Changed from amber
-    text: 'text-blue-700 dark:text-blue-300',
-    border: 'border-blue-200 dark:border-blue-800',
-    icon: 'text-blue-600 dark:text-blue-400'
+    bg: "bg-blue-50 dark:bg-blue-950/20", // Changed from amber
+    text: "text-blue-700 dark:text-blue-300",
+    border: "border-blue-200 dark:border-blue-800",
+    icon: "text-blue-600 dark:text-blue-400"
   },
   low: {
-    bg: 'bg-slate-50 dark:bg-slate-900/20',  // Changed from red
-    text: 'text-slate-700 dark:text-slate-300',
-    border: 'border-slate-200 dark:border-slate-700',
-    icon: 'text-slate-600 dark:text-slate-400'
+    bg: "bg-slate-50 dark:bg-slate-900/20", // Changed from red
+    text: "text-slate-700 dark:text-slate-300",
+    border: "border-slate-200 dark:border-slate-700",
+    icon: "text-slate-600 dark:text-slate-400"
   }
-}
+};
 ```
 
 **Rationale:**
+
 - Green = High confidence (positive, trustworthy)
 - Blue = Medium confidence (neutral, informative)
 - Slate/Gray = Low confidence (uncertain, review needed)
 - Red reserved for errors and destructive actions
 
 #### 2.2 Icon Usage Inconsistencies
+
 **Severity:** LOW
 
 **Problems:**
+
 1. Mixing emoji (🏷️, 📁, ⭐) with Lucide icons creates visual inconsistency
 2. Icon sizes vary (h-3, h-3.5, h-4, h-12)
 3. Some icons lack semantic meaning
@@ -222,6 +236,7 @@ const confidenceColors = {
 **Recommendations:**
 
 **Replace emoji with consistent Lucide icons:**
+
 ```tsx
 const categoryIcons = {
   topic: <Tag className="h-4 w-4" />,
@@ -231,46 +246,45 @@ const categoryIcons = {
 ```
 
 **Standardize icon sizes:**
+
 - List items: `h-4 w-4`
 - Badges/inline: `h-3.5 w-3.5`
 - Empty states: `h-12 w-12`
 - Buttons: `h-4 w-4`
 
 #### 2.3 Spacing and Density Issues
+
 **Location:** `bookmark-overview-column.tsx`, lines 40-73
 **Severity:** MEDIUM
 
 **Problem:** Bookmark items feel cramped with nested badges and truncated text
 
 **Current:**
+
 ```tsx
 <div className="flex items-start gap-2 p-2 rounded border">
   <Checkbox />
   <div className="flex-1 min-w-0">
     <p className="text-sm font-medium truncate">{title}</p>
-    <div className="flex items-center gap-1.5 mt-1">
-      {/* Badges */}
-    </div>
+    <div className="flex items-center gap-1.5 mt-1">{/* Badges */}</div>
   </div>
 </div>
 ```
 
 **Recommended:**
+
 ```tsx
 <div className="flex items-start gap-3 p-3 rounded-md border">
   <Checkbox className="mt-0.5 flex-shrink-0" />
   <div className="flex-1 min-w-0 space-y-1.5">
-    <p className="text-sm font-medium line-clamp-2 leading-snug">
-      {title}
-    </p>
-    <div className="flex flex-wrap items-center gap-1.5">
-      {/* Badges with better spacing */}
-    </div>
+    <p className="text-sm font-medium line-clamp-2 leading-snug">{title}</p>
+    <div className="flex flex-wrap items-center gap-1.5">{/* Badges with better spacing */}</div>
   </div>
 </div>
 ```
 
 **Changes:**
+
 - Increased padding (p-2 → p-3)
 - Better gap spacing (gap-2 → gap-3)
 - Allow two lines for title (truncate → line-clamp-2)
@@ -278,6 +292,7 @@ const categoryIcons = {
 - Better visual separation with space-y-1.5
 
 #### 2.4 Badge Design Improvements
+
 **Severity:** LOW
 
 **Current badges are too similar and hard to scan quickly.**
@@ -307,9 +322,11 @@ const categoryIcons = {
 ### 3. Interaction Patterns
 
 #### 3.1 Selection Mechanism Issues
+
 **Severity:** MEDIUM
 
 **Problems:**
+
 1. "Select All" doesn't indicate if it affects filtered or all bookmarks
 2. "Clear (N)" button doesn't explain what it clears
 3. No visual feedback showing selection count in context
@@ -317,34 +334,20 @@ const categoryIcons = {
 **Recommendations:**
 
 **Improved selection controls:**
+
 ```tsx
 <div className="space-y-2">
   <div className="flex items-center justify-between">
     <span className="text-xs font-medium text-muted-foreground">
-      {selectedCount > 0
-        ? `${selectedCount} of ${visibleCount} selected`
-        : `${visibleCount} bookmarks`
-      }
+      {selectedCount > 0 ? `${selectedCount} of ${visibleCount} selected` : `${visibleCount} bookmarks`}
     </span>
   </div>
   <div className="flex gap-2">
-    <Button
-      onClick={onSelectAll}
-      variant="outline"
-      size="sm"
-      className="flex-1"
-      disabled={visibleCount === 0}
-    >
+    <Button onClick={onSelectAll} variant="outline" size="sm" className="flex-1" disabled={visibleCount === 0}>
       <CheckSquare className="h-3.5 w-3.5 mr-1.5" />
       Select All Visible
     </Button>
-    <Button
-      onClick={onClearSelection}
-      variant="outline"
-      size="sm"
-      className="flex-1"
-      disabled={selectedCount === 0}
-    >
+    <Button onClick={onClearSelection} variant="outline" size="sm" className="flex-1" disabled={selectedCount === 0}>
       <XSquare className="h-3.5 w-3.5 mr-1.5" />
       Clear Selection
     </Button>
@@ -353,15 +356,18 @@ const categoryIcons = {
 ```
 
 #### 3.2 Bulk Action Button Clarity
+
 **Location:** `ai-labeling-dashboard.tsx`, lines 260-294
 **Severity:** MEDIUM
 
 **Problems:**
+
 1. Tooltips (title attribute) don't appear on touch devices
 2. Button labels could be more action-oriented
 3. No indication of what will be affected
 
 **Current:**
+
 ```tsx
 <Button title="Apply all labels with 85%+ confidence">
   <Sparkles /> Accept High Confidence
@@ -369,24 +375,21 @@ const categoryIcons = {
 ```
 
 **Recommended:**
+
 ```tsx
-<Button
-  variant="outline"
-  className="relative"
-  disabled={areButtonsDisabled}
-  onClick={handleAcceptHighConfidence}
->
+<Button variant="outline" className="relative" disabled={areButtonsDisabled} onClick={handleAcceptHighConfidence}>
   <Sparkles className="h-4 w-4 mr-2 text-primary" />
   <div className="flex flex-col items-start">
     <span className="text-sm font-medium">Accept High Confidence</span>
     <span className="text-xs text-muted-foreground">
-      {selectedCount > 0 ? `${selectedCount} selected` : 'All bookmarks'} · 85%+
+      {selectedCount > 0 ? `${selectedCount} selected` : "All bookmarks"} · 85%+
     </span>
   </div>
 </Button>
 ```
 
 **Alternative - Tooltip Component:**
+
 ```tsx
 <TooltipProvider>
   <Tooltip>
@@ -398,21 +401,21 @@ const categoryIcons = {
     </TooltipTrigger>
     <TooltipContent>
       <p>Apply labels with 85%+ confidence</p>
-      <p className="text-xs text-muted-foreground">
-        Affects {selectedCount || totalCount} bookmarks
-      </p>
+      <p className="text-xs text-muted-foreground">Affects {selectedCount || totalCount} bookmarks</p>
     </TooltipContent>
   </Tooltip>
 </TooltipProvider>
 ```
 
 #### 3.3 Collapsible Section Behavior
+
 **Location:** `bookmark-overview-column.tsx`, lines 90-139
 **Severity:** LOW
 
 **Current behavior is good, but could be enhanced:**
 
 **Recommendations:**
+
 1. Remember collapsed state in localStorage
 2. Add "Collapse All" / "Expand All" controls
 3. Show count of selected items in collapsed state
@@ -455,10 +458,12 @@ const categoryIcons = {
 ```
 
 #### 3.4 Pattern Application Workflow
+
 **Location:** `label-suggestions-column.tsx`, lines 60-70
 **Severity:** MEDIUM
 
 **Problem:** "Apply All" on a pattern doesn't clearly indicate:
+
 - How many bookmarks will be affected
 - Whether it applies to selected or all bookmarks
 - What happens after applying
@@ -478,22 +483,23 @@ const categoryIcons = {
     Apply to {affectedCount}
   </span>
   <span className="text-xs text-muted-foreground">
-    {pattern.count} bookmark{pattern.count !== 1 ? 's' : ''}
+    {pattern.count} bookmark{pattern.count !== 1 ? "s" : ""}
   </span>
 </Button>
 ```
 
 **Add confirmation for large operations:**
+
 ```tsx
 const handleApplyPattern = async (pattern: LabelPattern) => {
   const affectedCount = pattern.bookmarkIds.length;
 
   if (affectedCount > 10) {
     const confirmed = await showConfirmDialog({
-      title: 'Apply Label to Multiple Bookmarks',
+      title: "Apply Label to Multiple Bookmarks",
       description: `This will apply "${pattern.label}" to ${affectedCount} bookmarks.`,
-      confirmLabel: 'Apply Label',
-      cancelLabel: 'Cancel'
+      confirmLabel: "Apply Label",
+      cancelLabel: "Cancel"
     });
 
     if (!confirmed) return;
@@ -504,9 +510,11 @@ const handleApplyPattern = async (pattern: LabelPattern) => {
 ```
 
 #### 3.5 Loading States Need Improvement
+
 **Severity:** LOW
 
 **Problems:**
+
 1. Button disabled state doesn't indicate what's processing
 2. No visual feedback on which operation is running
 3. Progress bar in third column is disconnected from action location
@@ -514,6 +522,7 @@ const handleApplyPattern = async (pattern: LabelPattern) => {
 **Recommendations:**
 
 **Enhanced loading states for buttons:**
+
 ```tsx
 <Button disabled={isProcessing}>
   {isProcessing ? (
@@ -531,19 +540,22 @@ const handleApplyPattern = async (pattern: LabelPattern) => {
 ```
 
 **Move progress indicator closer to action:**
+
 ```tsx
 // In bottom action bar when processing
-{isProcessing && progress && (
-  <div className="flex-1 px-4">
-    <div className="flex items-center justify-between text-xs mb-1">
-      <span className="font-medium">{progress.operation}</span>
-      <span className="text-muted-foreground">
-        {progress.completed} / {progress.total}
-      </span>
+{
+  isProcessing && progress && (
+    <div className="flex-1 px-4">
+      <div className="flex items-center justify-between text-xs mb-1">
+        <span className="font-medium">{progress.operation}</span>
+        <span className="text-muted-foreground">
+          {progress.completed} / {progress.total}
+        </span>
+      </div>
+      <Progress value={(progress.completed / progress.total) * 100} />
     </div>
-    <Progress value={(progress.completed / progress.total) * 100} />
-  </div>
-)}
+  );
+}
 ```
 
 ---
@@ -551,9 +563,11 @@ const handleApplyPattern = async (pattern: LabelPattern) => {
 ### 4. User Flow & Task Completion
 
 #### 4.1 Primary Task Flow Issues
+
 **Severity:** HIGH
 
 **Current flow is unclear:**
+
 1. User opens dashboard
 2. Sees three columns of information
 3. Unclear which actions to take first
@@ -574,18 +588,19 @@ const handleApplyPattern = async (pattern: LabelPattern) => {
 ```
 
 **Implementation - Add step indicators:**
+
 ```tsx
 // Add to dashboard header
 <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md">
   <Info className="h-4 w-4 text-primary" />
   <p className="text-sm">
-    <strong>Quick start:</strong> Select bookmarks → Choose a pattern to apply →
-    Or use bulk actions below
+    <strong>Quick start:</strong> Select bookmarks → Choose a pattern to apply → Or use bulk actions below
   </p>
 </div>
 ```
 
 #### 4.2 Missing "Undo" Capability
+
 **Severity:** HIGH
 
 **Problem:** Once labels are applied, there's no way to undo the action
@@ -593,15 +608,16 @@ const handleApplyPattern = async (pattern: LabelPattern) => {
 **Recommendations:**
 
 1. **Add toast with undo action:**
+
 ```tsx
 const handleAcceptAll = async () => {
   const previousState = captureState(selectedBookmarks);
 
   await bulkOps.acceptAllLabels(selectedBookmarks);
 
-  toast.success('Labels applied', {
+  toast.success("Labels applied", {
     action: {
-      label: 'Undo',
+      label: "Undo",
       onClick: () => restoreState(previousState)
     },
     duration: 8000
@@ -610,11 +626,12 @@ const handleAcceptAll = async () => {
 ```
 
 2. **Add history panel (future enhancement):**
+
 ```tsx
 <div className="border-t p-4">
   <h3 className="text-sm font-medium mb-2">Recent Actions</h3>
   <div className="space-y-1 text-xs">
-    {recentActions.map(action => (
+    {recentActions.map((action) => (
       <div key={action.id} className="flex justify-between items-center">
         <span>{action.description}</span>
         <Button size="sm" variant="ghost" onClick={() => undo(action)}>
@@ -627,6 +644,7 @@ const handleAcceptAll = async () => {
 ```
 
 #### 4.3 No Preview Before Bulk Apply
+
 **Severity:** MEDIUM
 
 **Problem:** Users can't preview what will happen before applying labels in bulk
@@ -651,17 +669,15 @@ const showPreview = (action: string, bookmarks: DashboardBookmark[]) => {
   <DialogContent>
     <DialogHeader>
       <DialogTitle>Preview: {previewData?.action}</DialogTitle>
-      <DialogDescription>
-        Review changes before applying
-      </DialogDescription>
+      <DialogDescription>Review changes before applying</DialogDescription>
     </DialogHeader>
 
     <div className="space-y-2 max-h-96 overflow-y-auto">
-      {previewData?.bookmarks.map(b => (
+      {previewData?.bookmarks.map((b) => (
         <div key={b.bookmark.id} className="border rounded p-2">
           <p className="font-medium text-sm">{b.bookmark.title}</p>
           <div className="flex flex-wrap gap-1 mt-1">
-            {b.remainingLabels.map(label => (
+            {b.remainingLabels.map((label) => (
               <Badge key={label.label} variant="outline" className="text-xs">
                 +{label.label}
               </Badge>
@@ -675,22 +691,26 @@ const showPreview = (action: string, bookmarks: DashboardBookmark[]) => {
       <Button variant="outline" onClick={() => setPreviewOpen(false)}>
         Cancel
       </Button>
-      <Button onClick={() => {
-        confirmApply();
-        setPreviewOpen(false);
-      }}>
+      <Button
+        onClick={() => {
+          confirmApply();
+          setPreviewOpen(false);
+        }}
+      >
         Apply {previewData?.totalLabels} Labels
       </Button>
     </DialogFooter>
   </DialogContent>
-</Dialog>
+</Dialog>;
 ```
 
 #### 4.4 Reprocess Feedback Is Unclear
+
 **Location:** `ai-labeling-dashboard.tsx`, lines 130-178
 **Severity:** MEDIUM
 
 **Problems:**
+
 1. Users don't know why they'd reprocess
 2. No indication of what's different after reprocessing
 3. Loading toast doesn't show individual bookmark progress clearly
@@ -698,22 +718,22 @@ const showPreview = (action: string, bookmarks: DashboardBookmark[]) => {
 **Recommendations:**
 
 1. **Better action label and description:**
+
 ```tsx
 <Button onClick={handleReprocess}>
   <RefreshCw className="h-4 w-4 mr-2" />
   <div className="flex flex-col items-start">
     <span>Regenerate Suggestions</span>
-    <span className="text-xs text-muted-foreground">
-      Get new AI analysis
-    </span>
+    <span className="text-xs text-muted-foreground">Get new AI analysis</span>
   </div>
 </Button>
 ```
 
 2. **Show diff after reprocessing:**
+
 ```tsx
 const handleReprocess = async () => {
-  const beforeState = selectedBookmarks.map(b => ({
+  const beforeState = selectedBookmarks.map((b) => ({
     id: b.bookmark.id,
     labels: [...b.remainingLabels]
   }));
@@ -722,7 +742,7 @@ const handleReprocess = async () => {
 
   const changes = calculateChanges(beforeState, afterState);
 
-  toast.success('Reprocessing complete', {
+  toast.success("Reprocessing complete", {
     description: (
       <div className="text-xs space-y-1">
         <p>{changes.added} new suggestions</p>
@@ -739,12 +759,14 @@ const handleReprocess = async () => {
 ### 5. Feedback & Communication
 
 #### 5.1 Empty States Need Improvement
+
 **Location:** Multiple locations
 **Severity:** LOW
 
 **Current empty states are minimal. Need more guidance.**
 
 **Bookmark list empty state (line 266-276):**
+
 ```tsx
 // Current - too minimal
 <p className="text-sm">No bookmarks to display</p>
@@ -768,6 +790,7 @@ const handleReprocess = async () => {
 ```
 
 **No patterns empty state (line 259-265):**
+
 ```tsx
 // Current
 <p className="text-sm font-medium">No Label Patterns</p>
@@ -789,6 +812,7 @@ const handleReprocess = async () => {
 ```
 
 #### 5.2 Success/Error States
+
 **Severity:** MEDIUM
 
 **Current implementation uses toasts, which is good, but could be enhanced:**
@@ -796,6 +820,7 @@ const handleReprocess = async () => {
 **Recommendations:**
 
 1. **Add persistent success indicator:**
+
 ```tsx
 // After successful bulk operation
 <Alert className="mb-4">
@@ -811,16 +836,13 @@ const handleReprocess = async () => {
 ```
 
 2. **Better error messaging with recovery actions:**
+
 ```tsx
-toast.error('Some operations failed', {
+toast.error("Some operations failed", {
   description: (
     <div className="space-y-2">
       <p>{result.failed} bookmarks failed to update</p>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => retryFailed(result.errors)}
-      >
+      <Button size="sm" variant="outline" onClick={() => retryFailed(result.errors)}>
         Retry Failed Items
       </Button>
     </div>
@@ -830,6 +852,7 @@ toast.error('Some operations failed', {
 ```
 
 #### 5.3 Confidence Level Education
+
 **Severity:** LOW
 
 **Problem:** Users may not understand what confidence percentages mean
@@ -872,6 +895,7 @@ toast.error('Some operations failed', {
 ```
 
 #### 5.4 Processing Feedback Enhancement
+
 **Location:** `bulk-actions-column.tsx`, lines 149-166
 **Severity:** LOW
 
@@ -881,25 +905,27 @@ toast.error('Some operations failed', {
 
 ```tsx
 // In bookmark items being processed
-<div className={`relative ${isProcessing && isBeingProcessed ? 'opacity-50' : ''}`}>
+<div className={`relative ${isProcessing && isBeingProcessed ? "opacity-50" : ""}`}>
   {isProcessing && isBeingProcessed && (
     <div className="absolute inset-0 flex items-center justify-center bg-background/80">
       <Loader2 className="h-4 w-4 animate-spin" />
     </div>
   )}
   {/* bookmark content */}
-</div>
+</div>;
 
 // In action bar
-{isProcessing && (
-  <div className="absolute inset-0 flex items-center justify-center bg-background/95">
-    <div className="text-center space-y-2">
-      <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-      <p className="text-sm font-medium">{progress.current}</p>
-      <Progress value={progressPercentage} className="w-48" />
+{
+  isProcessing && (
+    <div className="absolute inset-0 flex items-center justify-center bg-background/95">
+      <div className="text-center space-y-2">
+        <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+        <p className="text-sm font-medium">{progress.current}</p>
+        <Progress value={progressPercentage} className="w-48" />
+      </div>
     </div>
-  </div>
-)}
+  );
+}
 ```
 
 ---
@@ -907,9 +933,11 @@ toast.error('Some operations failed', {
 ### 6. Accessibility Concerns
 
 #### 6.1 Missing ARIA Labels
+
 **Severity:** HIGH
 
 **Problems:**
+
 1. Checkboxes don't have proper labels for screen readers
 2. Icon buttons missing aria-labels
 3. Collapsible sections not announcing state
@@ -918,6 +946,7 @@ toast.error('Some operations failed', {
 **Recommendations:**
 
 **Checkbox accessibility:**
+
 ```tsx
 <Checkbox
   id={`bookmark-${bookmark.id}`}
@@ -941,18 +970,15 @@ toast.error('Some operations failed', {
 ```
 
 **Icon button accessibility:**
+
 ```tsx
-<Button
-  variant="ghost"
-  size="sm"
-  onClick={onClose}
-  aria-label="Close dashboard"
->
+<Button variant="ghost" size="sm" onClick={onClose} aria-label="Close dashboard">
   <X className="h-4 w-4" />
 </Button>
 ```
 
 **Collapsible sections:**
+
 ```tsx
 <button
   onClick={onToggleExpanded}
@@ -973,6 +999,7 @@ toast.error('Some operations failed', {
 ```
 
 **Progress announcements:**
+
 ```tsx
 <div
   role="progressbar"
@@ -989,9 +1016,11 @@ toast.error('Some operations failed', {
 ```
 
 #### 6.2 Keyboard Navigation Issues
+
 **Severity:** HIGH
 
 **Problems:**
+
 1. Can't navigate bookmarks with arrow keys
 2. No clear focus indicators in some areas
 3. Can't trigger actions with keyboard shortcuts
@@ -1000,36 +1029,33 @@ toast.error('Some operations failed', {
 **Recommendations:**
 
 1. **Add keyboard navigation to bookmark list:**
+
 ```tsx
 const handleKeyDown = (e: React.KeyboardEvent, index: number) => {
   switch (e.key) {
-    case 'ArrowDown':
+    case "ArrowDown":
       e.preventDefault();
       focusBookmark(index + 1);
       break;
-    case 'ArrowUp':
+    case "ArrowUp":
       e.preventDefault();
       focusBookmark(index - 1);
       break;
-    case ' ':
-    case 'Enter':
+    case " ":
+    case "Enter":
       e.preventDefault();
       onToggleSelection(bookmark.id);
       break;
   }
 };
 
-<div
-  role="option"
-  aria-selected={isSelected}
-  tabIndex={0}
-  onKeyDown={(e) => handleKeyDown(e, index)}
->
+<div role="option" aria-selected={isSelected} tabIndex={0} onKeyDown={(e) => handleKeyDown(e, index)}>
   {/* bookmark content */}
-</div>
+</div>;
 ```
 
 2. **Enhanced focus indicators:**
+
 ```tsx
 // Add to global styles or component
 .focus-visible:focus {
@@ -1041,6 +1067,7 @@ const handleKeyDown = (e: React.KeyboardEvent, index: number) => {
 ```
 
 3. **Keyboard shortcuts:**
+
 ```tsx
 useEffect(() => {
   const handleKeyPress = (e: KeyboardEvent) => {
@@ -1048,43 +1075,44 @@ useEffect(() => {
     if (!isOpen || e.target instanceof HTMLInputElement) return;
 
     switch (e.key) {
-      case 'a':
+      case "a":
         if (e.ctrlKey || e.metaKey) {
           e.preventDefault();
           onSelectAll();
         }
         break;
-      case 'Escape':
+      case "Escape":
         onClose();
         break;
     }
   };
 
-  window.addEventListener('keydown', handleKeyPress);
-  return () => window.removeEventListener('keydown', handleKeyPress);
+  window.addEventListener("keydown", handleKeyPress);
+  return () => window.removeEventListener("keydown", handleKeyPress);
 }, [isOpen]);
 
 // Show shortcuts hint
 <div className="text-xs text-muted-foreground">
   <kbd>Ctrl+A</kbd> Select all • <kbd>Esc</kbd> Close
-</div>
+</div>;
 ```
 
 4. **Proper modal focus trap:**
+
 ```tsx
-import { FocusTrap } from '@radix-ui/react-focus-trap';
+import { FocusTrap } from "@radix-ui/react-focus-trap";
 
 <FocusTrap>
-  <div className="fixed inset-0 z-50">
-    {/* dashboard content */}
-  </div>
-</FocusTrap>
+  <div className="fixed inset-0 z-50">{/* dashboard content */}</div>
+</FocusTrap>;
 ```
 
 #### 6.3 Color Contrast Issues
+
 **Severity:** MEDIUM
 
 **Potential issues:**
+
 - Muted text may not meet WCAG AA standards
 - Badge text on colored backgrounds
 - Disabled button states
@@ -1092,12 +1120,14 @@ import { FocusTrap } from '@radix-ui/react-focus-trap';
 **Recommendations:**
 
 1. **Audit all color combinations:**
+
 ```bash
 # Use automated tools
 npm install --save-dev @axe-core/react
 ```
 
 2. **Update problematic combinations:**
+
 ```tsx
 // Instead of text-muted-foreground (often too light)
 <p className="text-sm text-foreground/70">
@@ -1111,6 +1141,7 @@ npm install --save-dev @axe-core/react
 ```
 
 3. **Disabled state improvements:**
+
 ```tsx
 // Current disabled might be too subtle
 <Button disabled={true} className="opacity-50">
@@ -1124,9 +1155,11 @@ npm install --save-dev @axe-core/react
 ```
 
 #### 6.4 Screen Reader Experience
+
 **Severity:** HIGH
 
 **Problems:**
+
 1. Batch operations announce each item separately (overwhelming)
 2. Dynamic updates not announced
 3. Stats column not properly structured for screen readers
@@ -1134,6 +1167,7 @@ npm install --save-dev @axe-core/react
 **Recommendations:**
 
 1. **Batch operation announcements:**
+
 ```tsx
 <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
   {isProcessing && progress && (
@@ -1146,15 +1180,19 @@ npm install --save-dev @axe-core/react
 ```
 
 2. **Live region for updates:**
+
 ```tsx
 <div role="status" aria-live="polite" className="sr-only">
   {lastAction && (
-    <p>{lastAction.description} - {lastAction.result}</p>
+    <p>
+      {lastAction.description} - {lastAction.result}
+    </p>
   )}
 </div>
 ```
 
 3. **Stats structure:**
+
 ```tsx
 <section aria-labelledby="stats-heading">
   <h3 id="stats-heading" className="sr-only">
@@ -1175,10 +1213,12 @@ npm install --save-dev @axe-core/react
 ### 7. Mobile/Responsive Considerations
 
 #### 7.1 Three-Column Layout Breaks on Small Screens
+
 **Location:** `ai-labeling-dashboard.tsx`, line 215
 **Severity:** HIGH
 
 **Current:**
+
 ```tsx
 <div className="flex-1 grid grid-cols-3 gap-0">
 ```
@@ -1188,6 +1228,7 @@ npm install --save-dev @axe-core/react
 **Recommendations:**
 
 **Responsive layout:**
+
 ```tsx
 <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0">
   {/* On mobile: Stack vertically */}
@@ -1197,8 +1238,9 @@ npm install --save-dev @axe-core/react
 ```
 
 **Better approach - Tabs for mobile:**
+
 ```tsx
-const [activeTab, setActiveTab] = useState('bookmarks');
+const [activeTab, setActiveTab] = useState("bookmarks");
 
 return (
   <>
@@ -1216,16 +1258,18 @@ return (
           <TabsTrigger value="bookmarks">
             Bookmarks
             {selectedCount > 0 && (
-              <Badge variant="secondary" className="ml-2">{selectedCount}</Badge>
+              <Badge variant="secondary" className="ml-2">
+                {selectedCount}
+              </Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="suggestions">
             Suggestions
-            <Badge variant="secondary" className="ml-2">{patterns.length}</Badge>
+            <Badge variant="secondary" className="ml-2">
+              {patterns.length}
+            </Badge>
           </TabsTrigger>
-          <TabsTrigger value="stats">
-            Stats
-          </TabsTrigger>
+          <TabsTrigger value="stats">Stats</TabsTrigger>
         </TabsList>
 
         <TabsContent value="bookmarks">
@@ -1244,9 +1288,11 @@ return (
 ```
 
 #### 7.2 Touch Target Sizes
+
 **Severity:** MEDIUM
 
 **Problems:**
+
 - Checkboxes may be too small for touch (Radix default)
 - Small icon buttons (h-4 w-4 buttons)
 - Close button in header (h-8 w-8)
@@ -1281,15 +1327,18 @@ return (
 ```
 
 #### 7.3 Modal Sizing Issues
+
 **Location:** `ai-labeling-dashboard.tsx`, line 192
 **Severity:** MEDIUM
 
 **Current:**
+
 ```tsx
 <div className="w-full max-w-7xl h-[90vh]">
 ```
 
 **Problem:**
+
 - max-w-7xl is too wide on very large screens
 - h-[90vh] might not fit on small laptops
 - No horizontal padding on very small screens
@@ -1308,9 +1357,11 @@ return (
 ```
 
 #### 7.4 Scrolling Issues on Mobile
+
 **Severity:** MEDIUM
 
 **Problems:**
+
 1. ScrollArea might have touch scrolling issues
 2. No scroll indicators on mobile
 3. Bottom action bar might be hidden by keyboard
@@ -1318,28 +1369,25 @@ return (
 **Recommendations:**
 
 1. **Ensure touch scrolling:**
+
 ```tsx
-<ScrollArea className="flex-1 touch-pan-y overscroll-contain">
-  {/* Content */}
-</ScrollArea>
+<ScrollArea className="flex-1 touch-pan-y overscroll-contain">{/* Content */}</ScrollArea>
 ```
 
 2. **Make bottom bar sticky on mobile:**
+
 ```tsx
-<div className="p-4 border-t bg-background flex-shrink-0 sticky bottom-0 lg:relative">
-  {/* Actions */}
-</div>
+<div className="p-4 border-t bg-background flex-shrink-0 sticky bottom-0 lg:relative">{/* Actions */}</div>
 ```
 
 3. **Add scroll indicators:**
+
 ```tsx
 <div className="relative">
   {showTopShadow && (
     <div className="absolute top-0 left-0 right-0 h-4 bg-gradient-to-b from-background to-transparent z-10 pointer-events-none" />
   )}
-  <ScrollArea onScroll={handleScroll}>
-    {/* Content */}
-  </ScrollArea>
+  <ScrollArea onScroll={handleScroll}>{/* Content */}</ScrollArea>
   {showBottomShadow && (
     <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-t from-background to-transparent z-10 pointer-events-none" />
   )}
@@ -1453,6 +1501,7 @@ return (
 These changes provide maximum improvement for minimal effort:
 
 ### 1. Fix Broken Actions (5 min, CRITICAL)
+
 ```tsx
 // ai-labeling-dashboard.tsx, line 243
 <BulkActionsColumn
@@ -1465,35 +1514,35 @@ These changes provide maximum improvement for minimal effort:
 ```
 
 ### 2. Improve Dashboard Header (15 min)
+
 ```tsx
 <div>
   <h1 className="text-xl font-bold">Review & Apply AI Label Suggestions</h1>
   <p className="text-sm text-muted-foreground">
     {isAnalyzing
       ? `Analyzing ${totalCount} bookmarks...`
-      : `Review ${totalSuggestions} suggestions for ${totalCount} bookmarks`
-    }
+      : `Review ${totalSuggestions} suggestions for ${totalCount} bookmarks`}
   </p>
-  <p className="text-xs text-muted-foreground mt-1">
-    Select bookmarks → Apply patterns or use bulk actions below
-  </p>
+  <p className="text-xs text-muted-foreground mt-1">Select bookmarks → Apply patterns or use bulk actions below</p>
 </div>
 ```
 
 ### 3. Add Keyboard Shortcuts for Close (10 min)
+
 ```tsx
 useEffect(() => {
   const handleEscape = (e: KeyboardEvent) => {
-    if (e.key === 'Escape' && isOpen) {
+    if (e.key === "Escape" && isOpen) {
       onClose();
     }
   };
-  window.addEventListener('keydown', handleEscape);
-  return () => window.removeEventListener('keydown', handleEscape);
+  window.addEventListener("keydown", handleEscape);
+  return () => window.removeEventListener("keydown", handleEscape);
 }, [isOpen, onClose]);
 ```
 
 ### 4. Improve Selection Button Labels (5 min)
+
 ```tsx
 <Button onClick={onSelectAll} className="flex-1">
   <CheckSquare className="h-3.5 w-3.5 mr-1.5" />
@@ -1506,22 +1555,19 @@ useEffect(() => {
 ```
 
 ### 5. Add Basic ARIA to Close Button (2 min)
+
 ```tsx
-<Button
-  variant="ghost"
-  size="sm"
-  onClick={onClose}
-  className="h-8 w-8 p-0"
-  aria-label="Close AI Labeling Dashboard"
->
+<Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0" aria-label="Close AI Labeling Dashboard">
   <X className="h-4 w-4" />
 </Button>
 ```
 
 ### 6. Update Confidence Colors (30 min)
+
 Replace all instances of amber/red for medium/low confidence with blue/gray as detailed in section 2.1.
 
 ### 7. Add Context to Bottom Actions (20 min)
+
 ```tsx
 <Button disabled={areButtonsDisabled}>
   <Sparkles className="h-4 w-4 mr-2" />
@@ -1541,48 +1587,56 @@ Replace all instances of amber/red for medium/low confidence with blue/gray as d
 These are larger enhancements for future iterations:
 
 ### 1. Advanced Filtering & Search
+
 - Add search bar to filter bookmarks by title/URL
 - Filter by confidence level, category, domain
 - Saved filter presets
 - Sort options (confidence, date, title, label count)
 
 ### 2. Batch Action History
+
 - Track all bulk operations with timestamps
 - Allow undo/redo of any past action
 - Export history as log file
 - Resume interrupted operations
 
 ### 3. Label Management Enhancements
+
 - Create custom categories beyond topic/type/priority
 - Merge similar labels (e.g., "JS" + "JavaScript")
 - Set confidence thresholds per user preference
 - Block/ignore specific AI suggestions
 
 ### 4. Visualization Improvements
+
 - Charts showing label distribution
 - Network graph of related bookmarks
 - Timeline of when bookmarks were added
 - Heatmap of domains by label
 
 ### 5. Collaborative Features
+
 - Share label patterns with team
 - Approve/reject workflow for teams
 - Comments on bookmarks
 - Activity feed of label changes
 
 ### 6. Performance Optimizations
+
 - Virtual scrolling for large bookmark lists (1000+)
 - Debounced search and filtering
 - Lazy loading of pattern detection
 - Web Worker for heavy computations
 
 ### 7. Export & Integration
+
 - Export labeled bookmarks as CSV/JSON
 - Integration with other tools
 - Scheduled auto-labeling
 - API for programmatic access
 
 ### 8. Smart Suggestions
+
 - Learn from user accept/reject patterns
 - Suggest labels based on folder structure
 - Auto-apply based on rules (e.g., "always apply 'work' to company.com")
@@ -1593,6 +1647,7 @@ These are larger enhancements for future iterations:
 ## Implementation Roadmap
 
 ### Phase 1 - Critical Fixes (Week 1)
+
 - [ ] Fix broken action buttons
 - [ ] Resolve dual action placement
 - [ ] Add basic ARIA labels
@@ -1600,6 +1655,7 @@ These are larger enhancements for future iterations:
 - [ ] Fix touch target sizes
 
 ### Phase 2 - Core UX (Week 2-3)
+
 - [ ] Implement responsive layout
 - [ ] Add undo capability
 - [ ] Enhance action button clarity
@@ -1607,6 +1663,7 @@ These are larger enhancements for future iterations:
 - [ ] Add keyboard navigation
 
 ### Phase 3 - Polish (Week 4)
+
 - [ ] Preview before bulk apply
 - [ ] Better loading states
 - [ ] Keyboard shortcuts
@@ -1614,12 +1671,14 @@ These are larger enhancements for future iterations:
 - [ ] Enhanced selection controls
 
 ### Phase 4 - Advanced Features (Month 2)
+
 - [ ] Advanced filtering
 - [ ] Batch action history
 - [ ] Label management
 - [ ] Performance optimizations
 
 ### Phase 5 - Future Enhancements (Month 3+)
+
 - [ ] Visualizations
 - [ ] Collaborative features
 - [ ] Export & integration
@@ -1632,6 +1691,7 @@ These are larger enhancements for future iterations:
 The AI Labeling Dashboard has a solid foundation but requires immediate attention to critical usability issues, particularly the broken action buttons and confusing dual action placement. By addressing the high-priority recommendations, the dashboard will become significantly more usable and trustworthy.
 
 The most impactful improvements can be achieved in the first week:
+
 1. Fix broken functionality
 2. Clarify action placement and labeling
 3. Add basic accessibility features
@@ -1641,6 +1701,7 @@ The most impactful improvements can be achieved in the first week:
 These changes will transform the dashboard from a confusing interface into a powerful, efficient tool for managing AI-generated bookmark labels.
 
 **Estimated Total Effort:**
+
 - Critical fixes: 8-10 hours
 - High priority: 15-20 hours
 - Medium priority: 20-25 hours

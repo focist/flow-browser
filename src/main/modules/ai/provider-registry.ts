@@ -7,15 +7,15 @@
  * go through SelectionCore.testConnection.
  */
 
-import { LLMProvider, ProviderMetadata, ModelMetadata } from './providers/base-provider';
-import { OpenAIProvider } from './providers/openai-provider';
-import { AnthropicProvider } from './providers/anthropic-provider';
+import { LLMProvider, ProviderMetadata, ModelMetadata } from "./providers/base-provider";
+import { OpenAIProvider } from "./providers/openai-provider";
+import { AnthropicProvider } from "./providers/anthropic-provider";
 
 export class ProviderRegistry {
   private providers: Map<string, LLMProvider> = new Map();
 
   /** Optional per-provider base URL overrides (used by the test harness). */
-  constructor(private options: { baseUrls?: Partial<Record<'openai' | 'anthropic', string>> } = {}) {}
+  constructor(private options: { baseUrls?: Partial<Record<"openai" | "anthropic", string>> } = {}) {}
 
   /**
    * Get a provider by ID
@@ -28,17 +28,14 @@ export class ProviderRegistry {
    * List all registered providers
    */
   listProviders(): ProviderMetadata[] {
-    return Array.from(this.providers.values()).map(p => p.metadata);
+    return Array.from(this.providers.values()).map((p) => p.metadata);
   }
 
   /**
    * Configure a provider (set API key, etc.). Recreates the instance with
    * the new config; no network request is made.
    */
-  async configureProvider(
-    providerId: string,
-    config: { apiKey?: string; baseUrl?: string }
-  ): Promise<void> {
+  async configureProvider(providerId: string, config: { apiKey?: string; baseUrl?: string }): Promise<void> {
     const provider = this.createProvider(providerId, config);
     if (provider) {
       this.providers.set(providerId, provider);
@@ -91,27 +88,30 @@ export class ProviderRegistry {
    * Register the default providers (unkeyed until configured).
    */
   async initializeDefaults(): Promise<void> {
-    if (!this.providers.has('openai')) {
-      this.providers.set('openai', new OpenAIProvider({ apiKey: '', baseUrl: this.options.baseUrls?.openai }));
+    if (!this.providers.has("openai")) {
+      this.providers.set("openai", new OpenAIProvider({ apiKey: "", baseUrl: this.options.baseUrls?.openai }));
     }
-    if (!this.providers.has('anthropic')) {
-      this.providers.set('anthropic', new AnthropicProvider({ apiKey: '', baseUrl: this.options.baseUrls?.anthropic }));
+    if (!this.providers.has("anthropic")) {
+      this.providers.set("anthropic", new AnthropicProvider({ apiKey: "", baseUrl: this.options.baseUrls?.anthropic }));
     }
   }
 
   /**
    * Create provider instance
    */
-  private createProvider(
-    providerId: string,
-    config: { apiKey?: string; baseUrl?: string }
-  ): LLMProvider | null {
+  private createProvider(providerId: string, config: { apiKey?: string; baseUrl?: string }): LLMProvider | null {
     switch (providerId) {
-      case 'openai':
-        return new OpenAIProvider({ apiKey: config.apiKey || '', baseUrl: config.baseUrl ?? this.options.baseUrls?.openai });
+      case "openai":
+        return new OpenAIProvider({
+          apiKey: config.apiKey || "",
+          baseUrl: config.baseUrl ?? this.options.baseUrls?.openai
+        });
 
-      case 'anthropic':
-        return new AnthropicProvider({ apiKey: config.apiKey || '', baseUrl: config.baseUrl ?? this.options.baseUrls?.anthropic });
+      case "anthropic":
+        return new AnthropicProvider({
+          apiKey: config.apiKey || "",
+          baseUrl: config.baseUrl ?? this.options.baseUrls?.anthropic
+        });
 
       default:
         console.warn(`Unknown provider: ${providerId}`);

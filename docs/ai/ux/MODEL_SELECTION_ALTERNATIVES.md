@@ -5,6 +5,7 @@
 The current AI Settings interface uses a standard dropdown (Radix UI Select) for model selection. While functional, this approach has significant limitations:
 
 **Current Problems:**
+
 - Text gets "smushed" within the select trigger
 - Limited space to display rich model metadata (pricing, capabilities, context window)
 - Model details are only visible in a small info card AFTER selection
@@ -12,6 +13,7 @@ The current AI Settings interface uses a standard dropdown (Radix UI Select) for
 - Poor discoverability of model capabilities
 
 **Available Data Per Model:**
+
 ```typescript
 {
   id: string                    // e.g., "gpt-4o", "claude-opus-4-5"
@@ -38,6 +40,7 @@ The current AI Settings interface uses a standard dropdown (Radix UI Select) for
 ## Alternative 1: Radio Card Grid
 
 ### Visual Description
+
 A grid of card-style radio buttons, each displaying comprehensive model information. Cards would be arranged in a 2-column or 3-column grid (depending on available width), with each card containing:
 
 ```
@@ -52,27 +55,26 @@ A grid of card-style radio buttons, each displaying comprehensive model informat
 ```
 
 ### Behavior
+
 - Click anywhere on the card to select
 - Selected card has distinct visual state (border, background color, checkmark)
 - Cards can expand vertically to show full descriptions without truncation
 - Hover states show additional details or subtle elevation
 
 ### Implementation Pattern
+
 ```tsx
 <RadioGroup value={selectedModel} onValueChange={setModel}>
   <div className="grid grid-cols-2 gap-3">
-    {models.map(model => (
-      <RadioCard
-        key={model.id}
-        value={model.id}
-        model={model}
-      />
+    {models.map((model) => (
+      <RadioCard key={model.id} value={model.id} model={model} />
     ))}
   </div>
 </RadioGroup>
 ```
 
 ### Pros
+
 - **High information density** - Shows all key details at a glance
 - **Easy comparison** - Users can compare models side-by-side
 - **Clear selection state** - Obvious which model is selected
@@ -81,11 +83,13 @@ A grid of card-style radio buttons, each displaying comprehensive model informat
 - **Accessible** - Native radio semantics, keyboard navigable
 
 ### Cons
+
 - **Takes more vertical space** - With 10+ models, could require scrolling
 - **Fixed layout** - Less flexible than a dropdown for very long model lists
 - **May feel overwhelming** - If there are many models (20+)
 
 ### Best For
+
 - 3-15 models per provider
 - Settings pages with dedicated real estate
 - Users who need to compare options
@@ -96,9 +100,11 @@ A grid of card-style radio buttons, each displaying comprehensive model informat
 ## Alternative 2: Combobox with Rich Preview
 
 ### Visual Description
+
 A hybrid between a dropdown and autocomplete. The trigger shows the selected model name, but when opened, displays a searchable list with rich previews for each option.
 
 **Closed state:**
+
 ```
 ┌─────────────────────────────────┐
 │ GPT-4o                        ▼ │
@@ -106,6 +112,7 @@ A hybrid between a dropdown and autocomplete. The trigger shows the selected mod
 ```
 
 **Open state with rich items:**
+
 ```
 ┌─────────────────────────────────────────────────────┐
 │ Search models...                                    │
@@ -125,6 +132,7 @@ A hybrid between a dropdown and autocomplete. The trigger shows the selected mod
 ```
 
 ### Behavior
+
 - Opens like a dropdown but with larger, richer items
 - Optional search/filter at top of popover
 - Scrollable list for many models
@@ -132,7 +140,9 @@ A hybrid between a dropdown and autocomplete. The trigger shows the selected mod
 - Hover shows additional tooltip with full description
 
 ### Implementation Pattern
+
 Uses Radix UI Combobox or enhanced Select with custom item rendering:
+
 ```tsx
 <Combobox value={selectedModel} onValueChange={setModel}>
   <ComboboxTrigger>
@@ -141,12 +151,8 @@ Uses Radix UI Combobox or enhanced Select with custom item rendering:
   <ComboboxContent className="w-[500px]">
     <ComboboxInput placeholder="Search models..." />
     <ComboboxList>
-      {models.map(model => (
-        <ComboboxItem
-          key={model.id}
-          value={model.id}
-          className="min-h-[80px] py-3"
-        >
+      {models.map((model) => (
+        <ComboboxItem key={model.id} value={model.id} className="min-h-[80px] py-3">
           <ModelRichPreview model={model} />
         </ComboboxItem>
       ))}
@@ -156,6 +162,7 @@ Uses Radix UI Combobox or enhanced Select with custom item rendering:
 ```
 
 ### Pros
+
 - **Compact when closed** - Doesn't take up space until needed
 - **Searchable** - Can filter through many models quickly
 - **Rich information** - Shows all details without requiring selection first
@@ -164,12 +171,14 @@ Uses Radix UI Combobox or enhanced Select with custom item rendering:
 - **Progressive disclosure** - Hides complexity until user opens it
 
 ### Cons
+
 - **Requires click to see options** - Not immediately visible
 - **Harder to compare** - Only see one screenful at a time
 - **More complex** - Combobox behavior is more involved than radio buttons
 - **Scrolling required** - For long lists, must scroll through popover
 
 ### Best For
+
 - 10+ models per provider
 - When screen space is limited
 - Users who know what they're looking for (via search)
@@ -180,9 +189,11 @@ Uses Radix UI Combobox or enhanced Select with custom item rendering:
 ## Alternative 3: Segmented List with Expandable Details
 
 ### Visual Description
+
 A vertical list where each model is initially shown in a compact row. Clicking a model both selects it AND expands it to show full details.
 
 **List view:**
+
 ```
 ┌─────────────────────────────────────────────────────┐
 │ ● GPT-4o                            [RECOMMENDED] ▼ │
@@ -205,6 +216,7 @@ A vertical list where each model is initially shown in a compact row. Clicking a
 ```
 
 ### Behavior
+
 - Click to select AND expand
 - Only one model expanded at a time (accordion-style)
 - Collapsed models show just name + tags
@@ -213,10 +225,11 @@ A vertical list where each model is initially shown in a compact row. Clicking a
 - Chevron indicates expandable state
 
 ### Implementation Pattern
+
 ```tsx
 <RadioGroup value={selectedModel} onValueChange={setModel}>
   <Accordion type="single" value={expandedModel} onValueChange={setExpandedModel}>
-    {models.map(model => (
+    {models.map((model) => (
       <AccordionItem key={model.id} value={model.id}>
         <div className="flex items-center gap-2">
           <RadioGroupItem value={model.id} />
@@ -234,6 +247,7 @@ A vertical list where each model is initially shown in a compact row. Clicking a
 ```
 
 ### Pros
+
 - **Progressive disclosure** - Compact by default, detailed on demand
 - **Clear hierarchy** - Easy to scan model names
 - **Focused information** - One expanded model prevents overwhelm
@@ -242,12 +256,14 @@ A vertical list where each model is initially shown in a compact row. Clicking a
 - **Combines selection + exploration** - One interaction does both
 
 ### Cons
+
 - **Requires extra click to see details** - Unlike Radio Cards
 - **Can only view one at a time** - Harder to compare multiple models
 - **More complex interaction** - Managing selection + expansion state
 - **May feel slow** - If users need to expand many models to compare
 
 ### Best For
+
 - Users unfamiliar with models who need to explore
 - When you want to teach users about options
 - Medium to large model lists (5-30 models)
@@ -258,6 +274,7 @@ A vertical list where each model is initially shown in a compact row. Clicking a
 ## Alternative 4: Data Table with Radio Selection
 
 ### Visual Description
+
 A traditional table layout where each row is a model, with columns for key attributes. First column has radio buttons for selection.
 
 ```
@@ -276,6 +293,7 @@ A traditional table layout where each row is a model, with columns for key attri
 ```
 
 **Expandable row variant** - Click row to expand full description below:
+
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
 │   ●    │ GPT-4o     │ 🏆 Budget   │ 128K    │ $2.50/1M   │ $10.00/1M   │▼
@@ -287,6 +305,7 @@ A traditional table layout where each row is a model, with columns for key attri
 ```
 
 ### Behavior
+
 - Radio button in first column for selection
 - Entire row clickable to select
 - Sortable columns (by price, context window, etc.)
@@ -294,6 +313,7 @@ A traditional table layout where each row is a model, with columns for key attri
 - Hover highlights row
 
 ### Implementation Pattern
+
 ```tsx
 <Table>
   <TableHeader>
@@ -308,7 +328,7 @@ A traditional table layout where each row is a model, with columns for key attri
   </TableHeader>
   <TableBody>
     <RadioGroup value={selectedModel} onValueChange={setModel}>
-      {models.map(model => (
+      {models.map((model) => (
         <ModelTableRow key={model.id} model={model} />
       ))}
     </RadioGroup>
@@ -317,6 +337,7 @@ A traditional table layout where each row is a model, with columns for key attri
 ```
 
 ### Pros
+
 - **Excellent for comparison** - Side-by-side data comparison
 - **Dense information** - Lots of data in minimal space
 - **Sortable** - Users can sort by price, context, etc.
@@ -325,6 +346,7 @@ A traditional table layout where each row is a model, with columns for key attri
 - **Professional appearance** - Feels polished and data-driven
 
 ### Cons
+
 - **Less visual appeal** - More utilitarian than cards
 - **Rigid layout** - Doesn't adapt well to narrow screens
 - **Harder to show rich content** - Long descriptions don't fit
@@ -332,6 +354,7 @@ A traditional table layout where each row is a model, with columns for key attri
 - **Requires good UX** - Easy to make too dense or confusing
 
 ### Best For
+
 - Power users who want to compare specs
 - Many models with quantifiable differences
 - Desktop applications with horizontal space
@@ -357,18 +380,21 @@ A traditional table layout where each row is a model, with columns for key attri
 ### Implementation Approach
 
 **Phase 1: Basic Radio Cards**
+
 - Replace Select with RadioGroup + Card grid
 - 2-column layout on desktop
 - Show model name, description, tags, pricing, context window
 - Selected state via border + background color
 
 **Phase 2: Enhanced Details**
+
 - Add capability icons (vision, functions, etc.)
 - Cost estimator tooltip ("~$X for 100 bookmarks")
 - Deprecation warnings for old models
 - "Recommended for your use case" logic
 
 **Phase 3: Refinements**
+
 - Collapsible details for power users
 - Quick search/filter above cards
 - Group by provider if showing all at once
@@ -377,6 +403,7 @@ A traditional table layout where each row is a model, with columns for key attri
 ### Secondary Recommendation: Combobox with Rich Preview (Alternative 2)
 
 **If** the model list grows to 20+ models per provider, or if vertical space becomes constrained, switch to the Combobox pattern. This provides:
+
 - Compact closed state
 - Searchability for long lists
 - Still shows rich information per model
@@ -461,40 +488,35 @@ function ModelCard({ model, selected, onSelect }: ModelCardProps) {
     <label
       className={cn(
         "relative flex cursor-pointer flex-col gap-3 rounded-lg border-2 p-4 transition-all",
-        selected
-          ? "border-primary bg-primary/5"
-          : "border-border bg-card hover:border-primary/50"
+        selected ? "border-primary bg-primary/5" : "border-border bg-card hover:border-primary/50"
       )}
     >
-      <input
-        type="radio"
-        checked={selected}
-        onChange={onSelect}
-        className="sr-only"
-      />
+      <input type="radio" checked={selected} onChange={onSelect} className="sr-only" />
 
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <h4 className="font-semibold text-base">{model.name}</h4>
-          <p className="text-sm text-muted-foreground mt-1">
-            {model.description}
-          </p>
+          <p className="text-sm text-muted-foreground mt-1">{model.description}</p>
         </div>
 
-        {selected && (
-          <CheckCircle className="h-5 w-5 text-primary shrink-0" />
-        )}
+        {selected && <CheckCircle className="h-5 w-5 text-primary shrink-0" />}
       </div>
 
       <div className="flex flex-wrap gap-1">
-        {model.tags.includes('recommended') && (
-          <Badge variant="default" className="text-xs">Recommended</Badge>
+        {model.tags.includes("recommended") && (
+          <Badge variant="default" className="text-xs">
+            Recommended
+          </Badge>
         )}
-        {model.tags.includes('budget') && (
-          <Badge variant="secondary" className="text-xs">Budget</Badge>
+        {model.tags.includes("budget") && (
+          <Badge variant="secondary" className="text-xs">
+            Budget
+          </Badge>
         )}
-        {model.tags.includes('fast') && (
-          <Badge variant="outline" className="text-xs">Fast</Badge>
+        {model.tags.includes("fast") && (
+          <Badge variant="outline" className="text-xs">
+            Fast
+          </Badge>
         )}
       </div>
 
@@ -502,8 +524,8 @@ function ModelCard({ model, selected, onSelect }: ModelCardProps) {
         <div className="flex items-center gap-1">
           <DollarSign className="h-3 w-3" />
           <span>
-            ${model.pricing.inputCostPerMillion.toFixed(2)} / $
-            {model.pricing.outputCostPerMillion.toFixed(2)} per 1M tokens
+            ${model.pricing.inputCostPerMillion.toFixed(2)} / ${model.pricing.outputCostPerMillion.toFixed(2)} per 1M
+            tokens
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -528,7 +550,9 @@ function ModelCard({ model, selected, onSelect }: ModelCardProps) {
 ### Usage in Settings
 
 ```tsx
-{/* Model Selection - Radio Card Grid */}
+{
+  /* Model Selection - Radio Card Grid */
+}
 <div className="space-y-2">
   <Label>Select Model</Label>
   <div className="grid grid-cols-2 gap-3">
@@ -537,11 +561,11 @@ function ModelCard({ model, selected, onSelect }: ModelCardProps) {
         key={model.id}
         model={model}
         selected={settings.model === model.id}
-        onSelect={() => handleSettingChange('model', model.id)}
+        onSelect={() => handleSettingChange("model", model.id)}
       />
     ))}
   </div>
-</div>
+</div>;
 ```
 
 ---

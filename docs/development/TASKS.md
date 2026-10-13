@@ -1,11 +1,13 @@
 # Flow Browser - All ClickUp Tasks
 
 ## Current Task Structure Issues
+
 **PROBLEM**: All tasks were created as standalone parent tasks instead of proper parent → subtask relationships.
 
 ## All Tasks in ClickUp (Oasis Space)
 
 ### Import Feature Tasks
+
 - 📥 Import Feature - Unified Import Wizard (PARENT - CORRECT)
 - 🔍 Research Arc Export Format (SHOULD BE SUBTASK of Import Feature)
 - 🎨 Design Import Wizard UI/UX (SHOULD BE SUBTASK of Import Feature)
@@ -20,6 +22,7 @@
 - 📖 Import Feature Documentation (SHOULD BE SUBTASK of Import Feature)
 
 ### AI Labeling Dashboard Tasks
+
 - 🤖 AI Labeling Dashboard (PARENT - CORRECT)
 - Design three-column dashboard layout (SHOULD BE SUBTASK of AI Labeling Dashboard)
 - Add confidence-based grouping (high/medium/low) (SHOULD BE SUBTASK of AI Labeling Dashboard)
@@ -29,6 +32,7 @@
 - Add progress tracking and completion status (SHOULD BE SUBTASK of AI Labeling Dashboard)
 
 ### Tab Snooze System Tasks
+
 - 📑 Tab Snooze System (PARENT - CORRECT)
 - Design snooze database schema (SHOULD BE SUBTASK of Tab Snooze System)
 - Implement tab snooze functionality (SHOULD BE SUBTASK of Tab Snooze System)
@@ -38,6 +42,7 @@
 - Build notification system for wake-ups (SHOULD BE SUBTASK of Tab Snooze System)
 
 ### Pinned Tabs System Tasks
+
 - 📌 Pinned Tabs System (PARENT - CORRECT)
 - Create 4x3 grid layout system (SHOULD BE SUBTASK of Pinned Tabs System)
 - Add pin/unpin context menu functionality (SHOULD BE SUBTASK of Pinned Tabs System)
@@ -47,6 +52,7 @@
 - Create visual styling and interaction states (SHOULD BE SUBTASK of Pinned Tabs System)
 
 ### Space-Associated Bookmarks Folders Tasks
+
 - 🏷️ Space-Associated Bookmarks Folders (PARENT - CORRECT)
 - Extend database schema for space associations (SHOULD BE SUBTASK of Space-Associated Bookmarks Folders)
 - Create space assignment UI for folders (SHOULD BE SUBTASK of Space-Associated Bookmarks Folders)
@@ -56,9 +62,11 @@
 - Create migration for existing folders (SHOULD BE SUBTASK of Space-Associated Bookmarks Folders)
 
 ### OpenAI Batch API Implementation
+
 - ⚡ OpenAI Batch API Implementation (STANDALONE - CORRECT)
 
 ## Task IDs for Reference
+
 - 86b6p65yn - 📥 Import Feature - Unified Import Wizard
 - 86b6p6632 - 🔍 Research Arc Export Format
 - 86b6p6631 - 🎨 Design Import Wizard UI/UX
@@ -102,4 +110,5 @@
 - 86b6p3bxe - ⚡ OpenAI Batch API Implementation
 
 ## Action Required
+
 Need to fix parent-child relationships by making implementation tasks into subtasks of their respective parent features.

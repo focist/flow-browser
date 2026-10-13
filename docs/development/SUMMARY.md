@@ -9,16 +9,19 @@ The analysis involved comparing Arc browser's feature set with Flow Browser's ex
 ## Agents Involved
 
 ### **📊 Product Manager**
+
 - Analyzed and categorized all 41 features based on user detailed feedback
 - Structured analysis for implementation planning
 - Identified integration points and feature combinations
 
-### **🔍 Web Research Agent** 
+### **🔍 Web Research Agent**
+
 - Investigated Arc's claimed "uBlock Origin integration"
 - **Critical Finding**: Discovered Arc never had uBlock Origin integration - this was an incorrect claim
 - Confirmed Arc's built-in ad blocker was actually removed from the browser entirely
 
 ### **📝 Documentation Writer**
+
 - Updated UPCOMING.md with 13 high-priority features above the fold
 - Created new MAYBE.md file with 9 lower-priority/experimental features
 - Maintained consistent formatting and organization
@@ -26,63 +29,69 @@ The analysis involved comparing Arc browser's feature set with Flow Browser's ex
 ## Final Results Summary
 
 ### **✅ Added to UPCOMING.md (13 features)**
+
 **High-priority implementations:**
 
 4. **Library Central Hub** 📚 - Unified bookmark/media management hub
-10. **Website Screenshots** 📸 - Full page & element capture functionality
-21. **Ask on Page** 🤖 - AI webpage assistant (omnibox integration, part of "chat with tabs")
-22. **5-Second Previews** ⚡ - AI webpage summaries on link hover
-23. **Instant Links** 🔍 - AI-powered search (omnibox integration)
-24. **Live Folders** 🗂️ - AI-powered automatic organization
-25. **AI Content Learning** 🧠 - Personalized content discovery
-27. **Drag-to-Split Tab Creation** ↗️ - Visual tab splitting
-28. **Tab Renaming** ✏️ - Custom tab titles
-33. **Multiple Tab Split Ordering** 🔄 - Advanced split positioning (part of tab splits)
-39. **Cross-Device Syncing** 🔗 - Enhanced sync with profile syncing capabilities
-40. **Favorites Keyboard Shortcuts** ⌨️ - Quick access shortcuts (Cmd+1-12)
-41. **Meeting Integration** 💼 - Calendar and video meeting shortcuts
+5. **Website Screenshots** 📸 - Full page & element capture functionality
+6. **Ask on Page** 🤖 - AI webpage assistant (omnibox integration, part of "chat with tabs")
+7. **5-Second Previews** ⚡ - AI webpage summaries on link hover
+8. **Instant Links** 🔍 - AI-powered search (omnibox integration)
+9. **Live Folders** 🗂️ - AI-powered automatic organization
+10. **AI Content Learning** 🧠 - Personalized content discovery
+11. **Drag-to-Split Tab Creation** ↗️ - Visual tab splitting
+12. **Tab Renaming** ✏️ - Custom tab titles
+13. **Multiple Tab Split Ordering** 🔄 - Advanced split positioning (part of tab splits)
+14. **Cross-Device Syncing** 🔗 - Enhanced sync with profile syncing capabilities
+15. **Favorites Keyboard Shortcuts** ⌨️ - Quick access shortcuts (Cmd+1-12)
+16. **Meeting Integration** 💼 - Calendar and video meeting shortcuts
 
 ### **✅ Added to MAYBE.md (9 features)**
+
 **Lower-priority/experimental features:**
 
 6. **Website Customization (Boosts)** ✨ - Advanced CSS/JS website modification tools
 7. **Multi-Tab Split View** 🔄 - Native 4-tab split screen support
-12. **Per-Profile Archive Settings** ⚙️ - Individual timing configuration per profile
-15. **Multi-Space Tab Overview** 👁️ - Library view across all spaces
-16. **Digital Whiteboards (Easels)** 🎨 - Built-in creative workspace
-17-20. **Easel Features** 📷🤝🎥📐 - Screenshot integration, sharing, video embeds, alignment guides
-26. **Mini Browser Window** 🪟 - Lightweight temporary browser for quick access
+8. **Per-Profile Archive Settings** ⚙️ - Individual timing configuration per profile
+9. **Multi-Space Tab Overview** 👁️ - Library view across all spaces
+10. **Digital Whiteboards (Easels)** 🎨 - Built-in creative workspace
+    17-20. **Easel Features** 📷🤝🎥📐 - Screenshot integration, sharing, video embeds, alignment guides
+11. **Mini Browser Window** 🪟 - Lightweight temporary browser for quick access
 
 ### **🔍 Needs Verification (4 features)**
+
 **Features requiring double-check if already captured:**
 
 3. **Tab Auto-Archive System** - Check if already captured in existing roadmap
-11. **Cross-Space Favorites** - Part of pinned tabs, needs profile enhancement requirements clarification
-29. **Archived Tabs Search** - Different archive system, verify if already captured
-2. **Command Bar Enhancement** - Some enhancements needed beyond current Flow implementation
+4. **Cross-Space Favorites** - Part of pinned tabs, needs profile enhancement requirements clarification
+5. **Archived Tabs Search** - Different archive system, verify if already captured
+6. **Command Bar Enhancement** - Some enhancements needed beyond current Flow implementation
 
 ### **❌ Removed (1 feature)**
+
 31. **Built-in uBlock Origin Integration** - **Research revealed this was an incorrect claim**
-   - Arc browser never had uBlock Origin integration
-   - Arc had their own ad blocker which has since been removed
-   - Users now rely on extensions like uBlock Lite
+
+- Arc browser never had uBlock Origin integration
+- Arc had their own ad blocker which has since been removed
+- Users now rely on extensions like uBlock Lite
 
 ### **⚠️ No Action Required (14 features)**
+
 **Already implemented or covered elsewhere:**
 
 1. **Favorites System** - Already implemented (Flow's pinned tabs)
-8. **Picture-in-Picture Auto-Activation** - Covered by Mini-player feature just added
-9. **Desktop Capture Integration** - OS level functionality
-13. **Space-Transcendent Tab Management** - Already captured above
-14. **Profile-Scoped Data Management** - Already implemented
-32. **Chrome Extension Support** - Already implemented
-34. **Cross-Platform Universal Binary** - Already done
-35. **Space Theme Customization** - Already done
-36. **Tab Lifecycle Automation** - Already captured
-37. **Media Management Hub** - Same as #4 (Library Central Hub)
-38. **Download Management** - Same as #4 (Library Central Hub)
-5. **Today Tabs Auto-Management** - Same as #3
-30. **Tab Auto-Disappearing Logic** - Same as #3 & 5
+2. **Picture-in-Picture Auto-Activation** - Covered by Mini-player feature just added
+3. **Desktop Capture Integration** - OS level functionality
+4. **Space-Transcendent Tab Management** - Already captured above
+5. **Profile-Scoped Data Management** - Already implemented
+6. **Chrome Extension Support** - Already implemented
+7. **Cross-Platform Universal Binary** - Already done
+8. **Space Theme Customization** - Already done
+9. **Tab Lifecycle Automation** - Already captured
+10. **Media Management Hub** - Same as #4 (Library Central Hub)
+11. **Download Management** - Same as #4 (Library Central Hub)
+12. **Today Tabs Auto-Management** - Same as #3
+13. **Tab Auto-Disappearing Logic** - Same as #3 & 5
 
 ## Key Integration Requirements
 
@@ -98,7 +107,7 @@ Based on user feedback, several features have specific integration requirements:
 ## Files Modified
 
 - **📝 UPCOMING.md** - Added 13 high-priority features above the fold
-- **📝 MAYBE.md** - Created new file with 9 lower-priority features  
+- **📝 MAYBE.md** - Created new file with 9 lower-priority features
 - **📝 FEATURES.md** - Original list of 41 Arc features for reference
 - **📝 RESPONSE.md** - User feedback and categorization instructions
 - **📝 SUMMARY.md** - This comprehensive analysis summary

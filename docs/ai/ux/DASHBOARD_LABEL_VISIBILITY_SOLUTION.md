@@ -13,14 +13,17 @@ This creates a blind spot that reduces user confidence and makes it difficult to
 ## Current State Analysis
 
 ### Data Already Available
+
 The system already has the necessary data through `LabelPattern.bookmarkIds` and the `getBookmarksWithLabel()` helper function. The problem is purely one of visibility and interaction design.
 
 ### Three-Column Layout
+
 - **Column 1**: Bookmarks grouped by confidence (high/medium/low/none)
 - **Column 2**: Label patterns with "Apply All" buttons
 - **Column 3**: Statistics and bulk actions (currently stats-only)
 
 ### Key Constraints
+
 - Must maintain the three-column layout
 - Cannot significantly increase UI clutter
 - Must work for both individual patterns and bulk operations
@@ -41,6 +44,7 @@ When hovering over a bookmark in Column 1, show an indicator of which patterns/l
 ### Visual Treatment
 
 **On Pattern Hover:**
+
 1. Dim all non-affected bookmarks in Column 1 (reduce opacity to 40%)
 2. Highlight affected bookmarks with:
    - Subtle blue border glow (`ring-2 ring-blue-500/50`)
@@ -49,6 +53,7 @@ When hovering over a bookmark in Column 1, show an indicator of which patterns/l
 3. Update pattern card to show exact count: "Will apply to 12 bookmarks" (emphasized text)
 
 **On Bookmark Hover:**
+
 1. Expand bookmark card slightly to show a compact list of patterns that would apply
 2. Display as small pill badges below the bookmark title
 3. Color-code by category (topic/type/priority)
@@ -56,6 +61,7 @@ When hovering over a bookmark in Column 1, show an indicator of which patterns/l
 
 **Enhanced "Apply All" Button:**
 When hovering over the "Apply All" button specifically:
+
 - Show tooltip: "Apply 'JavaScript' to 12 bookmarks"
 - Instantly trigger the highlight effect without needing to hover the whole card
 
@@ -64,6 +70,7 @@ When hovering over the "Apply All" button specifically:
 **Component Changes:**
 
 1. **`LabelSuggestionsColumn` (Pattern Items):**
+
    ```tsx
    const [hoveredPatternId, setHoveredPatternId] = useState<string | null>(null);
 
@@ -76,6 +83,7 @@ When hovering over the "Apply All" button specifically:
    ```
 
 2. **`BookmarkOverviewColumn` (Bookmark Items):**
+
    ```tsx
    // Receive hoveredPatternId from parent
    const isHighlighted = hoveredPatternId &&
@@ -94,15 +102,20 @@ When hovering over the "Apply All" button specifically:
    - Coordinate highlighting logic
 
 **New Helper Function:**
+
 ```tsx
 // In use-pattern-detection.tsx
-const getBookmarkIdsForPattern = useCallback((patternKey: string): string[] => {
-  const pattern = labelPatterns.find(p => `${p.label}::${p.category}` === patternKey);
-  return pattern?.bookmarkIds || [];
-}, [labelPatterns]);
+const getBookmarkIdsForPattern = useCallback(
+  (patternKey: string): string[] => {
+    const pattern = labelPatterns.find((p) => `${p.label}::${p.category}` === patternKey);
+    return pattern?.bookmarkIds || [];
+  },
+  [labelPatterns]
+);
 ```
 
 ### Pros
+
 1. **Immediate visual feedback** - Users see exactly what will happen in real-time
 2. **No additional clicks** - Pure hover interaction is fast and intuitive
 3. **Bidirectional understanding** - Works both ways (pattern→bookmark and bookmark→pattern)
@@ -112,6 +125,7 @@ const getBookmarkIdsForPattern = useCallback((patternKey: string): string[] => {
 7. **Familiar pattern** - Similar to filter highlighting in other applications
 
 ### Cons
+
 1. **Mobile/touch limitations** - Hover doesn't work on touch devices (but this is a desktop app)
 2. **High bookmark counts** - With 100+ bookmarks, scrolling while highlighted might be needed
 3. **No persistent preview** - Highlighting disappears when mouse moves away
@@ -119,6 +133,7 @@ const getBookmarkIdsForPattern = useCallback((patternKey: string): string[] => {
 5. **Performance** - Need to ensure smooth transitions with many bookmarks
 
 ### Accessibility Enhancements
+
 - Add `aria-describedby` to pattern items: "Applies to 12 bookmarks: [list of bookmark IDs]"
 - Provide keyboard navigation to trigger highlight states (focus instead of hover)
 - Add screen reader announcements when patterns are focused
@@ -130,6 +145,7 @@ const getBookmarkIdsForPattern = useCallback((patternKey: string): string[] => {
 ### Interaction Pattern
 
 **Repurpose Column 3** as a dynamic context panel with expandable sections that shows:
+
 - **Default state**: Overall statistics (current behavior)
 - **On pattern hover**: Preview of affected bookmarks with expandable list and exclusion controls
 - **On bookmark hover**: Preview of applicable patterns with expandable details and label selection
@@ -138,6 +154,7 @@ const getBookmarkIdsForPattern = useCallback((patternKey: string): string[] => {
 ### Visual Treatment
 
 **Default State (Stats):**
+
 ```
 ┌─ Overview ──────────────────────┐
 │ Statistics                      │
@@ -148,6 +165,7 @@ const getBookmarkIdsForPattern = useCallback((patternKey: string): string[] => {
 ```
 
 **Pattern Hover State:**
+
 ```
 ┌─ Pattern Preview ───────────────┐
 │ JavaScript (Topic)              │
@@ -183,6 +201,7 @@ When expanded:
 ```
 
 **Bookmark Hover State:**
+
 ```
 ┌─ Bookmark Preview ──────────────┐
 │ React Documentation             │
@@ -213,6 +232,7 @@ When expanded:
 ```
 
 **Bulk Selection State:**
+
 ```
 ┌─ Bulk Impact Preview ───────────┐
 │ 5 bookmarks selected            │
@@ -273,8 +293,9 @@ When bookmark details expanded:
 **Component Restructure:**
 
 1. **Create `ContextPreviewColumn` Component:**
+
    ```tsx
-   type PreviewMode = 'stats' | 'pattern' | 'bookmark' | 'bulk-impact';
+   type PreviewMode = "stats" | "pattern" | "bookmark" | "bulk-impact";
 
    interface ContextPreviewColumnProps {
      mode: PreviewMode;
@@ -289,17 +310,18 @@ When bookmark details expanded:
    ```
 
 2. **State Management in `AILabelingDashboard`:**
+
    ```tsx
-   const [previewMode, setPreviewMode] = useState<PreviewMode>('stats');
+   const [previewMode, setPreviewMode] = useState<PreviewMode>("stats");
    const [previewContext, setPreviewContext] = useState<any>(null);
 
    // On pattern hover
    const handlePatternHover = (pattern: LabelPattern | null) => {
      if (pattern) {
-       setPreviewMode('pattern');
+       setPreviewMode("pattern");
        setPreviewContext(pattern);
      } else {
-       setPreviewMode('stats');
+       setPreviewMode("stats");
        setPreviewContext(null);
      }
    };
@@ -312,6 +334,7 @@ When bookmark details expanded:
    - `BulkImpactView` (shows bulk operation consequences with expandable bookmark details)
 
 **Interaction Flow:**
+
 - Hover on pattern → Column 3 switches to pattern preview mode
 - Click expand → Shows full list of affected bookmarks with checkboxes
 - Uncheck bookmarks → "Apply to Selected" button updates count
@@ -323,14 +346,15 @@ When bookmark details expanded:
 - Mouse leaves → Column 3 returns to stats mode (with 300ms delay to prevent flicker)
 
 **Expandable Section States:**
+
 ```tsx
 interface ExpandableState {
   // For pattern preview
-  expandedConfidenceGroups: Set<'high' | 'medium' | 'low'>;
+  expandedConfidenceGroups: Set<"high" | "medium" | "low">;
   selectedBookmarkIds: Set<string>; // Bookmarks included in apply operation
 
   // For bookmark preview
-  expandedLabelGroups: Set<'high' | 'medium' | 'low'>;
+  expandedLabelGroups: Set<"high" | "medium" | "low">;
   selectedLabelIds: Set<string>; // Labels to apply
 
   // For bulk impact
@@ -341,6 +365,7 @@ interface ExpandableState {
 ```
 
 ### Pros
+
 1. **Dedicated space** - Doesn't interfere with existing columns
 2. **Rich context** - Can show more detailed information
 3. **Maintains clean layout** - Expandable sections keep UI clean when not needed
@@ -353,6 +378,7 @@ interface ExpandableState {
 10. **Persistent view** - Expanded information stays visible until collapsed
 
 ### Cons
+
 1. **Eye travel** - Users need to look at Column 3 while interacting with Columns 1-2
 2. **Less direct** - Not as immediately connected as highlighting
 3. **Column 3 loses stats** - Statistics become secondary (though still accessible)
@@ -364,6 +390,7 @@ interface ExpandableState {
 ### Expandable Section Interaction Patterns
 
 **Expand/Collapse Behavior:**
+
 - Click anywhere on the confidence group header to toggle
 - Chevron icon rotates to indicate state (▼ collapsed, ▲ expanded)
 - Smooth animation (200ms) when expanding/collapsing
@@ -371,6 +398,7 @@ interface ExpandableState {
 - Expanding a new group auto-collapses the previous one
 
 **Checkbox Behavior:**
+
 - All items checked by default
 - Unchecking an item excludes it from the operation
 - "Select All" / "Deselect All" buttons for quick control
@@ -378,6 +406,7 @@ interface ExpandableState {
 - Disabled state when no items selected
 
 **Nested Expansion (Bulk Impact):**
+
 - First level: Expand to see all affected bookmarks
 - Second level: Click individual bookmark to see its labels
 - Independent expansion states for each bookmark
@@ -392,12 +421,14 @@ After analyzing both approaches, I recommend implementing a **hybrid of Solution
 ### Why This Combination Works
 
 **Solution 1 (Hover Highlighting)** provides:
+
 - Immediate, intuitive visual feedback
 - Direct connection between patterns and bookmarks
 - Low cognitive overhead
 - Fast interaction for power users
 
 **Solution 2 (Dynamic Preview Column with Expandable Controls)** provides:
+
 - Detailed information when needed
 - Dedicated space for context
 - Granular control through expandable sections with checkboxes
@@ -405,6 +436,7 @@ After analyzing both approaches, I recommend implementing a **hybrid of Solution
 - Better accessibility
 
 **Together**, they create a comprehensive visibility system where:
+
 1. **Quick glances** are served by hover highlighting
 2. **Detailed inspection** is served by the preview column
 3. **Precise control** is provided through expandable sections
@@ -413,12 +445,14 @@ After analyzing both approaches, I recommend implementing a **hybrid of Solution
 ### Implementation Strategy
 
 **Phase 1: Core Highlighting (Solution 1)**
+
 1. Add hover state management to `AILabelingDashboard`
 2. Implement bidirectional highlighting between Columns 1 and 2
 3. Add smooth transitions and visual polish
 4. Ensure accessibility with focus states
 
 **Phase 2: Preview Column with Expandable Sections (Solution 2)**
+
 1. Refactor Column 3 from `BulkActionsColumn` to `ContextPreviewColumn`
 2. Implement mode switching (stats/pattern/bookmark/bulk)
 3. Create sub-components for each preview mode with expandable section support
@@ -427,6 +461,7 @@ After analyzing both approaches, I recommend implementing a **hybrid of Solution
 6. Add transition animations for both mode switching and expand/collapse
 
 **Phase 3: Integration**
+
 1. Coordinate hover highlighting with preview column updates
 2. Synchronize checkbox states with apply operations
 3. Update button labels to reflect selections ("Apply to Selected (X)")
@@ -436,12 +471,14 @@ After analyzing both approaches, I recommend implementing a **hybrid of Solution
 ### User Experience Flow
 
 **Scenario 1: Quick Pattern Application**
+
 1. User hovers over "JavaScript" pattern in Column 2
 2. Affected bookmarks highlight in Column 1 (immediate feedback)
 3. Column 3 shows summary: "12 bookmarks will receive this label"
 4. User clicks "Apply All" with full confidence
 
 **Scenario 2: Selective Pattern Application**
+
 1. User hovers over "JavaScript" pattern in Column 2
 2. Affected bookmarks highlight in Column 1
 3. Column 3 shows preview with "High Confidence (8) [▼ Expand]"
@@ -451,6 +488,7 @@ After analyzing both approaches, I recommend implementing a **hybrid of Solution
 7. User clicks apply, only 6 bookmarks receive the label
 
 **Scenario 3: Bookmark Label Inspection**
+
 1. User hovers over bookmark in Column 1
 2. Column 3 shows preview with confidence groups
 3. User expands "High Confidence (2)" to see specific labels
@@ -459,6 +497,7 @@ After analyzing both approaches, I recommend implementing a **hybrid of Solution
 6. Only "JavaScript" label is applied, "Tutorial" is skipped
 
 **Scenario 4: Bulk Operation with Granular Control**
+
 1. User selects 5 bookmarks
 2. Column 3 switches to bulk impact preview
 3. Shows "18 total labels" with "Bookmarks (5) [▼ Expand]"
@@ -472,12 +511,14 @@ After analyzing both approaches, I recommend implementing a **hybrid of Solution
 ### Visual Harmony
 
 **Color Coding:**
+
 - Blue highlights for pattern-bookmark relationships
 - Emerald for high confidence operations
 - Amber for medium confidence operations
 - Slate for low confidence operations
 
 **Animation Timing:**
+
 - Highlight transitions: 200ms ease-in-out
 - Preview column mode switch: 300ms ease-in-out
 - Expand/collapse animations: 200ms ease-in-out
@@ -486,6 +527,7 @@ After analyzing both approaches, I recommend implementing a **hybrid of Solution
 - Return to stats delay: 500ms (allows mouse movement)
 
 **Typography Hierarchy:**
+
 - Preview column headers: 16px semibold
 - Expandable section headers: 14px medium
 - Bookmark/label titles in preview: 14px regular
@@ -496,6 +538,7 @@ After analyzing both approaches, I recommend implementing a **hybrid of Solution
 ### Accessibility Features
 
 **Keyboard Navigation:**
+
 - Tab through patterns, focus triggers highlight + preview
 - Tab into preview column to interact with expandable sections
 - Arrow keys to navigate within expanded lists
@@ -505,6 +548,7 @@ After analyzing both approaches, I recommend implementing a **hybrid of Solution
 - Screen reader announces affected bookmark counts and selection states
 
 **ARIA Labels:**
+
 - Pattern items: `aria-label="JavaScript topic pattern, applies to 12 bookmarks"`
 - Highlighted bookmarks: `aria-label="Will receive JavaScript label"`
 - Preview column: `role="complementary" aria-label="Context preview"`
@@ -513,6 +557,7 @@ After analyzing both approaches, I recommend implementing a **hybrid of Solution
 - Action buttons: `aria-label="Apply JavaScript label to 6 selected bookmarks"`
 
 **Focus Management:**
+
 - Focus ring matches highlight color scheme
 - Focus within preview column scrolls into view
 - Focus moves to first checkbox when section expands
@@ -522,6 +567,7 @@ After analyzing both approaches, I recommend implementing a **hybrid of Solution
 ### Technical Considerations
 
 **Performance:**
+
 - Debounce hover events (50ms) to reduce re-renders
 - Virtual scrolling for expanded bookmark lists > 50 items
 - Memoize highlight calculations and checkbox state computations
@@ -530,15 +576,16 @@ After analyzing both approaches, I recommend implementing a **hybrid of Solution
 - Optimize checkbox state updates with Set operations
 
 **State Management:**
+
 ```tsx
 interface PreviewState {
-  mode: 'stats' | 'pattern' | 'bookmark' | 'bulk-impact';
+  mode: "stats" | "pattern" | "bookmark" | "bulk-impact";
   hoveredPatternId: string | null;
   hoveredBookmarkId: string | null;
 
   // Expandable section states
   expandedSections: {
-    confidenceGroups: Set<'high' | 'medium' | 'low'>;
+    confidenceGroups: Set<"high" | "medium" | "low">;
     bookmarkDetails: Set<string>; // bookmark IDs
   };
 
@@ -552,6 +599,7 @@ interface PreviewState {
 ```
 
 **Data Flow:**
+
 ```
 AILabelingDashboard (state coordinator)
   ├─> BookmarkOverviewColumn (receives hoveredPatternId)
@@ -580,6 +628,7 @@ AILabelingDashboard (state coordinator)
 ### Success Metrics
 
 The solution succeeds when:
+
 1. Users can identify affected bookmarks in <2 seconds
 2. Users can exclude specific items from bulk operations without confusion
 3. Zero "Apply All" operations are executed blindly
@@ -598,6 +647,7 @@ The solution succeeds when:
 **Reason:** Provides the most comprehensive UX solution that serves both quick interactions and detailed inspection needs. The combination addresses all user scenarios with granular control capabilities.
 
 **Rollout Strategy:**
+
 1. Start with Solution 1 (hover highlighting) - lower complexity, high impact
 2. Validate with users and gather feedback
 3. Add Solution 2 base (preview column with mode switching) without expandable sections
@@ -611,6 +661,7 @@ The solution succeeds when:
 **Reason:** If development resources are limited or the full hybrid approach proves too complex initially, Solution 1 provides immediate value with minimal complexity.
 
 **Rollout Strategy:**
+
 1. Implement hover highlighting between columns
 2. Gather user feedback on visibility improvements
 3. Plan expansion to full hybrid approach based on user needs
@@ -681,6 +732,7 @@ The solution succeeds when:
 ### Code Examples
 
 **ExpandableSection Component:**
+
 ```tsx
 interface ExpandableSectionProps {
   title: string;
@@ -691,18 +743,11 @@ interface ExpandableSectionProps {
   level?: number; // For nested sections
 }
 
-export function ExpandableSection({
-  title,
-  count,
-  isExpanded,
-  onToggle,
-  children,
-  level = 0
-}: ExpandableSectionProps) {
+export function ExpandableSection({ title, count, isExpanded, onToggle, children, level = 0 }: ExpandableSectionProps) {
   const contentId = useId();
 
   return (
-    <div className={cn('border-b border-gray-200 dark:border-gray-700', level > 0 && 'ml-4')}>
+    <div className={cn("border-b border-gray-200 dark:border-gray-700", level > 0 && "ml-4")}>
       <button
         className="w-full flex items-center justify-between py-2 px-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
         onClick={onToggle}
@@ -712,22 +757,17 @@ export function ExpandableSection({
         <span className="text-sm font-medium">
           {title} ({count})
         </span>
-        <ChevronDown
-          className={cn(
-            'h-4 w-4 transition-transform duration-200',
-            isExpanded && 'rotate-180'
-          )}
-        />
+        <ChevronDown className={cn("h-4 w-4 transition-transform duration-200", isExpanded && "rotate-180")} />
       </button>
 
       <motion.div
         id={contentId}
         initial={false}
         animate={{
-          height: isExpanded ? 'auto' : 0,
+          height: isExpanded ? "auto" : 0,
           opacity: isExpanded ? 1 : 0
         }}
-        transition={{ duration: 0.2, ease: 'easeInOut' }}
+        transition={{ duration: 0.2, ease: "easeInOut" }}
         className="overflow-hidden"
       >
         <div className="pb-2">{children}</div>
@@ -738,6 +778,7 @@ export function ExpandableSection({
 ```
 
 **PatternPreviewView with Expandable Sections:**
+
 ```tsx
 interface PatternPreviewViewProps {
   pattern: LabelPattern;
@@ -745,41 +786,29 @@ interface PatternPreviewViewProps {
   onApplyToSelected: (bookmarkIds: string[]) => void;
 }
 
-export function PatternPreviewView({
-  pattern,
-  bookmarks,
-  onApplyToSelected
-}: PatternPreviewViewProps) {
+export function PatternPreviewView({ pattern, bookmarks, onApplyToSelected }: PatternPreviewViewProps) {
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(
-    new Set(bookmarks.map(b => b.id))
-  );
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(bookmarks.map((b) => b.id)));
 
   // Group bookmarks by confidence
   const grouped = useMemo(() => {
-    const high = bookmarks.filter(b => {
-      const label = b.remainingLabels.find(l =>
-        l.label === pattern.label && l.category === pattern.category
-      );
+    const high = bookmarks.filter((b) => {
+      const label = b.remainingLabels.find((l) => l.label === pattern.label && l.category === pattern.category);
       return label && label.confidence >= 85;
     });
-    const medium = bookmarks.filter(b => {
-      const label = b.remainingLabels.find(l =>
-        l.label === pattern.label && l.category === pattern.category
-      );
+    const medium = bookmarks.filter((b) => {
+      const label = b.remainingLabels.find((l) => l.label === pattern.label && l.category === pattern.category);
       return label && label.confidence >= 70 && label.confidence < 85;
     });
-    const low = bookmarks.filter(b => {
-      const label = b.remainingLabels.find(l =>
-        l.label === pattern.label && l.category === pattern.category
-      );
+    const low = bookmarks.filter((b) => {
+      const label = b.remainingLabels.find((l) => l.label === pattern.label && l.category === pattern.category);
       return label && label.confidence < 70;
     });
     return { high, medium, low };
   }, [bookmarks, pattern]);
 
   const handleToggle = (bookmarkId: string) => {
-    setSelectedIds(prev => {
+    setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(bookmarkId)) {
         next.delete(bookmarkId);
@@ -791,7 +820,7 @@ export function PatternPreviewView({
   };
 
   const handleSelectAll = () => {
-    setSelectedIds(new Set(bookmarks.map(b => b.id)));
+    setSelectedIds(new Set(bookmarks.map((b) => b.id)));
   };
 
   const handleDeselectAll = () => {
@@ -802,22 +831,20 @@ export function PatternPreviewView({
     <div className="space-y-4">
       <div>
         <h3 className="text-lg font-semibold">{pattern.label}</h3>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          {bookmarks.length} bookmarks will receive this label
-        </p>
+        <p className="text-sm text-gray-600 dark:text-gray-400">{bookmarks.length} bookmarks will receive this label</p>
       </div>
 
       {grouped.high.length > 0 && (
         <ExpandableSection
           title="High Confidence"
           count={grouped.high.length}
-          isExpanded={expandedGroup === 'high'}
-          onToggle={() => setExpandedGroup(prev => prev === 'high' ? null : 'high')}
+          isExpanded={expandedGroup === "high"}
+          onToggle={() => setExpandedGroup((prev) => (prev === "high" ? null : "high"))}
         >
           <div className="space-y-1 px-3">
-            {grouped.high.map(bookmark => {
-              const label = bookmark.remainingLabels.find(l =>
-                l.label === pattern.label && l.category === pattern.category
+            {grouped.high.map((bookmark) => {
+              const label = bookmark.remainingLabels.find(
+                (l) => l.label === pattern.label && l.category === pattern.category
               );
               return (
                 <label
@@ -832,9 +859,7 @@ export function PatternPreviewView({
                     aria-label={`Include ${bookmark.title} (${label?.confidence}% confidence)`}
                   />
                   <span className="flex-1 text-sm truncate">{bookmark.title}</span>
-                  <span className="text-xs text-gray-500">
-                    {label?.confidence}%
-                  </span>
+                  <span className="text-xs text-gray-500">{label?.confidence}%</span>
                 </label>
               );
             })}
@@ -845,20 +870,10 @@ export function PatternPreviewView({
       {/* Similar sections for medium and low */}
 
       <div className="flex gap-2 pt-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleSelectAll}
-          disabled={selectedIds.size === bookmarks.length}
-        >
+        <Button variant="ghost" size="sm" onClick={handleSelectAll} disabled={selectedIds.size === bookmarks.length}>
           Select All
         </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleDeselectAll}
-          disabled={selectedIds.size === 0}
-        >
+        <Button variant="ghost" size="sm" onClick={handleDeselectAll} disabled={selectedIds.size === 0}>
           Deselect All
         </Button>
       </div>
@@ -876,33 +891,28 @@ export function PatternPreviewView({
 ```
 
 **BulkImpactView with Nested Expansion:**
+
 ```tsx
-export function BulkImpactView({
-  selectedBookmarks,
-  onApplyToSelected
-}: BulkImpactViewProps) {
+export function BulkImpactView({ selectedBookmarks, onApplyToSelected }: BulkImpactViewProps) {
   const [isListExpanded, setIsListExpanded] = useState(false);
   const [expandedBookmarkIds, setExpandedBookmarkIds] = useState<Set<string>>(new Set());
   const [selectedBookmarkIds, setSelectedBookmarkIds] = useState<Set<string>>(
-    new Set(selectedBookmarks.map(b => b.id))
+    new Set(selectedBookmarks.map((b) => b.id))
   );
   const [labelSelections, setLabelSelections] = useState<Map<string, Set<string>>>(
-    new Map(selectedBookmarks.map(b => [
-      b.id,
-      new Set(b.remainingLabels.map(l => `${l.label}::${l.category}`))
-    ]))
+    new Map(selectedBookmarks.map((b) => [b.id, new Set(b.remainingLabels.map((l) => `${l.label}::${l.category}`))]))
   );
 
   const totalLabels = useMemo(() => {
     let total = 0;
-    selectedBookmarkIds.forEach(bookmarkId => {
+    selectedBookmarkIds.forEach((bookmarkId) => {
       total += labelSelections.get(bookmarkId)?.size || 0;
     });
     return total;
   }, [selectedBookmarkIds, labelSelections]);
 
   const toggleBookmarkExpansion = (bookmarkId: string) => {
-    setExpandedBookmarkIds(prev => {
+    setExpandedBookmarkIds((prev) => {
       const next = new Set(prev);
       if (next.has(bookmarkId)) {
         next.delete(bookmarkId);
@@ -917,9 +927,7 @@ export function BulkImpactView({
     <div className="space-y-4">
       <div>
         <h3 className="text-lg font-semibold">Bulk Impact Preview</h3>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          {selectedBookmarks.length} bookmarks selected
-        </p>
+        <p className="text-sm text-gray-600 dark:text-gray-400">{selectedBookmarks.length} bookmarks selected</p>
       </div>
 
       <ExpandableSection
@@ -929,14 +937,14 @@ export function BulkImpactView({
         onToggle={() => setIsListExpanded(!isListExpanded)}
       >
         <div className="space-y-2 px-3">
-          {selectedBookmarks.map(bookmark => (
+          {selectedBookmarks.map((bookmark) => (
             <div key={bookmark.id} className="border-l-2 border-gray-200 dark:border-gray-700">
               <label className="flex items-center gap-2 py-1 px-2 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={selectedBookmarkIds.has(bookmark.id)}
                   onChange={() => {
-                    setSelectedBookmarkIds(prev => {
+                    setSelectedBookmarkIds((prev) => {
                       const next = new Set(prev);
                       if (next.has(bookmark.id)) {
                         next.delete(bookmark.id);
@@ -949,9 +957,7 @@ export function BulkImpactView({
                   className="rounded"
                 />
                 <span className="flex-1 text-sm truncate">{bookmark.title}</span>
-                <span className="text-xs text-gray-500">
-                  +{bookmark.remainingLabels.length}
-                </span>
+                <span className="text-xs text-gray-500">+{bookmark.remainingLabels.length}</span>
                 <button
                   onClick={(e) => {
                     e.preventDefault();
@@ -960,10 +966,7 @@ export function BulkImpactView({
                   className="p-1"
                 >
                   <ChevronDown
-                    className={cn(
-                      'h-3 w-3 transition-transform',
-                      expandedBookmarkIds.has(bookmark.id) && 'rotate-180'
-                    )}
+                    className={cn("h-3 w-3 transition-transform", expandedBookmarkIds.has(bookmark.id) && "rotate-180")}
                   />
                 </button>
               </label>
@@ -971,12 +974,12 @@ export function BulkImpactView({
               {expandedBookmarkIds.has(bookmark.id) && (
                 <motion.div
                   initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
+                  animate={{ height: "auto", opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
                   transition={{ duration: 0.2 }}
                   className="ml-8 mt-1 space-y-1"
                 >
-                  {bookmark.remainingLabels.map(label => {
+                  {bookmark.remainingLabels.map((label) => {
                     const labelKey = `${label.label}::${label.category}`;
                     const isSelected = labelSelections.get(bookmark.id)?.has(labelKey);
 
@@ -989,7 +992,7 @@ export function BulkImpactView({
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => {
-                            setLabelSelections(prev => {
+                            setLabelSelections((prev) => {
                               const next = new Map(prev);
                               const bookmarkLabels = new Set(next.get(bookmark.id));
                               if (bookmarkLabels.has(labelKey)) {
@@ -1006,9 +1009,7 @@ export function BulkImpactView({
                         <span className="text-xs flex-1">
                           {label.label} ({label.category})
                         </span>
-                        <span className="text-xs text-gray-500">
-                          {label.confidence}%
-                        </span>
+                        <span className="text-xs text-gray-500">{label.confidence}%</span>
                       </label>
                     );
                   })}
@@ -1038,6 +1039,7 @@ export function BulkImpactView({
 ### No New Dependencies Required
 
 All functionality can be implemented with existing dependencies:
+
 - Motion (framer-motion) for animations
 - Radix UI components for accessible interactions
 - TailwindCSS for styling

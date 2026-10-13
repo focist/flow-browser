@@ -5,19 +5,23 @@ This directory contains UX/UI design specifications and user experience planning
 ## Documents
 
 ### [AI Auto-Apply UX Design](./AI_AUTO_APPLY_UX_DESIGN.md)
+
 Design specification for automatically adding high-confidence AI labels to the "Applied Labels" section, skipping manual review for labels that meet confidence thresholds.
 
 **Key Features:**
+
 - Visual design for auto-applied labels with distinct styling
-- Workflow design for auto-add behavior 
+- Workflow design for auto-add behavior
 - Settings interface for threshold configuration
 - Notification strategy and user trust mechanisms
 - Accessibility considerations and implementation roadmap
 
 ### [AI Labeling UX Plan](./AI_LABELING_UX_PLAN.md)
+
 Comprehensive redesign of bookmark AI analysis and labeling workflow focused on bulk operations and scalable patterns.
 
 **Key Features:**
+
 - Dashboard-first approach with three-column layout
 - Confidence-based workflow optimization
 - Bulk operations for processing large bookmark collections

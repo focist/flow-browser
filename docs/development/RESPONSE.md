@@ -22,10 +22,8 @@ This document contains the user's detailed feedback and categorization of the 41
 14. already implemented
 15. maybe
 
-16-20: maybe
-21. yes, but needs to not be part of find dialog. Arc replaces find with this. This is also part of "chat with your tabs" feature, so make sure it is captured there. This should be part of the omnibox
-22-25. are all nice to haves. Please add. Instant links is part of the omnibox
-26. very meh on this one. add to the maybes
+16-20: maybe 21. yes, but needs to not be part of find dialog. Arc replaces find with this. This is also part of "chat with your tabs" feature, so make sure it is captured there. This should be part of the omnibox
+22-25. are all nice to haves. Please add. Instant links is part of the omnibox 26. very meh on this one. add to the maybes
 
 27. yes
 28. yes

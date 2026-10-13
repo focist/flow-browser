@@ -1,7 +1,7 @@
-import React, { useId } from 'react';
-import { ChevronDown } from 'lucide-react';
-import { motion } from 'motion/react';
-import { cn } from '../../lib/utils';
+import React, { useId } from "react";
+import { ChevronDown } from "lucide-react";
+import { motion } from "motion/react";
+import { cn } from "../../lib/utils";
 
 interface ExpandableSectionProps {
   title: string;
@@ -31,10 +31,10 @@ export function ExpandableSection({
   const contentId = useId();
 
   return (
-    <div className={cn('border-b border-gray-200 dark:border-gray-700 min-w-0', level > 0 && 'ml-4', className)}>
+    <div className={cn("border-b border-gray-200 dark:border-gray-700 min-w-0", level > 0 && "ml-4", className)}>
       <div
         className={cn(
-          'w-full flex items-center justify-between py-2 px-3 hover:bg-accent transition-colors',
+          "w-full flex items-center justify-between py-2 px-3 hover:bg-accent transition-colors",
           headerClassName
         )}
       >
@@ -52,12 +52,7 @@ export function ExpandableSection({
           <span className="text-sm font-medium">
             {title} ({count})
           </span>
-          <ChevronDown
-            className={cn(
-              'h-4 w-4 transition-transform duration-200',
-              isExpanded && 'rotate-180'
-            )}
-          />
+          <ChevronDown className={cn("h-4 w-4 transition-transform duration-200", isExpanded && "rotate-180")} />
         </button>
       </div>
 
@@ -65,13 +60,13 @@ export function ExpandableSection({
         id={contentId}
         initial={false}
         animate={{
-          height: isExpanded ? 'auto' : 0,
+          height: isExpanded ? "auto" : 0,
           opacity: isExpanded ? 1 : 0
         }}
-        transition={{ duration: 0.2, ease: 'easeInOut' }}
+        transition={{ duration: 0.2, ease: "easeInOut" }}
         className="overflow-hidden min-w-0"
       >
-        <div className={cn('pb-2 min-w-0', contentClassName)}>{children}</div>
+        <div className={cn("pb-2 min-w-0", contentClassName)}>{children}</div>
       </motion.div>
     </div>
   );

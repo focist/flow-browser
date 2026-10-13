@@ -1,25 +1,22 @@
-import { useState } from 'react';
-import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
-import { Sparkles } from 'lucide-react';
-import type { DashboardBookmark } from '../../hooks/use-dashboard-state';
-import type { BookmarkLabel } from '~/flow/interfaces/ai';
-import { getCategoryStyles, getCategoryIcon } from '../../lib/label-styles';
-import { useShiftClickSelection } from '../../hooks/use-shift-click-selection';
-import { useConfidenceGrouping } from '../../hooks/use-confidence-grouping';
-import { useGroupCheckbox } from '../../hooks/use-group-checkbox';
-import { ConfidenceGroupSection } from './confidence-group-section';
-import { SelectionControls } from './selection-controls';
+import { useState } from "react";
+import { Button } from "../ui/button";
+import { Badge } from "../ui/badge";
+import { Sparkles } from "lucide-react";
+import type { DashboardBookmark } from "../../hooks/use-dashboard-state";
+import type { BookmarkLabel } from "~/flow/interfaces/ai";
+import { getCategoryStyles, getCategoryIcon } from "../../lib/label-styles";
+import { useShiftClickSelection } from "../../hooks/use-shift-click-selection";
+import { useConfidenceGrouping } from "../../hooks/use-confidence-grouping";
+import { useGroupCheckbox } from "../../hooks/use-group-checkbox";
+import { ConfidenceGroupSection } from "./confidence-group-section";
+import { SelectionControls } from "./selection-controls";
 
 interface BookmarkPreviewViewProps {
   bookmark: DashboardBookmark;
   onApplySelectedLabels: (labelIds: string[]) => void;
 }
 
-export function BookmarkPreviewView({
-  bookmark,
-  onApplySelectedLabels
-}: BookmarkPreviewViewProps) {
+export function BookmarkPreviewView({ bookmark, onApplySelectedLabels }: BookmarkPreviewViewProps) {
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
 
   // Use shared selection hook
@@ -32,30 +29,27 @@ export function BookmarkPreviewView({
   } = useShiftClickSelection({
     items: bookmark.remainingLabels,
     getId: (l) => `${l.label}::${l.category}`,
-    initialSelection: new Set(bookmark.remainingLabels.map(l => `${l.label}::${l.category}`))
+    initialSelection: new Set(bookmark.remainingLabels.map((l) => `${l.label}::${l.category}`))
   });
 
   // Use shared confidence grouping hook
-  const grouped = useConfidenceGrouping(
-    bookmark.remainingLabels,
-    (label) => label.confidence
-  );
+  const grouped = useConfidenceGrouping(bookmark.remainingLabels, (label) => label.confidence);
 
   // Use shared group checkbox hooks for each confidence level
   const highCheckbox = useGroupCheckbox(
-    grouped.high.map(l => `${l.label}::${l.category}`),
+    grouped.high.map((l) => `${l.label}::${l.category}`),
     selectedLabelIds,
     setSelectedLabelIds
   );
 
   const mediumCheckbox = useGroupCheckbox(
-    grouped.medium.map(l => `${l.label}::${l.category}`),
+    grouped.medium.map((l) => `${l.label}::${l.category}`),
     selectedLabelIds,
     setSelectedLabelIds
   );
 
   const lowCheckbox = useGroupCheckbox(
-    grouped.low.map(l => `${l.label}::${l.category}`),
+    grouped.low.map((l) => `${l.label}::${l.category}`),
     selectedLabelIds,
     setSelectedLabelIds
   );
@@ -73,9 +67,7 @@ export function BookmarkPreviewView({
         <Badge variant="outline" className={`text-xs h-5 flex-shrink-0 ${getCategoryStyles(label.category)}`}>
           {label.category}
         </Badge>
-        <span className="text-xs text-muted-foreground flex-shrink-0">
-          {Math.round(label.confidence * 100)}%
-        </span>
+        <span className="text-xs text-muted-foreground flex-shrink-0">{Math.round(label.confidence * 100)}%</span>
       </>
     );
   };
@@ -90,7 +82,7 @@ export function BookmarkPreviewView({
           {bookmark.bookmark.title}
         </h3>
         <p className="text-sm text-muted-foreground mb-3">
-          Will receive {totalLabels} label{totalLabels !== 1 ? 's' : ''}
+          Will receive {totalLabels} label{totalLabels !== 1 ? "s" : ""}
         </p>
 
         {/* Auto-Applied Labels */}
@@ -103,7 +95,7 @@ export function BookmarkPreviewView({
               </span>
             </div>
             <div className="flex flex-wrap gap-1.5 min-w-0">
-              {bookmark.autoAppliedLabels.map(label => (
+              {bookmark.autoAppliedLabels.map((label) => (
                 <Badge
                   key={`${label.label}::${label.category}`}
                   variant="outline"
@@ -122,8 +114,8 @@ export function BookmarkPreviewView({
       <ConfidenceGroupSection
         level="High"
         items={grouped.high}
-        isExpanded={expandedGroup === 'high'}
-        onToggle={() => setExpandedGroup(prev => prev === 'high' ? null : 'high')}
+        isExpanded={expandedGroup === "high"}
+        onToggle={() => setExpandedGroup((prev) => (prev === "high" ? null : "high"))}
         groupCheckboxState={highCheckbox.state}
         onGroupToggle={highCheckbox.toggle}
         selectedIds={selectedLabelIds}
@@ -135,8 +127,8 @@ export function BookmarkPreviewView({
       <ConfidenceGroupSection
         level="Medium"
         items={grouped.medium}
-        isExpanded={expandedGroup === 'medium'}
-        onToggle={() => setExpandedGroup(prev => prev === 'medium' ? null : 'medium')}
+        isExpanded={expandedGroup === "medium"}
+        onToggle={() => setExpandedGroup((prev) => (prev === "medium" ? null : "medium"))}
         groupCheckboxState={mediumCheckbox.state}
         onGroupToggle={mediumCheckbox.toggle}
         selectedIds={selectedLabelIds}
@@ -148,8 +140,8 @@ export function BookmarkPreviewView({
       <ConfidenceGroupSection
         level="Low"
         items={grouped.low}
-        isExpanded={expandedGroup === 'low'}
-        onToggle={() => setExpandedGroup(prev => prev === 'low' ? null : 'low')}
+        isExpanded={expandedGroup === "low"}
+        onToggle={() => setExpandedGroup((prev) => (prev === "low" ? null : "low"))}
         groupCheckboxState={lowCheckbox.state}
         onGroupToggle={lowCheckbox.toggle}
         selectedIds={selectedLabelIds}
@@ -175,11 +167,7 @@ export function BookmarkPreviewView({
           />
 
           {/* Apply Button */}
-          <Button
-            className="w-full min-w-0"
-            onClick={handleApply}
-            disabled={selectedLabelIds.size === 0}
-          >
+          <Button className="w-full min-w-0" onClick={handleApply} disabled={selectedLabelIds.size === 0}>
             Apply Selected Labels ({selectedLabelIds.size})
           </Button>
         </>

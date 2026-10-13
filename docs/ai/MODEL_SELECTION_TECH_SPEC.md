@@ -36,13 +36,13 @@ This document specifies the architecture for a unified LLM provider system in Fl
 
 #### Available Models
 
-| Model | Context Window | Input Price | Output Price | Key Features |
-|-------|---------------|-------------|--------------|--------------|
-| GPT-4o | 128K | $3/M tokens | $10/M tokens | Vision, function calling, fast |
-| GPT-4o Mini | 128K | $0.15/M tokens | $0.60/M tokens | Budget-friendly, fast |
-| GPT-4.1 | 1M+ | $15/M tokens | $60/M tokens | Extended context, prompt caching |
-| GPT-4.1 Nano | 1M+ | $0.30/M tokens | $1.20/M tokens | Budget + extended context |
-| GPT-4 Turbo | 128K | $10/M tokens | $30/M tokens | Previous generation |
+| Model        | Context Window | Input Price    | Output Price   | Key Features                     |
+| ------------ | -------------- | -------------- | -------------- | -------------------------------- |
+| GPT-4o       | 128K           | $3/M tokens    | $10/M tokens   | Vision, function calling, fast   |
+| GPT-4o Mini  | 128K           | $0.15/M tokens | $0.60/M tokens | Budget-friendly, fast            |
+| GPT-4.1      | 1M+            | $15/M tokens   | $60/M tokens   | Extended context, prompt caching |
+| GPT-4.1 Nano | 1M+            | $0.30/M tokens | $1.20/M tokens | Budget + extended context        |
+| GPT-4 Turbo  | 128K           | $10/M tokens   | $30/M tokens   | Previous generation              |
 
 #### Authentication
 
@@ -123,13 +123,13 @@ data: [DONE]
 
 #### Available Models
 
-| Model | Context Window | Input Price | Output Price | Key Features |
-|-------|---------------|-------------|--------------|--------------|
-| Claude Sonnet 4.5 | 200K (1M beta) | $3/M tokens | $15/M tokens | Latest, most capable |
-| Claude 3.5 Sonnet | 200K | $3/M tokens | $15/M tokens | Balanced performance |
-| Claude 3.5 Haiku | 200K | $0.80/M tokens | $4/M tokens | Fast, economical |
-| Claude Opus 4.1 | 200K (1M beta) | $15/M tokens | $75/M tokens | Most powerful |
-| Claude 3 Haiku | 200K | $0.25/M tokens | $1.25/M tokens | Budget option |
+| Model             | Context Window | Input Price    | Output Price   | Key Features         |
+| ----------------- | -------------- | -------------- | -------------- | -------------------- |
+| Claude Sonnet 4.5 | 200K (1M beta) | $3/M tokens    | $15/M tokens   | Latest, most capable |
+| Claude 3.5 Sonnet | 200K           | $3/M tokens    | $15/M tokens   | Balanced performance |
+| Claude 3.5 Haiku  | 200K           | $0.80/M tokens | $4/M tokens    | Fast, economical     |
+| Claude Opus 4.1   | 200K (1M beta) | $15/M tokens   | $75/M tokens   | Most powerful        |
+| Claude 3 Haiku    | 200K           | $0.25/M tokens | $1.25/M tokens | Budget option        |
 
 #### Authentication
 
@@ -215,19 +215,19 @@ event: message_stop
 
 ### API Comparison Matrix
 
-| Feature | OpenAI | Anthropic | Notes |
-|---------|--------|-----------|-------|
-| **Auth Method** | Bearer token | x-api-key header | Different auth headers |
-| **Max Context** | 128K-1M | 200K-1M | Both offer extended context |
-| **Streaming** | SSE with delta | SSE with events | Similar but different formats |
-| **System Prompt** | In messages array | Separate field | Different request structure |
-| **Vision Support** | ✅ GPT-4o/4.1 | ✅ All Claude 3+ | Both support image analysis |
-| **Function Calling** | ✅ Native | ✅ Tool use | Different terminology, same concept |
-| **Batch Processing** | ❌ Not available | ✅ 50% discount | Anthropic has batch API |
-| **Prompt Caching** | ✅ 50-75% | ✅ 90% | Anthropic more aggressive |
-| **Rate Limit Headers** | x-ratelimit-* | anthropic-ratelimit-* | Different header names |
-| **Error Codes** | Standard HTTP | Standard HTTP | Both use 429 for rate limits |
-| **Cost Tracking** | Usage object | Usage object | Both return token counts |
+| Feature                | OpenAI            | Anthropic              | Notes                               |
+| ---------------------- | ----------------- | ---------------------- | ----------------------------------- |
+| **Auth Method**        | Bearer token      | x-api-key header       | Different auth headers              |
+| **Max Context**        | 128K-1M           | 200K-1M                | Both offer extended context         |
+| **Streaming**          | SSE with delta    | SSE with events        | Similar but different formats       |
+| **System Prompt**      | In messages array | Separate field         | Different request structure         |
+| **Vision Support**     | ✅ GPT-4o/4.1     | ✅ All Claude 3+       | Both support image analysis         |
+| **Function Calling**   | ✅ Native         | ✅ Tool use            | Different terminology, same concept |
+| **Batch Processing**   | ❌ Not available  | ✅ 50% discount        | Anthropic has batch API             |
+| **Prompt Caching**     | ✅ 50-75%         | ✅ 90%                 | Anthropic more aggressive           |
+| **Rate Limit Headers** | x-ratelimit-\*    | anthropic-ratelimit-\* | Different header names              |
+| **Error Codes**        | Standard HTTP     | Standard HTTP          | Both use 429 for rate limits        |
+| **Cost Tracking**      | Usage object      | Usage object           | Both return token counts            |
 
 ### Key Differences Requiring Abstraction
 
@@ -361,7 +361,7 @@ AIService.analyzeBookmark() ◄──────┘
  */
 export interface LLMRequest {
   messages: Array<{
-    role: 'system' | 'user' | 'assistant';
+    role: "system" | "user" | "assistant";
     content: string;
   }>;
   temperature?: number;
@@ -382,7 +382,7 @@ export interface LLMResponse {
   id: string;
   model: string;
   content: string;
-  finishReason: 'stop' | 'length' | 'tool_calls' | 'error';
+  finishReason: "stop" | "length" | "tool_calls" | "error";
   usage: {
     promptTokens: number;
     completionTokens: number;
@@ -407,7 +407,7 @@ export interface LLMResponse {
 export interface LLMStreamChunk {
   delta: string;
   isComplete: boolean;
-  usage?: LLMResponse['usage'];
+  usage?: LLMResponse["usage"];
 }
 
 /**
@@ -478,18 +478,12 @@ export abstract class LLMProvider {
   /**
    * Complete a prompt (non-streaming)
    */
-  abstract complete(
-    request: LLMRequest,
-    model: string
-  ): Promise<LLMResponse>;
+  abstract complete(request: LLMRequest, model: string): Promise<LLMResponse>;
 
   /**
    * Stream a completion
    */
-  abstract stream(
-    request: LLMRequest,
-    model: string
-  ): AsyncGenerator<LLMStreamChunk>;
+  abstract stream(request: LLMRequest, model: string): AsyncGenerator<LLMStreamChunk>;
 
   /**
    * List available models from the provider
@@ -536,9 +530,7 @@ export abstract class LLMProvider {
    * Estimate tokens for a request (rough estimation)
    */
   protected estimateTokens(request: LLMRequest): number {
-    const text = request.messages
-      .map(m => m.content)
-      .join(' ');
+    const text = request.messages.map((m) => m.content).join(" ");
     return Math.ceil(text.length / 4); // Rough: 4 chars = 1 token
   }
 
@@ -546,12 +538,10 @@ export abstract class LLMProvider {
    * Handle rate limiting with exponential backoff
    */
   protected async handleRateLimit(error: any, attempt: number): Promise<void> {
-    const retryAfter = error.headers?.['retry-after'];
-    const delay = retryAfter
-      ? parseInt(retryAfter) * 1000
-      : Math.min(1000 * Math.pow(2, attempt), 60000);
+    const retryAfter = error.headers?.["retry-after"];
+    const delay = retryAfter ? parseInt(retryAfter) * 1000 : Math.min(1000 * Math.pow(2, attempt), 60000);
 
-    await new Promise(resolve => setTimeout(resolve, delay));
+    await new Promise((resolve) => setTimeout(resolve, delay));
   }
 
   /**
@@ -559,7 +549,7 @@ export abstract class LLMProvider {
    */
   protected normalizeError(error: any): Error {
     if (error.response?.data?.error) {
-      return new Error(error.response.data.error.message || 'API error');
+      return new Error(error.response.data.error.message || "API error");
     }
     return error instanceof Error ? error : new Error(String(error));
   }
@@ -571,20 +561,20 @@ export abstract class LLMProvider {
 ```typescript
 // src/main/modules/ai/providers/openai-provider.ts
 
-import axios, { AxiosInstance } from 'axios';
-import { LLMProvider, LLMRequest, LLMResponse, LLMStreamChunk, ModelMetadata, ProviderMetadata } from './base-provider';
+import axios, { AxiosInstance } from "axios";
+import { LLMProvider, LLMRequest, LLMResponse, LLMStreamChunk, ModelMetadata, ProviderMetadata } from "./base-provider";
 
 export class OpenAIProvider extends LLMProvider {
   readonly metadata: ProviderMetadata = {
-    id: 'openai',
-    name: 'OpenAI',
-    description: 'ChatGPT models including GPT-4o, GPT-4.1, and more',
-    website: 'https://openai.com',
-    documentationUrl: 'https://platform.openai.com/docs',
+    id: "openai",
+    name: "OpenAI",
+    description: "ChatGPT models including GPT-4o, GPT-4.1, and more",
+    website: "https://openai.com",
+    documentationUrl: "https://platform.openai.com/docs",
     requiresApiKey: true,
     supportsBatch: false,
     supportsStreaming: true,
-    defaultModel: 'gpt-4o-mini'
+    defaultModel: "gpt-4o-mini"
   };
 
   private client: AxiosInstance;
@@ -595,10 +585,10 @@ export class OpenAIProvider extends LLMProvider {
     super(config);
 
     this.client = axios.create({
-      baseURL: config.baseUrl || 'https://api.openai.com/v1',
+      baseURL: config.baseUrl || "https://api.openai.com/v1",
       headers: {
-        'Authorization': `Bearer ${config.apiKey}`,
-        'Content-Type': 'application/json'
+        Authorization: `Bearer ${config.apiKey}`,
+        "Content-Type": "application/json"
       },
       timeout: 60000
     });
@@ -611,10 +601,10 @@ export class OpenAIProvider extends LLMProvider {
 
   async validateApiKey(): Promise<boolean> {
     try {
-      await this.client.get('/models');
+      await this.client.get("/models");
       return true;
     } catch (error) {
-      throw new Error('Invalid OpenAI API key');
+      throw new Error("Invalid OpenAI API key");
     }
   }
 
@@ -625,17 +615,17 @@ export class OpenAIProvider extends LLMProvider {
 
     while (attempt < maxAttempts) {
       try {
-        const response = await this.client.post('/chat/completions', {
+        const response = await this.client.post("/chat/completions", {
           model,
-          messages: request.messages.map(m => ({
+          messages: request.messages.map((m) => ({
             role: m.role,
             content: m.content
           })),
           temperature: request.temperature ?? 0.7,
           max_tokens: request.maxTokens ?? 500,
           top_p: request.topP ?? 1.0,
-          tools: request.tools?.map(tool => ({
-            type: 'function',
+          tools: request.tools?.map((tool) => ({
+            type: "function",
             function: {
               name: tool.name,
               description: tool.description,
@@ -656,7 +646,7 @@ export class OpenAIProvider extends LLMProvider {
         return {
           id: response.data.id,
           model: response.data.model,
-          content: choice.message.content || '',
+          content: choice.message.content || "",
           finishReason: this.normalizeFinishReason(choice.finish_reason),
           usage: {
             promptTokens: usage.prompt_tokens,
@@ -684,38 +674,42 @@ export class OpenAIProvider extends LLMProvider {
       }
     }
 
-    throw new Error('Max retry attempts exceeded');
+    throw new Error("Max retry attempts exceeded");
   }
 
   async *stream(request: LLMRequest, model: string): AsyncGenerator<LLMStreamChunk> {
-    const response = await this.client.post('/chat/completions', {
-      model,
-      messages: request.messages,
-      temperature: request.temperature ?? 0.7,
-      max_tokens: request.maxTokens ?? 500,
-      stream: true
-    }, {
-      responseType: 'stream'
-    });
+    const response = await this.client.post(
+      "/chat/completions",
+      {
+        model,
+        messages: request.messages,
+        temperature: request.temperature ?? 0.7,
+        max_tokens: request.maxTokens ?? 500,
+        stream: true
+      },
+      {
+        responseType: "stream"
+      }
+    );
 
-    let buffer = '';
+    let buffer = "";
 
     for await (const chunk of response.data) {
       buffer += chunk.toString();
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
 
       for (const line of lines) {
-        if (line.startsWith('data: ')) {
+        if (line.startsWith("data: ")) {
           const data = line.slice(6);
-          if (data === '[DONE]') {
-            yield { delta: '', isComplete: true };
+          if (data === "[DONE]") {
+            yield { delta: "", isComplete: true };
             return;
           }
 
           try {
             const parsed = JSON.parse(data);
-            const delta = parsed.choices[0]?.delta?.content || '';
+            const delta = parsed.choices[0]?.delta?.content || "";
             yield { delta, isComplete: false };
           } catch (e) {
             // Skip invalid JSON
@@ -732,13 +726,11 @@ export class OpenAIProvider extends LLMProvider {
     }
 
     try {
-      const response = await this.client.get('/models');
+      const response = await this.client.get("/models");
       const models = response.data.data;
 
       // Filter to chat models and add metadata
-      this.modelCache = models
-        .filter((m: any) => m.id.includes('gpt'))
-        .map((m: any) => this.buildModelMetadata(m));
+      this.modelCache = models.filter((m: any) => m.id.includes("gpt")).map((m: any) => this.buildModelMetadata(m));
 
       this.modelCacheExpiry = Date.now() + 3600000; // 1 hour cache
       return this.modelCache;
@@ -753,9 +745,9 @@ export class OpenAIProvider extends LLMProvider {
 
     // Define pricing and metadata for known models
     const modelConfigs: Record<string, Partial<ModelMetadata>> = {
-      'gpt-4o': {
-        name: 'GPT-4o',
-        description: 'Most capable GPT-4 model, optimized for chat',
+      "gpt-4o": {
+        name: "GPT-4o",
+        description: "Most capable GPT-4 model, optimized for chat",
         contextWindow: 128000,
         pricing: {
           inputCostPerMillion: 3,
@@ -774,15 +766,15 @@ export class OpenAIProvider extends LLMProvider {
           requestsPerMinute: 500,
           tokensPerMinute: 500000
         },
-        tags: ['recommended', 'powerful', 'vision']
+        tags: ["recommended", "powerful", "vision"]
       },
-      'gpt-4o-mini': {
-        name: 'GPT-4o Mini',
-        description: 'Affordable and intelligent small model for fast tasks',
+      "gpt-4o-mini": {
+        name: "GPT-4o Mini",
+        description: "Affordable and intelligent small model for fast tasks",
         contextWindow: 128000,
         pricing: {
           inputCostPerMillion: 0.15,
-          outputCostPerMillion: 0.60
+          outputCostPerMillion: 0.6
         },
         capabilities: {
           vision: true,
@@ -795,11 +787,11 @@ export class OpenAIProvider extends LLMProvider {
           requestsPerMinute: 500,
           tokensPerMinute: 2000000
         },
-        tags: ['recommended', 'budget', 'fast']
+        tags: ["recommended", "budget", "fast"]
       },
-      'gpt-4-turbo': {
-        name: 'GPT-4 Turbo',
-        description: 'Previous generation GPT-4',
+      "gpt-4-turbo": {
+        name: "GPT-4 Turbo",
+        description: "Previous generation GPT-4",
         contextWindow: 128000,
         pricing: {
           inputCostPerMillion: 10,
@@ -818,9 +810,9 @@ export class OpenAIProvider extends LLMProvider {
         },
         tags: []
       },
-      'gpt-4.1': {
-        name: 'GPT-4.1',
-        description: 'Extended 1M context window with prompt caching',
+      "gpt-4.1": {
+        name: "GPT-4.1",
+        description: "Extended 1M context window with prompt caching",
         contextWindow: 1000000,
         pricing: {
           inputCostPerMillion: 15,
@@ -839,15 +831,15 @@ export class OpenAIProvider extends LLMProvider {
           requestsPerMinute: 100,
           tokensPerMinute: 1000000
         },
-        tags: ['powerful', 'extended-context']
+        tags: ["powerful", "extended-context"]
       },
-      'gpt-4.1-nano': {
-        name: 'GPT-4.1 Nano',
-        description: 'Budget-friendly 1M context model',
+      "gpt-4.1-nano": {
+        name: "GPT-4.1 Nano",
+        description: "Budget-friendly 1M context model",
         contextWindow: 1000000,
         pricing: {
-          inputCostPerMillion: 0.30,
-          outputCostPerMillion: 1.20,
+          inputCostPerMillion: 0.3,
+          outputCostPerMillion: 1.2,
           cacheCostPerMillion: 0.075,
           cacheDiscountPercent: 75
         },
@@ -862,7 +854,7 @@ export class OpenAIProvider extends LLMProvider {
           requestsPerMinute: 500,
           tokensPerMinute: 2000000
         },
-        tags: ['recommended', 'budget', 'extended-context']
+        tags: ["recommended", "budget", "extended-context"]
       }
     };
 
@@ -872,7 +864,7 @@ export class OpenAIProvider extends LLMProvider {
       id: modelId,
       provider: this.metadata.id,
       name: config.name || modelId,
-      description: config.description || '',
+      description: config.description || "",
       contextWindow: config.contextWindow || 8192,
       pricing: config.pricing || {
         inputCostPerMillion: 0,
@@ -895,25 +887,25 @@ export class OpenAIProvider extends LLMProvider {
 
   async getModel(modelId: string): Promise<ModelMetadata | null> {
     const models = await this.listModels();
-    return models.find(m => m.id === modelId) || null;
+    return models.find((m) => m.id === modelId) || null;
   }
 
   private getHardcodedModels(): ModelMetadata[] {
-    return [
-      'gpt-4o',
-      'gpt-4o-mini',
-      'gpt-4-turbo',
-      'gpt-4.1',
-      'gpt-4.1-nano'
-    ].map(id => this.buildModelMetadata({ id }));
+    return ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-4.1", "gpt-4.1-nano"].map((id) =>
+      this.buildModelMetadata({ id })
+    );
   }
 
-  private normalizeFinishReason(reason: string): LLMResponse['finishReason'] {
+  private normalizeFinishReason(reason: string): LLMResponse["finishReason"] {
     switch (reason) {
-      case 'stop': return 'stop';
-      case 'length': return 'length';
-      case 'tool_calls': return 'tool_calls';
-      default: return 'stop';
+      case "stop":
+        return "stop";
+      case "length":
+        return "length";
+      case "tool_calls":
+        return "tool_calls";
+      default:
+        return "stop";
     }
   }
 }
@@ -924,20 +916,20 @@ export class OpenAIProvider extends LLMProvider {
 ```typescript
 // src/main/modules/ai/providers/anthropic-provider.ts
 
-import axios, { AxiosInstance } from 'axios';
-import { LLMProvider, LLMRequest, LLMResponse, LLMStreamChunk, ModelMetadata, ProviderMetadata } from './base-provider';
+import axios, { AxiosInstance } from "axios";
+import { LLMProvider, LLMRequest, LLMResponse, LLMStreamChunk, ModelMetadata, ProviderMetadata } from "./base-provider";
 
 export class AnthropicProvider extends LLMProvider {
   readonly metadata: ProviderMetadata = {
-    id: 'anthropic',
-    name: 'Anthropic',
-    description: 'Claude AI models by Anthropic',
-    website: 'https://anthropic.com',
-    documentationUrl: 'https://docs.anthropic.com',
+    id: "anthropic",
+    name: "Anthropic",
+    description: "Claude AI models by Anthropic",
+    website: "https://anthropic.com",
+    documentationUrl: "https://docs.anthropic.com",
     requiresApiKey: true,
     supportsBatch: true,
     supportsStreaming: true,
-    defaultModel: 'claude-3-5-sonnet-20241022'
+    defaultModel: "claude-3-5-sonnet-20241022"
   };
 
   private client: AxiosInstance;
@@ -947,11 +939,11 @@ export class AnthropicProvider extends LLMProvider {
     super(config);
 
     this.client = axios.create({
-      baseURL: config.baseUrl || 'https://api.anthropic.com/v1',
+      baseURL: config.baseUrl || "https://api.anthropic.com/v1",
       headers: {
-        'x-api-key': config.apiKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json'
+        "x-api-key": config.apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json"
       },
       timeout: 60000
     });
@@ -964,14 +956,14 @@ export class AnthropicProvider extends LLMProvider {
   async validateApiKey(): Promise<boolean> {
     try {
       // Test with a minimal request
-      await this.client.post('/messages', {
-        model: 'claude-3-5-haiku-20241022',
+      await this.client.post("/messages", {
+        model: "claude-3-5-haiku-20241022",
         max_tokens: 1,
-        messages: [{ role: 'user', content: 'Hi' }]
+        messages: [{ role: "user", content: "Hi" }]
       });
       return true;
     } catch (error) {
-      throw new Error('Invalid Anthropic API key');
+      throw new Error("Invalid Anthropic API key");
     }
   }
 
@@ -981,22 +973,22 @@ export class AnthropicProvider extends LLMProvider {
     const maxAttempts = 3;
 
     // Extract system message
-    const systemMessage = request.messages.find(m => m.role === 'system');
-    const userMessages = request.messages.filter(m => m.role !== 'system');
+    const systemMessage = request.messages.find((m) => m.role === "system");
+    const userMessages = request.messages.filter((m) => m.role !== "system");
 
     while (attempt < maxAttempts) {
       try {
-        const response = await this.client.post('/messages', {
+        const response = await this.client.post("/messages", {
           model,
           max_tokens: request.maxTokens ?? 500,
           temperature: request.temperature ?? 0.7,
           top_p: request.topP ?? 1.0,
           system: systemMessage?.content,
-          messages: userMessages.map(m => ({
-            role: m.role === 'assistant' ? 'assistant' : 'user',
+          messages: userMessages.map((m) => ({
+            role: m.role === "assistant" ? "assistant" : "user",
             content: m.content
           })),
-          tools: request.tools?.map(tool => ({
+          tools: request.tools?.map((tool) => ({
             name: tool.name,
             description: tool.description,
             input_schema: tool.parameters
@@ -1013,13 +1005,12 @@ export class AnthropicProvider extends LLMProvider {
 
         // Extract text content
         const textContent = response.data.content
-          .filter((c: any) => c.type === 'text')
+          .filter((c: any) => c.type === "text")
           .map((c: any) => c.text)
-          .join('');
+          .join("");
 
         // Extract tool calls
-        const toolUse = response.data.content
-          .filter((c: any) => c.type === 'tool_use');
+        const toolUse = response.data.content.filter((c: any) => c.type === "tool_use");
 
         return {
           id: response.data.id,
@@ -1052,47 +1043,51 @@ export class AnthropicProvider extends LLMProvider {
       }
     }
 
-    throw new Error('Max retry attempts exceeded');
+    throw new Error("Max retry attempts exceeded");
   }
 
   async *stream(request: LLMRequest, model: string): AsyncGenerator<LLMStreamChunk> {
-    const systemMessage = request.messages.find(m => m.role === 'system');
-    const userMessages = request.messages.filter(m => m.role !== 'system');
+    const systemMessage = request.messages.find((m) => m.role === "system");
+    const userMessages = request.messages.filter((m) => m.role !== "system");
 
-    const response = await this.client.post('/messages', {
-      model,
-      max_tokens: request.maxTokens ?? 500,
-      temperature: request.temperature ?? 0.7,
-      system: systemMessage?.content,
-      messages: userMessages,
-      stream: true
-    }, {
-      responseType: 'stream'
-    });
+    const response = await this.client.post(
+      "/messages",
+      {
+        model,
+        max_tokens: request.maxTokens ?? 500,
+        temperature: request.temperature ?? 0.7,
+        system: systemMessage?.content,
+        messages: userMessages,
+        stream: true
+      },
+      {
+        responseType: "stream"
+      }
+    );
 
-    let buffer = '';
+    let buffer = "";
 
     for await (const chunk of response.data) {
       buffer += chunk.toString();
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
 
       for (const line of lines) {
-        if (line.startsWith('event: ')) {
+        if (line.startsWith("event: ")) {
           const event = line.slice(7);
           continue; // Process event type if needed
         }
 
-        if (line.startsWith('data: ')) {
+        if (line.startsWith("data: ")) {
           const data = line.slice(6);
 
           try {
             const parsed = JSON.parse(data);
 
-            if (parsed.type === 'content_block_delta' && parsed.delta?.type === 'text_delta') {
+            if (parsed.type === "content_block_delta" && parsed.delta?.type === "text_delta") {
               yield { delta: parsed.delta.text, isComplete: false };
-            } else if (parsed.type === 'message_stop') {
-              yield { delta: '', isComplete: true };
+            } else if (parsed.type === "message_stop") {
+              yield { delta: "", isComplete: true };
               return;
             }
           } catch (e) {
@@ -1113,20 +1108,20 @@ export class AnthropicProvider extends LLMProvider {
 
   async getModel(modelId: string): Promise<ModelMetadata | null> {
     const models = await this.listModels();
-    return models.find(m => m.id === modelId) || null;
+    return models.find((m) => m.id === modelId) || null;
   }
 
   private getHardcodedModels(): ModelMetadata[] {
     const models: Array<Partial<ModelMetadata> & { id: string }> = [
       {
-        id: 'claude-sonnet-4-5-20250514',
-        name: 'Claude Sonnet 4.5',
-        description: 'Most capable Claude model (May 2025)',
+        id: "claude-sonnet-4-5-20250514",
+        name: "Claude Sonnet 4.5",
+        description: "Most capable Claude model (May 2025)",
         contextWindow: 200000,
         pricing: {
           inputCostPerMillion: 3,
           outputCostPerMillion: 15,
-          cacheCostPerMillion: 0.30,
+          cacheCostPerMillion: 0.3,
           cacheDiscountPercent: 90
         },
         capabilities: {
@@ -1140,17 +1135,17 @@ export class AnthropicProvider extends LLMProvider {
           requestsPerMinute: 50,
           tokensPerMinute: 40000
         },
-        tags: ['recommended', 'powerful', 'vision']
+        tags: ["recommended", "powerful", "vision"]
       },
       {
-        id: 'claude-3-5-sonnet-20241022',
-        name: 'Claude 3.5 Sonnet',
-        description: 'Balanced intelligence and speed',
+        id: "claude-3-5-sonnet-20241022",
+        name: "Claude 3.5 Sonnet",
+        description: "Balanced intelligence and speed",
         contextWindow: 200000,
         pricing: {
           inputCostPerMillion: 3,
           outputCostPerMillion: 15,
-          cacheCostPerMillion: 0.30,
+          cacheCostPerMillion: 0.3,
           cacheDiscountPercent: 90
         },
         capabilities: {
@@ -1164,15 +1159,15 @@ export class AnthropicProvider extends LLMProvider {
           requestsPerMinute: 50,
           tokensPerMinute: 40000
         },
-        tags: ['balanced', 'vision']
+        tags: ["balanced", "vision"]
       },
       {
-        id: 'claude-3-5-haiku-20241022',
-        name: 'Claude 3.5 Haiku',
-        description: 'Fast and affordable',
+        id: "claude-3-5-haiku-20241022",
+        name: "Claude 3.5 Haiku",
+        description: "Fast and affordable",
         contextWindow: 200000,
         pricing: {
-          inputCostPerMillion: 0.80,
+          inputCostPerMillion: 0.8,
           outputCostPerMillion: 4,
           cacheCostPerMillion: 0.08,
           cacheDiscountPercent: 90
@@ -1188,17 +1183,17 @@ export class AnthropicProvider extends LLMProvider {
           requestsPerMinute: 50,
           tokensPerMinute: 50000
         },
-        tags: ['recommended', 'budget', 'fast']
+        tags: ["recommended", "budget", "fast"]
       },
       {
-        id: 'claude-opus-4-1-20250514',
-        name: 'Claude Opus 4.1',
-        description: 'Most powerful for complex tasks',
+        id: "claude-opus-4-1-20250514",
+        name: "Claude Opus 4.1",
+        description: "Most powerful for complex tasks",
         contextWindow: 200000,
         pricing: {
           inputCostPerMillion: 15,
           outputCostPerMillion: 75,
-          cacheCostPerMillion: 1.50,
+          cacheCostPerMillion: 1.5,
           cacheDiscountPercent: 90
         },
         capabilities: {
@@ -1212,12 +1207,12 @@ export class AnthropicProvider extends LLMProvider {
           requestsPerMinute: 50,
           tokensPerMinute: 20000
         },
-        tags: ['powerful', 'vision']
+        tags: ["powerful", "vision"]
       },
       {
-        id: 'claude-3-haiku-20240307',
-        name: 'Claude 3 Haiku',
-        description: 'Cheapest option for simple tasks',
+        id: "claude-3-haiku-20240307",
+        name: "Claude 3 Haiku",
+        description: "Cheapest option for simple tasks",
         contextWindow: 200000,
         pricing: {
           inputCostPerMillion: 0.25,
@@ -1234,22 +1229,29 @@ export class AnthropicProvider extends LLMProvider {
           requestsPerMinute: 50,
           tokensPerMinute: 50000
         },
-        tags: ['budget']
+        tags: ["budget"]
       }
     ];
 
-    return models.map(m => ({
-      ...m,
-      provider: this.metadata.id
-    } as ModelMetadata));
+    return models.map(
+      (m) =>
+        ({
+          ...m,
+          provider: this.metadata.id
+        }) as ModelMetadata
+    );
   }
 
-  private normalizeFinishReason(reason: string): LLMResponse['finishReason'] {
+  private normalizeFinishReason(reason: string): LLMResponse["finishReason"] {
     switch (reason) {
-      case 'end_turn': return 'stop';
-      case 'max_tokens': return 'length';
-      case 'tool_use': return 'tool_calls';
-      default: return 'stop';
+      case "end_turn":
+        return "stop";
+      case "max_tokens":
+        return "length";
+      case "tool_use":
+        return "tool_calls";
+      default:
+        return "stop";
     }
   }
 }
@@ -1260,9 +1262,9 @@ export class AnthropicProvider extends LLMProvider {
 ```typescript
 // src/main/modules/ai/provider-registry.ts
 
-import { LLMProvider, ProviderMetadata, ModelMetadata } from './providers/base-provider';
-import { OpenAIProvider } from './providers/openai-provider';
-import { AnthropicProvider } from './providers/anthropic-provider';
+import { LLMProvider, ProviderMetadata, ModelMetadata } from "./providers/base-provider";
+import { OpenAIProvider } from "./providers/openai-provider";
+import { AnthropicProvider } from "./providers/anthropic-provider";
 
 export class ProviderRegistry {
   private providers: Map<string, LLMProvider> = new Map();
@@ -1286,16 +1288,13 @@ export class ProviderRegistry {
    * List all registered providers
    */
   listProviders(): ProviderMetadata[] {
-    return Array.from(this.providers.values()).map(p => p.metadata);
+    return Array.from(this.providers.values()).map((p) => p.metadata);
   }
 
   /**
    * Configure a provider (set API key, etc.)
    */
-  async configureProvider(
-    providerId: string,
-    config: { apiKey?: string; baseUrl?: string }
-  ): Promise<void> {
+  async configureProvider(providerId: string, config: { apiKey?: string; baseUrl?: string }): Promise<void> {
     this.settings.set(providerId, config);
 
     // Recreate provider with new config
@@ -1353,11 +1352,11 @@ export class ProviderRegistry {
    */
   async initializeDefaults(): Promise<void> {
     // Register providers with empty configs (will need API keys later)
-    const openai = await this.createProvider('openai', {});
-    const anthropic = await this.createProvider('anthropic', {});
+    const openai = await this.createProvider("openai", {});
+    const anthropic = await this.createProvider("anthropic", {});
 
-    if (openai) this.providers.set('openai', openai);
-    if (anthropic) this.providers.set('anthropic', anthropic);
+    if (openai) this.providers.set("openai", openai);
+    if (anthropic) this.providers.set("anthropic", anthropic);
   }
 
   /**
@@ -1368,11 +1367,11 @@ export class ProviderRegistry {
     config: { apiKey?: string; baseUrl?: string }
   ): Promise<LLMProvider | null> {
     switch (providerId) {
-      case 'openai':
+      case "openai":
         if (!config.apiKey) return null;
         return new OpenAIProvider(config as { apiKey: string });
 
-      case 'anthropic':
+      case "anthropic":
         if (!config.apiKey) return null;
         return new AnthropicProvider(config as { apiKey: string });
 
@@ -1389,13 +1388,13 @@ export class ProviderRegistry {
 ```typescript
 // src/main/modules/ai-service.ts
 
-import { ProviderRegistry } from './ai/provider-registry';
-import { LLMRequest, LLMResponse, ModelMetadata } from './ai/providers/base-provider';
+import { ProviderRegistry } from "./ai/provider-registry";
+import { LLMRequest, LLMResponse, ModelMetadata } from "./ai/providers/base-provider";
 
 export class AIService {
   private registry: ProviderRegistry;
-  private currentProvider: string = 'openai';
-  private currentModel: string = 'gpt-4o-mini';
+  private currentProvider: string = "openai";
+  private currentModel: string = "gpt-4o-mini";
 
   constructor() {
     this.registry = new ProviderRegistry();
@@ -1418,11 +1417,7 @@ export class AIService {
   /**
    * Analyze a bookmark using the configured model
    */
-  async analyzeBookmark(
-    title: string,
-    url: string,
-    content?: string
-  ): Promise<BookmarkAnalysis> {
+  async analyzeBookmark(title: string, url: string, content?: string): Promise<BookmarkAnalysis> {
     const provider = this.registry.getProvider(this.currentProvider);
     if (!provider) {
       throw new Error(`Provider ${this.currentProvider} not configured`);
@@ -1431,16 +1426,16 @@ export class AIService {
     const request: LLMRequest = {
       messages: [
         {
-          role: 'system',
-          content: 'You are a bookmark categorization assistant. Analyze bookmarks and suggest relevant labels.'
+          role: "system",
+          content: "You are a bookmark categorization assistant. Analyze bookmarks and suggest relevant labels."
         },
         {
-          role: 'user',
+          role: "user",
           content: `Analyze this bookmark and suggest categorization labels:
 
 Title: ${title}
 URL: ${url}
-${content ? `Content: ${content.substring(0, 1000)}...` : ''}
+${content ? `Content: ${content.substring(0, 1000)}...` : ""}
 
 Respond with JSON containing:
 - labels: Array of { label: string, category: string, confidence: number }
@@ -1458,12 +1453,12 @@ Respond with JSON containing:
       const result = JSON.parse(response.content);
       return {
         labels: result.labels || [],
-        summary: result.summary || '',
+        summary: result.summary || "",
         cost: response.cost.totalCost,
         modelUsed: response.model
       };
     } catch (error) {
-      throw new Error('Failed to parse AI response');
+      throw new Error("Failed to parse AI response");
     }
   }
 
@@ -1472,7 +1467,7 @@ Respond with JSON containing:
    */
   async listProviders(): Promise<Array<{ id: string; name: string; description: string }>> {
     const providers = this.registry.listProviders();
-    return providers.map(p => ({
+    return providers.map((p) => ({
       id: p.id,
       name: p.name,
       description: p.description
@@ -1507,7 +1502,7 @@ Respond with JSON containing:
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : "Unknown error"
       };
     }
   }
@@ -1521,7 +1516,7 @@ Respond with JSON containing:
   ): Promise<{ inputCost: number; outputCost: number; totalCost: number }> {
     const provider = this.registry.getProvider(this.currentProvider);
     if (!provider) {
-      throw new Error('No provider configured');
+      throw new Error("No provider configured");
     }
 
     // Average bookmark analysis: ~200 input tokens, ~150 output tokens
@@ -1530,11 +1525,11 @@ Respond with JSON containing:
 
     const modelMeta = await provider.getModel(model || this.currentModel);
     if (!modelMeta) {
-      throw new Error('Model not found');
+      throw new Error("Model not found");
     }
 
-    const inputCost = (avgInputTokens * bookmarkCount / 1_000_000) * modelMeta.pricing.inputCostPerMillion;
-    const outputCost = (avgOutputTokens * bookmarkCount / 1_000_000) * modelMeta.pricing.outputCostPerMillion;
+    const inputCost = ((avgInputTokens * bookmarkCount) / 1_000_000) * modelMeta.pricing.inputCostPerMillion;
+    const outputCost = ((avgOutputTokens * bookmarkCount) / 1_000_000) * modelMeta.pricing.outputCostPerMillion;
 
     return {
       inputCost,
@@ -1545,9 +1540,12 @@ Respond with JSON containing:
 
   private getDefaultModel(provider: string): string {
     switch (provider) {
-      case 'openai': return 'gpt-4o-mini';
-      case 'anthropic': return 'claude-3-5-sonnet-20241022';
-      default: return '';
+      case "openai":
+        return "gpt-4o-mini";
+      case "anthropic":
+        return "claude-3-5-sonnet-20241022";
+      default:
+        return "";
     }
   }
 }
@@ -1576,9 +1574,11 @@ interface BookmarkAnalysis {
 ## Implementation Plan
 
 ### Phase 1: Provider Abstraction
+
 **Goal**: Create the base provider interface and OpenAI implementation
 
 **Tasks**:
+
 1. Create `base-provider.ts` with abstract class and interfaces
 2. Implement `OpenAIProvider` with complete/stream/listModels
 3. Add comprehensive error handling and rate limiting
@@ -1586,14 +1586,17 @@ interface BookmarkAnalysis {
 5. Test with real OpenAI API calls
 
 **Deliverables**:
+
 - Working OpenAI provider with all methods
 - Test suite covering happy paths and error cases
 - Documentation for provider interface
 
 ### Phase 2: Anthropic Implementation
+
 **Goal**: Add Anthropic Claude support with same interface
 
 **Tasks**:
+
 1. Implement `AnthropicProvider` following same pattern
 2. Handle API differences (system messages, streaming format)
 3. Add Anthropic-specific error handling
@@ -1601,14 +1604,17 @@ interface BookmarkAnalysis {
 5. Test with real Anthropic API calls
 
 **Deliverables**:
+
 - Working Anthropic provider
 - Comparison tests between providers
 - Documentation for provider-specific quirks
 
 ### Phase 3: Provider Registry
+
 **Goal**: Create centralized provider management
 
 **Tasks**:
+
 1. Implement `ProviderRegistry` class
 2. Add provider configuration/initialization logic
 3. Implement model listing and discovery
@@ -1616,14 +1622,17 @@ interface BookmarkAnalysis {
 5. Write integration tests
 
 **Deliverables**:
+
 - ProviderRegistry with full provider lifecycle
 - Tests for provider switching
 - Documentation for registry usage
 
 ### Phase 4: AI Service Integration
+
 **Goal**: Update AIService to use provider abstraction
 
 **Tasks**:
+
 1. Refactor `AIService` to use ProviderRegistry
 2. Update `analyzeBookmark` to work with any provider
 3. Add cost estimation and tracking
@@ -1631,14 +1640,17 @@ interface BookmarkAnalysis {
 5. Write integration tests
 
 **Deliverables**:
+
 - Updated AIService using providers
 - Backward compatibility maintained
 - E2E tests for bookmark analysis
 
 ### Phase 5: Dynamic Model Discovery
+
 **Goal**: Fetch available models from APIs at runtime
 
 **Tasks**:
+
 1. Implement model caching with expiry
 2. Add `/v1/models` API calls for OpenAI
 3. Create hardcoded fallback for Anthropic
@@ -1646,14 +1658,17 @@ interface BookmarkAnalysis {
 5. Test model discovery and caching
 
 **Deliverables**:
+
 - Dynamic model lists from APIs
 - Cached model data for performance
 - Fallback mechanisms for API failures
 
 ### Phase 6: UI Integration
+
 **Goal**: Update settings UI to use dynamic providers/models
 
 **Tasks**:
+
 1. Update `AISettings` component to fetch providers
 2. Replace hardcoded models with API-fetched data
 3. Add model metadata display (pricing, capabilities)
@@ -1661,14 +1676,17 @@ interface BookmarkAnalysis {
 5. Add connection testing UI
 
 **Deliverables**:
+
 - Dynamic provider/model selection UI
 - Model comparison features
 - Cost estimation display
 
 ### Phase 7: Testing & Polish
+
 **Goal**: Comprehensive testing and performance optimization
 
 **Tasks**:
+
 1. E2E tests for full user workflows
 2. Performance testing with large batches
 3. Error recovery testing
@@ -1676,6 +1694,7 @@ interface BookmarkAnalysis {
 5. Documentation and code cleanup
 
 **Deliverables**:
+
 - Complete test suite
 - Performance benchmarks
 - User documentation
@@ -1688,6 +1707,7 @@ interface BookmarkAnalysis {
 ### From Current to New System
 
 **Current State**:
+
 - Hardcoded model options in UI
 - Direct API calls in AIService
 - Limited error handling
@@ -1696,6 +1716,7 @@ interface BookmarkAnalysis {
 **Migration Steps**:
 
 1. **Parallel Implementation** (No Breaking Changes):
+
    ```typescript
    // Keep existing methods working
    async analyzeBookmark_OLD(/* ... */) { /* existing code */ }
@@ -1710,10 +1731,11 @@ interface BookmarkAnalysis {
    - Phase 3: Remove hardcoded models entirely
 
 3. **Settings Migration**:
+
    ```typescript
    // Old settings
    interface OldAISettings {
-     provider: 'openai' | 'claude' | 'local';
+     provider: "openai" | "claude" | "local";
      model: string; // e.g., 'gpt-4o'
    }
 
@@ -1741,12 +1763,14 @@ interface BookmarkAnalysis {
 
 ```typescript
 // Test provider interface
-describe('LLMProvider', () => {
-  it('should normalize requests across providers', async () => {
-    const request: LLMRequest = { /* ... */ };
+describe("LLMProvider", () => {
+  it("should normalize requests across providers", async () => {
+    const request: LLMRequest = {
+      /* ... */
+    };
 
-    const openaiResponse = await openaiProvider.complete(request, 'gpt-4o');
-    const claudeResponse = await anthropicProvider.complete(request, 'claude-3-5-sonnet');
+    const openaiResponse = await openaiProvider.complete(request, "gpt-4o");
+    const claudeResponse = await anthropicProvider.complete(request, "claude-3-5-sonnet");
 
     // Both responses should have same structure
     expect(openaiResponse).toMatchObject({
@@ -1761,7 +1785,7 @@ describe('LLMProvider', () => {
     });
   });
 
-  it('should handle rate limiting with retry', async () => {
+  it("should handle rate limiting with retry", async () => {
     mockApiToReturn429(); // Mock 429 response
 
     const response = await provider.complete(request, model);
@@ -1777,17 +1801,17 @@ describe('LLMProvider', () => {
 
 ```typescript
 // Test provider registry
-describe('ProviderRegistry', () => {
-  it('should list models from all providers', async () => {
+describe("ProviderRegistry", () => {
+  it("should list models from all providers", async () => {
     const registry = new ProviderRegistry();
-    await registry.configureProvider('openai', { apiKey: OPENAI_KEY });
-    await registry.configureProvider('anthropic', { apiKey: ANTHROPIC_KEY });
+    await registry.configureProvider("openai", { apiKey: OPENAI_KEY });
+    await registry.configureProvider("anthropic", { apiKey: ANTHROPIC_KEY });
 
     const models = await registry.listAllModels();
 
     expect(models.length).toBeGreaterThan(5);
-    expect(models.some(m => m.provider === 'openai')).toBe(true);
-    expect(models.some(m => m.provider === 'anthropic')).toBe(true);
+    expect(models.some((m) => m.provider === "openai")).toBe(true);
+    expect(models.some((m) => m.provider === "anthropic")).toBe(true);
   });
 });
 ```
@@ -1796,31 +1820,29 @@ describe('ProviderRegistry', () => {
 
 ```typescript
 // Test full bookmark analysis workflow
-describe('Bookmark Analysis E2E', () => {
-  it('should analyze bookmark with OpenAI', async () => {
-    await flow.ai['ai:updateSettings']({
+describe("Bookmark Analysis E2E", () => {
+  it("should analyze bookmark with OpenAI", async () => {
+    await flow.ai["ai:updateSettings"]({
       enabled: true,
-      provider: 'openai',
-      model: 'gpt-4o-mini',
+      provider: "openai",
+      model: "gpt-4o-mini",
       apiKey: OPENAI_KEY
     });
 
-    const result = await flow.ai['ai:analyzeBookmarks']([
-      { title: 'React Documentation', url: 'https://react.dev' }
-    ]);
+    const result = await flow.ai["ai:analyzeBookmarks"]([{ title: "React Documentation", url: "https://react.dev" }]);
 
     expect(result.success).toBe(true);
     expect(result.data[0].labels.length).toBeGreaterThan(0);
   });
 
-  it('should switch providers without error', async () => {
+  it("should switch providers without error", async () => {
     // Start with OpenAI
-    await flow.ai['ai:updateSettings']({ provider: 'openai' });
-    const result1 = await flow.ai['ai:analyzeBookmarks']([bookmark]);
+    await flow.ai["ai:updateSettings"]({ provider: "openai" });
+    const result1 = await flow.ai["ai:analyzeBookmarks"]([bookmark]);
 
     // Switch to Anthropic
-    await flow.ai['ai:updateSettings']({ provider: 'anthropic' });
-    const result2 = await flow.ai['ai:analyzeBookmarks']([bookmark]);
+    await flow.ai["ai:updateSettings"]({ provider: "anthropic" });
+    const result2 = await flow.ai["ai:analyzeBookmarks"]([bookmark]);
 
     expect(result1.success).toBe(true);
     expect(result2.success).toBe(true);
@@ -1831,12 +1853,12 @@ describe('Bookmark Analysis E2E', () => {
 ### Performance Tests
 
 ```typescript
-describe('Performance', () => {
-  it('should handle 100 bookmarks in under 60 seconds', async () => {
+describe("Performance", () => {
+  it("should handle 100 bookmarks in under 60 seconds", async () => {
     const bookmarks = generateTestBookmarks(100);
     const startTime = Date.now();
 
-    await flow.ai['ai:analyzeBookmarks'](bookmarks, {
+    await flow.ai["ai:analyzeBookmarks"](bookmarks, {
       batchSize: 10,
       concurrency: 3
     });
@@ -1845,7 +1867,7 @@ describe('Performance', () => {
     expect(duration).toBeLessThan(60000);
   });
 
-  it('should cache model lists for 1 hour', async () => {
+  it("should cache model lists for 1 hour", async () => {
     await provider.listModels(); // First call
     const start = Date.now();
     await provider.listModels(); // Second call (should be cached)
@@ -1863,6 +1885,7 @@ describe('Performance', () => {
 ### API Key Management
 
 **Current Issues**:
+
 - API keys stored in plain text in settings
 - Keys visible in logs
 - No key rotation support
@@ -1870,20 +1893,22 @@ describe('Performance', () => {
 **Improvements**:
 
 1. **Encrypted Storage**:
+
    ```typescript
-   import { safeStorage } from 'electron';
+   import { safeStorage } from "electron";
 
    function encryptApiKey(key: string): string {
-     return safeStorage.encryptString(key).toString('base64');
+     return safeStorage.encryptString(key).toString("base64");
    }
 
    function decryptApiKey(encrypted: string): string {
-     const buffer = Buffer.from(encrypted, 'base64');
+     const buffer = Buffer.from(encrypted, "base64");
      return safeStorage.decryptString(buffer);
    }
    ```
 
 2. **Key Validation**:
+
    ```typescript
    async validateApiKey(provider: string, key: string): Promise<boolean> {
      // Test with minimal API call
@@ -1897,6 +1922,7 @@ describe('Performance', () => {
    ```
 
 3. **Key Rotation**:
+
    ```typescript
    interface ApiKeyHistory {
      keys: Array<{
@@ -1918,20 +1944,20 @@ describe('Performance', () => {
 ### Error Message Sanitization
 
 **Before**:
+
 ```typescript
 throw new Error(`API call failed: ${error.response.data}`);
 // Leaks: API key in URL, sensitive data
 ```
 
 **After**:
+
 ```typescript
 function sanitizeError(error: any): Error {
   // Remove sensitive data
-  const message = error.message
-    ?.replace(/sk-[a-zA-Z0-9-]+/g, 'sk-***')
-    ?.replace(/Bearer .+/g, 'Bearer ***');
+  const message = error.message?.replace(/sk-[a-zA-Z0-9-]+/g, "sk-***")?.replace(/Bearer .+/g, "Bearer ***");
 
-  return new Error(message || 'API request failed');
+  return new Error(message || "API request failed");
 }
 ```
 
@@ -1958,7 +1984,7 @@ class RateLimiter {
 
   private hashKey(key: string): string {
     // Hash for privacy, don't store raw keys
-    return crypto.createHash('sha256').update(key).digest('hex');
+    return crypto.createHash("sha256").update(key).digest("hex");
   }
 }
 ```
@@ -1975,10 +2001,7 @@ class ResponseCache {
   private ttl: number = 3600000; // 1 hour
 
   private getCacheKey(request: LLMRequest, model: string): string {
-    return crypto
-      .createHash('md5')
-      .update(JSON.stringify({ request, model }))
-      .digest('hex');
+    return crypto.createHash("md5").update(JSON.stringify({ request, model })).digest("hex");
   }
 
   async get(request: LLMRequest, model: string): Promise<LLMResponse | null> {
@@ -2066,12 +2089,14 @@ class BatchProcessor {
 ### 3. Prompt Caching (Provider-Specific)
 
 **OpenAI**:
+
 ```typescript
 // Automatically enabled, no code changes needed
 // Cache key based on prompt prefix
 ```
 
 **Anthropic**:
+
 ```typescript
 async complete(request: LLMRequest, model: string): Promise<LLMResponse> {
   const response = await this.client.post('/messages', {
@@ -2099,17 +2124,15 @@ class CostOptimizer {
   /**
    * Select cheapest model that meets requirements
    */
-  async selectModel(
-    requirements: {
-      minContextWindow?: number;
-      needsVision?: boolean;
-      needsFunctionCalling?: boolean;
-      maxCostPer1K?: number;
-    }
-  ): Promise<ModelMetadata> {
+  async selectModel(requirements: {
+    minContextWindow?: number;
+    needsVision?: boolean;
+    needsFunctionCalling?: boolean;
+    maxCostPer1K?: number;
+  }): Promise<ModelMetadata> {
     const models = await registry.listAllModels();
 
-    const suitable = models.filter(m => {
+    const suitable = models.filter((m) => {
       if (requirements.minContextWindow && m.contextWindow < requirements.minContextWindow) {
         return false;
       }
@@ -2120,8 +2143,7 @@ class CostOptimizer {
         return false;
       }
 
-      const costPer1K = (m.pricing.inputCostPerMillion / 1000) +
-                        (m.pricing.outputCostPerMillion / 1000);
+      const costPer1K = m.pricing.inputCostPerMillion / 1000 + m.pricing.outputCostPerMillion / 1000;
       if (requirements.maxCostPer1K && costPer1K > requirements.maxCostPer1K) {
         return false;
       }
@@ -2178,19 +2200,19 @@ case 'gemini':
 
 export class LocalProvider extends LLMProvider {
   readonly metadata: ProviderMetadata = {
-    id: 'local',
-    name: 'Local Models',
-    description: 'Run models locally via Ollama',
-    website: 'https://ollama.ai',
-    documentationUrl: 'https://github.com/jmorganca/ollama',
+    id: "local",
+    name: "Local Models",
+    description: "Run models locally via Ollama",
+    website: "https://ollama.ai",
+    documentationUrl: "https://github.com/jmorganca/ollama",
     requiresApiKey: false,
     supportsBatch: false,
     supportsStreaming: true,
-    defaultModel: 'llama2'
+    defaultModel: "llama2"
   };
 
   constructor(config: { baseUrl?: string }) {
-    super({ baseUrl: config.baseUrl || 'http://localhost:11434' });
+    super({ baseUrl: config.baseUrl || "http://localhost:11434" });
   }
 
   // Implement with Ollama API
@@ -2220,11 +2242,11 @@ interface ProviderPlugin {
 
 class PluginManager {
   async loadPlugin(pluginPath: string): Promise<void> {
-    const plugin = await import(pluginPath) as ProviderPlugin;
+    const plugin = (await import(pluginPath)) as ProviderPlugin;
 
     // Validate plugin interface
     if (!this.validatePlugin(plugin)) {
-      throw new Error('Invalid plugin format');
+      throw new Error("Invalid plugin format");
     }
 
     // Register provider class
@@ -2245,10 +2267,7 @@ interface ModelCapabilities {
   computerUse?: boolean; // Anthropic-specific
 }
 
-async function detectCapabilities(
-  provider: LLMProvider,
-  model: string
-): Promise<ModelCapabilities> {
+async function detectCapabilities(provider: LLMProvider, model: string): Promise<ModelCapabilities> {
   // Test each capability
   const capabilities: ModelCapabilities = {
     vision: await testVision(provider, model),
@@ -2274,28 +2293,31 @@ const registry = new ProviderRegistry();
 await registry.initializeDefaults();
 
 // 2. Configure a provider
-await registry.configureProvider('openai', {
-  apiKey: 'sk-...'
+await registry.configureProvider("openai", {
+  apiKey: "sk-..."
 });
 
 // 3. List available models
-const models = await registry.getProviderModels('openai');
-console.log(models.map(m => `${m.name}: $${m.pricing.inputCostPerMillion}/M`));
+const models = await registry.getProviderModels("openai");
+console.log(models.map((m) => `${m.name}: $${m.pricing.inputCostPerMillion}/M`));
 
 // 4. Use a model
-const provider = registry.getProvider('openai');
-const response = await provider.complete({
-  messages: [
-    { role: 'system', content: 'You are helpful.' },
-    { role: 'user', content: 'Analyze this bookmark...' }
-  ],
-  temperature: 0.7,
-  maxTokens: 500
-}, 'gpt-4o-mini');
+const provider = registry.getProvider("openai");
+const response = await provider.complete(
+  {
+    messages: [
+      { role: "system", content: "You are helpful." },
+      { role: "user", content: "Analyze this bookmark..." }
+    ],
+    temperature: 0.7,
+    maxTokens: 500
+  },
+  "gpt-4o-mini"
+);
 
-console.log('Response:', response.content);
-console.log('Cost:', response.cost.totalCost);
-console.log('Tokens:', response.usage.totalTokens);
+console.log("Response:", response.content);
+console.log("Cost:", response.cost.totalCost);
+console.log("Tokens:", response.usage.totalTokens);
 ```
 
 ### Switching Providers
@@ -2305,9 +2327,11 @@ console.log('Tokens:', response.usage.totalTokens);
 async function analyzeWithBestPrice(bookmark: Bookmark): Promise<Analysis> {
   // Get all models sorted by cost
   const models = await registry.listAllModels();
-  models.sort((a, b) =>
-    (a.pricing.inputCostPerMillion + a.pricing.outputCostPerMillion) -
-    (b.pricing.inputCostPerMillion + b.pricing.outputCostPerMillion)
+  models.sort(
+    (a, b) =>
+      a.pricing.inputCostPerMillion +
+      a.pricing.outputCostPerMillion -
+      (b.pricing.inputCostPerMillion + b.pricing.outputCostPerMillion)
   );
 
   // Try cheapest first
@@ -2316,9 +2340,14 @@ async function analyzeWithBestPrice(bookmark: Bookmark): Promise<Analysis> {
       const provider = registry.getProvider(model.provider);
       if (!provider) continue;
 
-      const result = await provider.complete({
-        messages: [/* ... */]
-      }, model.id);
+      const result = await provider.complete(
+        {
+          messages: [
+            /* ... */
+          ]
+        },
+        model.id
+      );
 
       return parseAnalysis(result);
     } catch (error) {
@@ -2326,7 +2355,7 @@ async function analyzeWithBestPrice(bookmark: Bookmark): Promise<Analysis> {
     }
   }
 
-  throw new Error('All providers failed');
+  throw new Error("All providers failed");
 }
 ```
 
@@ -2334,15 +2363,20 @@ async function analyzeWithBestPrice(bookmark: Bookmark): Promise<Analysis> {
 
 ```typescript
 async function streamAnalysis(bookmark: Bookmark): Promise<void> {
-  const provider = registry.getProvider('openai');
+  const provider = registry.getProvider("openai");
 
-  for await (const chunk of provider.stream({
-    messages: [/* ... */]
-  }, 'gpt-4o-mini')) {
+  for await (const chunk of provider.stream(
+    {
+      messages: [
+        /* ... */
+      ]
+    },
+    "gpt-4o-mini"
+  )) {
     if (chunk.isComplete) {
-      console.log('\nComplete!');
+      console.log("\nComplete!");
       if (chunk.usage) {
-        console.log('Tokens used:', chunk.usage.totalTokens);
+        console.log("Tokens used:", chunk.usage.totalTokens);
       }
     } else {
       process.stdout.write(chunk.delta);

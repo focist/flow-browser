@@ -82,7 +82,7 @@ function App() {
           <Routes />
         </PlatformProvider>
       </QueryParamProvider>
-      
+
       <Toaster
         style={{
           zIndex: 60

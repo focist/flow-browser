@@ -1,13 +1,13 @@
-import { motion, AnimatePresence } from 'motion/react';
-import { StatsView } from './stats-view';
-import { LabelPreviewView } from './label-preview-view';
-import { BookmarkPreviewView } from './bookmark-preview-view';
-import { BulkImpactView } from './bulk-impact-view';
-import { ScrollArea } from '../ui/scroll-area';
-import type { LabelPattern } from '../../hooks/use-pattern-detection';
-import type { DashboardBookmark } from '../../hooks/use-dashboard-state';
+import { motion, AnimatePresence } from "motion/react";
+import { StatsView } from "./stats-view";
+import { LabelPreviewView } from "./label-preview-view";
+import { BookmarkPreviewView } from "./bookmark-preview-view";
+import { BulkImpactView } from "./bulk-impact-view";
+import { ScrollArea } from "../ui/scroll-area";
+import type { LabelPattern } from "../../hooks/use-pattern-detection";
+import type { DashboardBookmark } from "../../hooks/use-dashboard-state";
 
-export type PreviewMode = 'stats' | 'label' | 'bookmark' | 'bulk-impact';
+export type PreviewMode = "stats" | "label" | "bookmark" | "bulk-impact";
 
 interface ContextPreviewColumnProps {
   mode: PreviewMode;
@@ -46,7 +46,7 @@ export function ContextPreviewColumn({
   // The dashboard handles all mode logic and timing
   const renderContent = (): React.ReactNode => {
     switch (mode) {
-      case 'label':
+      case "label":
         if (selectedPattern && affectedBookmarks.length > 0 && onApplyPattern) {
           return (
             <LabelPreviewView
@@ -58,26 +58,16 @@ export function ContextPreviewColumn({
         }
         return <StatsView stats={stats} />;
 
-      case 'bookmark':
+      case "bookmark":
         if (selectedBookmark && onApplyBookmarkLabels) {
-          return (
-            <BookmarkPreviewView
-              bookmark={selectedBookmark}
-              onApplySelectedLabels={onApplyBookmarkLabels}
-            />
-          );
+          return <BookmarkPreviewView bookmark={selectedBookmark} onApplySelectedLabels={onApplyBookmarkLabels} />;
         }
         return <StatsView stats={stats} />;
 
-      case 'bulk-impact':
-        return (
-          <BulkImpactView
-            selectedBookmarks={selectedBookmarks}
-            onApplyToSelected={onApplyBulk || (() => {})}
-          />
-        );
+      case "bulk-impact":
+        return <BulkImpactView selectedBookmarks={selectedBookmarks} onApplyToSelected={onApplyBulk || (() => {})} />;
 
-      case 'stats':
+      case "stats":
       default:
         return <StatsView stats={stats} />;
     }
@@ -92,21 +82,21 @@ export function ContextPreviewColumn({
       {/* Header */}
       <div className="p-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex-shrink-0">
         <h2 className="text-lg font-semibold">
-          {mode === 'label' && 'Label Preview'}
-          {mode === 'bookmark' && 'Bookmark Preview'}
-          {mode === 'bulk-impact' && 'Bulk Impact'}
-          {mode === 'stats' && 'Overview'}
+          {mode === "label" && "Label Preview"}
+          {mode === "bookmark" && "Bookmark Preview"}
+          {mode === "bulk-impact" && "Bulk Impact"}
+          {mode === "stats" && "Overview"}
         </h2>
         <p className="text-xs text-muted-foreground mt-1">
-          {mode === 'label' && 'Hover over labels to see affected bookmarks'}
-          {mode === 'bookmark' && 'Hover over bookmarks to see applicable labels'}
-          {mode === 'bulk-impact' && 'Review and customize bulk operations'}
-          {mode === 'stats' && 'Statistics and overview'}
+          {mode === "label" && "Hover over labels to see affected bookmarks"}
+          {mode === "bookmark" && "Hover over bookmarks to see applicable labels"}
+          {mode === "bulk-impact" && "Review and customize bulk operations"}
+          {mode === "stats" && "Statistics and overview"}
         </p>
       </div>
 
       {/* Content Area with Transition */}
-      {mode === 'bulk-impact' ? (
+      {mode === "bulk-impact" ? (
         <div className="flex-1 overflow-hidden p-4 min-w-0 flex flex-col min-h-0">
           <AnimatePresence mode="sync">
             <motion.div
@@ -115,7 +105,7 @@ export function ContextPreviewColumn({
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2, ease: 'easeInOut' }}
+              transition={{ duration: 0.2, ease: "easeInOut" }}
             >
               {renderContent()}
             </motion.div>
@@ -131,7 +121,7 @@ export function ContextPreviewColumn({
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2, ease: 'easeInOut' }}
+                transition={{ duration: 0.2, ease: "easeInOut" }}
               >
                 {renderContent()}
               </motion.div>

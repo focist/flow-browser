@@ -18,7 +18,7 @@ Let users choose which AI provider and model runs bookmark analysis and
 reprocessing, configured in **Settings** (the AI section). This spec describes a
 from-scratch build of that capability: pick a provider, pick a model from the
 provider's available models shown with accurate metadata, persist the choice,
-and have that choice actually drive analysis. Scope is model *selection* — not
+and have that choice actually drive analysis. Scope is model _selection_ — not
 cost optimization, failover, batching, or a per-run picker elsewhere in the app.
 
 ## Goals

@@ -8,10 +8,10 @@
  * providers while checks wire a file-backed store and fakes.
  */
 
-import type { AISettings } from '~/flow/interfaces/ai';
-import type { LLMProvider, LLMRequest, LLMResponse, ModelMetadata } from './providers/base-provider';
-import { getDefaultModelId, normalizeProviderId, resolveSelection } from './model-catalog';
-import { validateSettingsPatch } from './settings-validation';
+import type { AISettings } from "~/flow/interfaces/ai";
+import type { LLMProvider, LLMRequest, LLMResponse, ModelMetadata } from "./providers/base-provider";
+import { getDefaultModelId, normalizeProviderId, resolveSelection } from "./model-catalog";
+import { validateSettingsPatch } from "./settings-validation";
 
 /** The slice of a datastore the core needs. SettingsDataStore satisfies it. */
 export interface KVStore {
@@ -25,12 +25,12 @@ export interface RegistryLike {
   configureProvider(providerId: string, config: { apiKey?: string; baseUrl?: string }): Promise<void>;
 }
 
-export const AI_SETTINGS_KEY = 'ai-settings';
+export const AI_SETTINGS_KEY = "ai-settings";
 
 export const DEFAULT_SETTINGS: AISettings = {
   enabled: true,
-  provider: 'openai',
-  model: '',
+  provider: "openai",
+  model: "",
   autoAnalyze: false,
   confidenceThreshold: 0.7,
   autoApply: {
@@ -46,8 +46,8 @@ export const DEFAULT_SETTINGS: AISettings = {
 };
 
 export type RunTarget =
-  | { kind: 'local' }
-  | { kind: 'api'; provider: LLMProvider; providerId: 'openai' | 'anthropic'; model: string };
+  | { kind: "local" }
+  | { kind: "api"; provider: LLMProvider; providerId: "openai" | "anthropic"; model: string };
 
 export type ConnectionTestResult = {
   success: boolean;
@@ -77,7 +77,7 @@ export class SelectionCore {
           this.settings = { ...DEFAULT_SETTINGS, ...saved };
         }
         this.applyResolvedSelection();
-        if (this.settings.apiKey && normalizeProviderId(this.settings.provider) !== 'local') {
+        if (this.settings.apiKey && normalizeProviderId(this.settings.provider) !== "local") {
           await this.registry.configureProvider(normalizeProviderId(this.settings.provider), {
             apiKey: this.settings.apiKey
           });
@@ -115,7 +115,7 @@ export class SelectionCore {
     }
     this.applyResolvedSelection();
 
-    if (this.settings.apiKey && normalizeProviderId(this.settings.provider) !== 'local') {
+    if (this.settings.apiKey && normalizeProviderId(this.settings.provider) !== "local") {
       await this.registry.configureProvider(normalizeProviderId(this.settings.provider), {
         apiKey: this.settings.apiKey
       });
@@ -129,21 +129,21 @@ export class SelectionCore {
   async getRunTarget(): Promise<RunTarget> {
     await this.load();
     const selection = resolveSelection(this.settings.provider, this.settings.model);
-    if (selection.provider === 'local') {
-      return { kind: 'local' };
+    if (selection.provider === "local") {
+      return { kind: "local" };
     }
     const provider = this.registry.getProvider(selection.provider);
     if (!provider) {
       throw new Error(`Provider ${selection.provider} not configured`);
     }
-    return { kind: 'api', provider, providerId: selection.provider, model: selection.model! };
+    return { kind: "api", provider, providerId: selection.provider, model: selection.model! };
   }
 
   /** Run a completion on the currently selected provider and model. */
   async runCompletion(request: LLMRequest): Promise<{ response: LLMResponse; model: string; providerId: string }> {
     const target = await this.getRunTarget();
-    if (target.kind === 'local') {
-      throw new Error('The local provider does not run completions');
+    if (target.kind === "local") {
+      throw new Error("The local provider does not run completions");
     }
     const response = await target.provider.complete(request, target.model);
     return { response, model: target.model, providerId: target.providerId };
@@ -157,7 +157,7 @@ export class SelectionCore {
   async testConnection(providerId: string, apiKey: string): Promise<ConnectionTestResult> {
     await this.load();
     const normalized = normalizeProviderId(providerId);
-    if (normalized === 'local') {
+    if (normalized === "local") {
       return { success: true, models: [] };
     }
     try {
@@ -172,12 +172,12 @@ export class SelectionCore {
       }
       return { success: true, models: await provider.listModels() };
     } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+      return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
   }
 
   private applyResolvedSelection(): void {
     const selection = resolveSelection(this.settings.provider, this.settings.model);
-    this.settings.model = selection.provider === 'local' ? '' : selection.model;
+    this.settings.model = selection.provider === "local" ? "" : selection.model;
   }
 }

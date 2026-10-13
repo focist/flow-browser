@@ -10,7 +10,7 @@
  */
 export interface LLMRequest {
   messages: Array<{
-    role: 'system' | 'user' | 'assistant';
+    role: "system" | "user" | "assistant";
     content: string;
   }>;
   temperature?: number;
@@ -31,7 +31,7 @@ export interface LLMResponse {
   id: string;
   model: string;
   content: string;
-  finishReason: 'stop' | 'length' | 'tool_calls' | 'error';
+  finishReason: "stop" | "length" | "tool_calls" | "error";
   usage: {
     promptTokens: number;
     completionTokens: number;
@@ -56,7 +56,7 @@ export interface LLMResponse {
 export interface LLMStreamChunk {
   delta: string;
   isComplete: boolean;
-  usage?: LLMResponse['usage'];
+  usage?: LLMResponse["usage"];
 }
 
 /**
@@ -127,18 +127,12 @@ export abstract class LLMProvider {
   /**
    * Complete a prompt (non-streaming)
    */
-  abstract complete(
-    request: LLMRequest,
-    model: string
-  ): Promise<LLMResponse>;
+  abstract complete(request: LLMRequest, model: string): Promise<LLMResponse>;
 
   /**
    * Stream a completion
    */
-  abstract stream(
-    request: LLMRequest,
-    model: string
-  ): AsyncGenerator<LLMStreamChunk>;
+  abstract stream(request: LLMRequest, model: string): AsyncGenerator<LLMStreamChunk>;
 
   /**
    * List available models from the provider
@@ -187,9 +181,7 @@ export abstract class LLMProvider {
    * Estimate tokens for a request (rough estimation)
    */
   protected estimateTokens(request: LLMRequest): number {
-    const text = request.messages
-      .map(m => m.content)
-      .join(' ');
+    const text = request.messages.map((m) => m.content).join(" ");
     return Math.ceil(text.length / 4); // Rough: 4 chars = 1 token
   }
 
@@ -197,12 +189,10 @@ export abstract class LLMProvider {
    * Handle rate limiting with exponential backoff
    */
   protected async handleRateLimit(error: unknown, attempt: number): Promise<void> {
-    const retryAfter = (error as { headers?: Record<string, string> }).headers?.['retry-after'];
-    const delay = retryAfter
-      ? parseInt(retryAfter) * 1000
-      : Math.min(1000 * Math.pow(2, attempt), 60000);
+    const retryAfter = (error as { headers?: Record<string, string> }).headers?.["retry-after"];
+    const delay = retryAfter ? parseInt(retryAfter) * 1000 : Math.min(1000 * Math.pow(2, attempt), 60000);
 
-    await new Promise(resolve => setTimeout(resolve, delay));
+    await new Promise((resolve) => setTimeout(resolve, delay));
   }
 
   /**
@@ -211,7 +201,7 @@ export abstract class LLMProvider {
   protected normalizeError(error: unknown): Error {
     const apiError = (error as { response?: { data?: { error?: { message?: string } } } }).response?.data?.error;
     if (apiError) {
-      return new Error(apiError.message || 'API error');
+      return new Error(apiError.message || "API error");
     }
     return error instanceof Error ? error : new Error(String(error));
   }

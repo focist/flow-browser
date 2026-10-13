@@ -1,8 +1,8 @@
-import { ReactNode } from 'react';
-import { ExpandableSection } from './expandable-section';
+import { ReactNode } from "react";
+import { ExpandableSection } from "./expandable-section";
 
-type ConfidenceLevel = 'High' | 'Medium' | 'Low';
-type CheckboxState = 'checked' | 'unchecked' | 'indeterminate';
+type ConfidenceLevel = "High" | "Medium" | "Low";
+type CheckboxState = "checked" | "unchecked" | "indeterminate";
 
 interface ConfidenceGroupSectionProps<T> {
   level: ConfidenceLevel;
@@ -59,10 +59,10 @@ export function ConfidenceGroupSection<T>({
       headerAction={
         <input
           type="checkbox"
-          checked={groupCheckboxState === 'checked'}
+          checked={groupCheckboxState === "checked"}
           ref={(el) => {
             if (el) {
-              el.indeterminate = groupCheckboxState === 'indeterminate';
+              el.indeterminate = groupCheckboxState === "indeterminate";
             }
           }}
           onChange={onGroupToggle}
@@ -72,14 +72,16 @@ export function ConfidenceGroupSection<T>({
       }
     >
       <div className="space-y-1 px-3 min-w-0">
-        {items.map(item => {
+        {items.map((item) => {
           const id = getId(item);
           const isSelected = selectedIds.has(id);
           return (
             <label
               key={id}
               className="flex items-center gap-2 py-1 hover:bg-accent rounded px-2 cursor-pointer transition-colors min-w-0 max-w-full overflow-hidden"
-              onMouseDown={(e) => { if (e.shiftKey) e.preventDefault(); }}
+              onMouseDown={(e) => {
+                if (e.shiftKey) e.preventDefault();
+              }}
             >
               <input
                 type="checkbox"

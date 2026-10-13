@@ -1,15 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { Button } from '../ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
-import { Switch } from '../ui/switch';
-import { Slider } from '../ui/slider';
-import { Badge } from '../ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Brain, Key, Settings, AlertCircle, CheckCircle, Sparkles, Loader2, DollarSign, Eye, Code } from 'lucide-react';
-import { toast } from 'sonner';
-import type { AISettings, ModelMetadata } from '~/flow/interfaces/ai';
+import React, { useState, useEffect } from "react";
+import { Button } from "../ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import { Switch } from "../ui/switch";
+import { Slider } from "../ui/slider";
+import { Badge } from "../ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import { Brain, Key, Settings, AlertCircle, CheckCircle, Sparkles, Loader2, DollarSign, Eye, Code } from "lucide-react";
+import { toast } from "sonner";
+import type { AISettings, ModelMetadata } from "~/flow/interfaces/ai";
 
 interface AISettingsProps {
   onSettingsChange?: (settings: AISettings) => void;
@@ -32,49 +32,38 @@ const formatContextWindow = (tokens: number): string => {
 
 /** The provider's preferred model: the catalog's default tag, else the first entry. */
 const pickDefaultModel = (models: ModelMetadata[]): string =>
-  (models.find((m) => m.tags.includes('default')) ?? models[0])?.id ?? '';
+  (models.find((m) => m.tags.includes("default")) ?? models[0])?.id ?? "";
 
 const ModelCard: React.FC<ModelCardProps> = ({ model, selected, onSelect }) => {
   return (
     <label
       className={`relative flex cursor-pointer flex-col gap-3 rounded-lg border-2 p-4 transition-all ${
-        selected
-          ? 'border-primary bg-primary/5'
-          : 'border-border bg-card hover:border-primary/50'
+        selected ? "border-primary bg-primary/5" : "border-border bg-card hover:border-primary/50"
       }`}
     >
-      <input
-        type="radio"
-        checked={selected}
-        onChange={onSelect}
-        className="sr-only"
-      />
+      <input type="radio" checked={selected} onChange={onSelect} className="sr-only" />
 
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <h4 className="font-semibold text-base">{model.name}</h4>
-          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-            {model.description}
-          </p>
+          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{model.description}</p>
         </div>
 
-        {selected && (
-          <CheckCircle className="h-5 w-5 text-primary shrink-0" />
-        )}
+        {selected && <CheckCircle className="h-5 w-5 text-primary shrink-0" />}
       </div>
 
       <div className="flex flex-wrap gap-1.5">
-        {model.tags.includes('recommended') && (
+        {model.tags.includes("recommended") && (
           <Badge variant="default" className="text-[10px] px-1.5 py-0.5">
             Recommended
           </Badge>
         )}
-        {model.tags.includes('budget') && (
+        {model.tags.includes("budget") && (
           <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5">
             Budget
           </Badge>
         )}
-        {model.tags.includes('fast') && (
+        {model.tags.includes("fast") && (
           <Badge variant="outline" className="text-[10px] px-1.5 py-0.5">
             Fast
           </Badge>
@@ -85,8 +74,8 @@ const ModelCard: React.FC<ModelCardProps> = ({ model, selected, onSelect }) => {
         <div className="flex items-center gap-1">
           <DollarSign className="h-3 w-3" />
           <span>
-            ${model.pricing.inputCostPerMillion.toFixed(2)} / $
-            {model.pricing.outputCostPerMillion.toFixed(2)} per 1M tokens
+            ${model.pricing.inputCostPerMillion.toFixed(2)} / ${model.pricing.outputCostPerMillion.toFixed(2)} per 1M
+            tokens
           </span>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
@@ -107,32 +96,29 @@ const ModelCard: React.FC<ModelCardProps> = ({ model, selected, onSelect }) => {
   );
 };
 
-export const AISettingsComponent: React.FC<AISettingsProps> = ({
-  onSettingsChange,
-  className = ''
-}) => {
+export const AISettingsComponent: React.FC<AISettingsProps> = ({ onSettingsChange, className = "" }) => {
   const [settings, setSettings] = useState<AISettings>({
     enabled: false,
-    provider: 'openai',
-    model: 'gpt-6-luna',
+    provider: "openai",
+    model: "gpt-6-luna",
     autoAnalyze: false,
     confidenceThreshold: 0.7,
     autoApply: {
       enabled: false,
       maxLabels: 1,
-      notifications: true,
+      notifications: true
     },
     categories: {
       topics: true,
       types: true,
-      priority: false,
+      priority: false
     }
   });
 
-  const [apiKey, setApiKey] = useState('');
+  const [apiKey, setApiKey] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isTestingConnection, setIsTestingConnection] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [connectionStatus, setConnectionStatus] = useState<"idle" | "success" | "error">("idle");
 
   const [models, setModels] = useState<ModelMetadata[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
@@ -144,7 +130,7 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
 
   // Load models when provider changes (the catalog is served without an API key)
   useEffect(() => {
-    if (settings.provider && settings.provider !== 'local') {
+    if (settings.provider && settings.provider !== "local") {
       loadModelsForProvider(settings.provider);
     } else {
       setModels([]);
@@ -154,7 +140,7 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
   // Keep the selection valid: once the provider's models arrive, a missing or
   // cross-provider model lands on the provider's default.
   useEffect(() => {
-    if (settings.provider === 'local' || models.length === 0) return;
+    if (settings.provider === "local" || models.length === 0) return;
     if (!settings.model || !models.some((m) => m.id === settings.model)) {
       setSettings((prev) => ({ ...prev, model: pickDefaultModel(models) }));
     }
@@ -162,7 +148,7 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
 
   const loadSettings = async () => {
     try {
-      const result = await flow.ai['ai:getSettings']();
+      const result = await flow.ai["ai:getSettings"]();
       if (result.success && result.data) {
         // Ensure autoApply exists with proper defaults
         const loadedSettings = {
@@ -170,15 +156,15 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
           autoApply: result.data.autoApply || {
             enabled: false,
             maxLabels: 1,
-            notifications: true,
+            notifications: true
           }
         };
         setSettings(loadedSettings);
-        setApiKey(result.data.apiKey || '');
+        setApiKey(result.data.apiKey || "");
       }
     } catch (error) {
-      console.error('Failed to load AI settings:', error);
-      toast.error('Failed to load AI settings');
+      console.error("Failed to load AI settings:", error);
+      toast.error("Failed to load AI settings");
     }
   };
 
@@ -186,13 +172,13 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
     setIsLoadingModels(true);
     try {
       // Normalize provider ID (claude -> anthropic)
-      const normalizedProviderId = providerId === 'claude' ? 'anthropic' : providerId;
-      const result = await flow.ai['ai:listModels'](normalizedProviderId);
+      const normalizedProviderId = providerId === "claude" ? "anthropic" : providerId;
+      const result = await flow.ai["ai:listModels"](normalizedProviderId);
       if (result.success && result.data) {
         setModels(result.data);
       }
     } catch (error) {
-      console.error('Failed to load models:', error);
+      console.error("Failed to load models:", error);
       // Don't show error toast here as models might not be available without API key
       setModels([]);
     } finally {
@@ -204,26 +190,26 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
     setIsLoading(true);
     try {
       const updatedSettings = { ...settings, ...newSettings };
-      
+
       // Include API key if provided
       if (apiKey.trim()) {
         updatedSettings.apiKey = apiKey.trim();
       }
 
-      const result = await flow.ai['ai:updateSettings'](updatedSettings);
-      
+      const result = await flow.ai["ai:updateSettings"](updatedSettings);
+
       if (result.success) {
         setSettings(updatedSettings);
         onSettingsChange?.(updatedSettings);
-        toast.success('AI settings saved');
+        toast.success("AI settings saved");
         // Saving never issues a provider request — connection validation
         // happens only via the explicit Test button.
       } else {
-        throw new Error(result.error || 'Failed to save settings');
+        throw new Error(result.error || "Failed to save settings");
       }
     } catch (error) {
-      console.error('Failed to save AI settings:', error);
-      toast.error('Failed to save settings: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      console.error("Failed to save AI settings:", error);
+      toast.error("Failed to save settings: " + (error instanceof Error ? error.message : "Unknown error"));
     } finally {
       setIsLoading(false);
     }
@@ -231,60 +217,57 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
 
   const testConnection = async () => {
     if (!apiKey.trim()) {
-      toast.error('Please enter an API key first');
+      toast.error("Please enter an API key first");
       return;
     }
 
     setIsTestingConnection(true);
-    setConnectionStatus('idle');
+    setConnectionStatus("idle");
 
     try {
       // Explicit, non-billable validation: the key is verified against the
       // provider's model-list endpoint. Settings are not saved here.
-      const result = await flow.ai['ai:testConnection'](settings.provider, apiKey.trim());
+      const result = await flow.ai["ai:testConnection"](settings.provider, apiKey.trim());
       const outcome = result.success ? result.data : undefined;
 
       if (outcome?.success) {
-        setConnectionStatus('success');
+        setConnectionStatus("success");
         if (outcome.models?.length) {
           setModels(outcome.models as ModelMetadata[]);
         }
-        toast.success('Connection verified — your API key works.');
+        toast.success("Connection verified — your API key works.");
       } else {
-        throw new Error(outcome?.error || result.error || 'Connection test failed');
+        throw new Error(outcome?.error || result.error || "Connection test failed");
       }
     } catch (error) {
-      console.error('AI connection test failed:', error);
-      setConnectionStatus('error');
-      toast.error('Connection test failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      console.error("AI connection test failed:", error);
+      setConnectionStatus("error");
+      toast.error("Connection test failed: " + (error instanceof Error ? error.message : "Unknown error"));
     } finally {
       setIsTestingConnection(false);
     }
   };
 
-  const handleSettingChange = <K extends keyof AISettings>(
-    key: K,
-    value: AISettings[K]
-  ) => {
+  const handleSettingChange = <K extends keyof AISettings>(key: K, value: AISettings[K]) => {
     const newSettings = { ...settings, [key]: value };
 
     // A provider switch clears the model; the new provider's default is
     // selected as soon as its models load, so no cross-provider model lingers.
-    if (key === 'provider') {
-      newSettings.model = '';
+    if (key === "provider") {
+      newSettings.model = "";
     }
 
     setSettings(newSettings);
   };
 
-  const handleCategoryChange = (category: keyof AISettings['categories'], enabled: boolean) => {
+  const handleCategoryChange = (category: keyof AISettings["categories"], enabled: boolean) => {
     const newCategories = { ...settings.categories, [category]: enabled };
-    handleSettingChange('categories', newCategories);
+    handleSettingChange("categories", newCategories);
   };
 
-  const handleAutoApplyChange = (setting: keyof AISettings['autoApply'], value: boolean | number) => {
+  const handleAutoApplyChange = (setting: keyof AISettings["autoApply"], value: boolean | number) => {
     const newAutoApply = { ...settings.autoApply, [setting]: value };
-    handleSettingChange('autoApply', newAutoApply);
+    handleSettingChange("autoApply", newAutoApply);
   };
 
   return (
@@ -295,13 +278,11 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
           <div className="flex items-center gap-2">
             <Brain className="h-5 w-5 text-blue-600" />
             <CardTitle>AI Bookmark Analysis</CardTitle>
-            <Badge variant={settings.enabled ? 'default' : 'secondary'}>
-              {settings.enabled ? 'Enabled' : 'Disabled'}
+            <Badge variant={settings.enabled ? "default" : "secondary"}>
+              {settings.enabled ? "Enabled" : "Disabled"}
             </Badge>
           </div>
-          <CardDescription>
-            Use AI to automatically categorize and analyze your bookmarks
-          </CardDescription>
+          <CardDescription>Use AI to automatically categorize and analyze your bookmarks</CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-6">
@@ -311,14 +292,12 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
               <Label htmlFor="ai-enabled" className="font-medium">
                 Enable AI Analysis
               </Label>
-              <p className="text-sm text-muted-foreground">
-                Turn on AI-powered bookmark categorization
-              </p>
+              <p className="text-sm text-muted-foreground">Turn on AI-powered bookmark categorization</p>
             </div>
             <Switch
               id="ai-enabled"
               checked={settings.enabled}
-              onCheckedChange={(checked) => handleSettingChange('enabled', checked)}
+              onCheckedChange={(checked) => handleSettingChange("enabled", checked)}
             />
           </div>
 
@@ -330,7 +309,7 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
                   <Label htmlFor="provider-select">AI Provider</Label>
                   <Select
                     value={settings.provider}
-                    onValueChange={(value: 'openai' | 'claude' | 'local') => handleSettingChange('provider', value)}
+                    onValueChange={(value: "openai" | "claude" | "local") => handleSettingChange("provider", value)}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -342,15 +321,14 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
-                    {settings.provider === 'local' 
-                      ? 'Uses basic keyword analysis without API calls'
-                      : 'Requires API key for advanced AI features'
-                    }
+                    {settings.provider === "local"
+                      ? "Uses basic keyword analysis without API calls"
+                      : "Requires API key for advanced AI features"}
                   </p>
                 </div>
 
                 {/* Model Selection - Radio Card Grid */}
-                {(settings.provider === 'openai' || settings.provider === 'claude') && (
+                {(settings.provider === "openai" || settings.provider === "claude") && (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <Label>Select Model</Label>
@@ -365,9 +343,8 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
                     {!apiKey.trim() && (
                       <div className="p-4 bg-amber-50 border border-amber-200 rounded-md">
                         <p className="text-sm text-amber-800">
-                          You can choose a model now, but analysis needs a{' '}
-                          {settings.provider === 'openai' ? 'OpenAI' : 'Anthropic'} API key — add one below
-                          to run it.
+                          You can choose a model now, but analysis needs a{" "}
+                          {settings.provider === "openai" ? "OpenAI" : "Anthropic"} API key — add one below to run it.
                         </p>
                       </div>
                     )}
@@ -385,7 +362,7 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
                             key={model.id}
                             model={model}
                             selected={settings.model === model.id}
-                            onSelect={() => handleSettingChange('model', model.id)}
+                            onSelect={() => handleSettingChange("model", model.id)}
                           />
                         ))}
                       </div>
@@ -395,51 +372,71 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
               </div>
 
               {/* API Configuration */}
-              {(settings.provider === 'openai' || settings.provider === 'claude') && (
+              {(settings.provider === "openai" || settings.provider === "claude") && (
                 <div className="space-y-4 border-t pt-6">
                   <div className="flex items-center gap-2">
                     <Key className="h-4 w-4" />
                     <Label className="font-medium">
-                      {settings.provider === 'openai' ? 'OpenAI Configuration' : 'Anthropic Configuration'}
+                      {settings.provider === "openai" ? "OpenAI Configuration" : "Anthropic Configuration"}
                     </Label>
                   </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="api-key">API Key</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="api-key"
-                      type="password"
-                      placeholder="sk-..."
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
-                      className="flex-1"
-                    />
-                    <Button
-                      variant="outline"
-                      onClick={testConnection}
-                      disabled={!apiKey.trim() || isTestingConnection}
-                      size="sm"
-                    >
-                      {isTestingConnection ? (
-                        'Testing...'
+                  <div className="space-y-2">
+                    <Label htmlFor="api-key">API Key</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="api-key"
+                        type="password"
+                        placeholder="sk-..."
+                        value={apiKey}
+                        onChange={(e) => setApiKey(e.target.value)}
+                        className="flex-1"
+                      />
+                      <Button
+                        variant="outline"
+                        onClick={testConnection}
+                        disabled={!apiKey.trim() || isTestingConnection}
+                        size="sm"
+                      >
+                        {isTestingConnection ? (
+                          "Testing..."
+                        ) : (
+                          <>
+                            {connectionStatus === "success" && <CheckCircle className="h-4 w-4 mr-1 text-green-600" />}
+                            {connectionStatus === "error" && <AlertCircle className="h-4 w-4 mr-1 text-red-600" />}
+                            Test
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {settings.provider === "openai" ? (
+                        <>
+                          Get your API key from{" "}
+                          <a
+                            href="https://platform.openai.com/api-keys"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline"
+                          >
+                            OpenAI Platform
+                          </a>
+                        </>
                       ) : (
                         <>
-                          {connectionStatus === 'success' && <CheckCircle className="h-4 w-4 mr-1 text-green-600" />}
-                          {connectionStatus === 'error' && <AlertCircle className="h-4 w-4 mr-1 text-red-600" />}
-                          Test
+                          Get your API key from{" "}
+                          <a
+                            href="https://console.anthropic.com/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline"
+                          >
+                            Anthropic Console
+                          </a>
                         </>
                       )}
-                    </Button>
+                    </p>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {settings.provider === 'openai' ? (
-                      <>Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="underline">OpenAI Platform</a></>
-                    ) : (
-                      <>Get your API key from <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer" className="underline">Anthropic Console</a></>
-                    )}
-                  </p>
-                </div>
                 </div>
               )}
 
@@ -456,13 +453,13 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
                     <Label htmlFor="auto-analyze">Auto-analyze new bookmarks</Label>
                     <p className="text-sm text-muted-foreground">
                       Automatically analyze bookmarks when they&apos;re created
-                      {settings.provider === 'local' && ' (limited analysis without API)'}
+                      {settings.provider === "local" && " (limited analysis without API)"}
                     </p>
                   </div>
                   <Switch
                     id="auto-analyze"
                     checked={settings.autoAnalyze}
-                    onCheckedChange={(checked) => handleSettingChange('autoAnalyze', checked)}
+                    onCheckedChange={(checked) => handleSettingChange("autoAnalyze", checked)}
                   />
                 </div>
 
@@ -471,7 +468,7 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
                   <Label>Confidence Threshold: {Math.round(settings.confidenceThreshold * 100)}%</Label>
                   <Slider
                     value={[settings.confidenceThreshold]}
-                    onValueChange={([value]) => handleSettingChange('confidenceThreshold', value)}
+                    onValueChange={([value]) => handleSettingChange("confidenceThreshold", value)}
                     min={0.1}
                     max={1.0}
                     step={0.1}
@@ -497,7 +494,7 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
                     <Switch
                       id="auto-apply"
                       checked={settings.autoApply.enabled}
-                      onCheckedChange={(checked) => handleAutoApplyChange('enabled', checked)}
+                      onCheckedChange={(checked) => handleAutoApplyChange("enabled", checked)}
                     />
                   </div>
 
@@ -507,7 +504,7 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
                         <Label>Max auto-applied labels: {settings.autoApply.maxLabels}</Label>
                         <Slider
                           value={[settings.autoApply.maxLabels]}
-                          onValueChange={([value]) => handleAutoApplyChange('maxLabels', value)}
+                          onValueChange={([value]) => handleAutoApplyChange("maxLabels", value)}
                           min={1}
                           max={3}
                           step={1}
@@ -528,7 +525,7 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
                         <Switch
                           id="auto-apply-notifications"
                           checked={settings.autoApply.notifications}
-                          onCheckedChange={(checked) => handleAutoApplyChange('notifications', checked)}
+                          onCheckedChange={(checked) => handleAutoApplyChange("notifications", checked)}
                         />
                       </div>
                     </>
@@ -538,7 +535,7 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
                 {/* Categories */}
                 <div className="space-y-3">
                   <Label>Label Categories to Generate</Label>
-                  
+
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <div>
@@ -548,7 +545,7 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
                       <Switch
                         id="topics"
                         checked={settings.categories.topics}
-                        onCheckedChange={(checked) => handleCategoryChange('topics', checked)}
+                        onCheckedChange={(checked) => handleCategoryChange("topics", checked)}
                       />
                     </div>
 
@@ -560,7 +557,7 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
                       <Switch
                         id="types"
                         checked={settings.categories.types}
-                        onCheckedChange={(checked) => handleCategoryChange('types', checked)}
+                        onCheckedChange={(checked) => handleCategoryChange("types", checked)}
                       />
                     </div>
 
@@ -572,7 +569,7 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
                       <Switch
                         id="priority"
                         checked={settings.categories.priority}
-                        onCheckedChange={(checked) => handleCategoryChange('priority', checked)}
+                        onCheckedChange={(checked) => handleCategoryChange("priority", checked)}
                       />
                     </div>
                   </div>
@@ -583,12 +580,8 @@ export const AISettingsComponent: React.FC<AISettingsProps> = ({
 
           {/* Save Button */}
           <div className="border-t pt-6">
-            <Button
-              onClick={() => saveSettings(settings)}
-              disabled={isLoading}
-              className="w-full"
-            >
-              {isLoading ? 'Saving...' : 'Save AI Settings'}
+            <Button onClick={() => saveSettings(settings)} disabled={isLoading} className="w-full">
+              {isLoading ? "Saving..." : "Save AI Settings"}
             </Button>
           </div>
         </CardContent>

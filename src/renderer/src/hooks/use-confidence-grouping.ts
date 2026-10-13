@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo } from "react";
 
 interface ConfidenceGroups<T> {
   high: T[];
@@ -18,20 +18,17 @@ interface ConfidenceGroups<T> {
  * @param getConfidence - Function to extract confidence value from an item
  * @returns Object with high, medium, and low arrays
  */
-export function useConfidenceGrouping<T>(
-  items: T[],
-  getConfidence: (item: T) => number
-): ConfidenceGroups<T> {
+export function useConfidenceGrouping<T>(items: T[], getConfidence: (item: T) => number): ConfidenceGroups<T> {
   return useMemo(() => {
     const high: T[] = [];
     const medium: T[] = [];
     const low: T[] = [];
 
-    items.forEach(item => {
+    items.forEach((item) => {
       const confidence = getConfidence(item);
       if (confidence >= 0.85) {
         high.push(item);
-      } else if (confidence >= 0.60) {
+      } else if (confidence >= 0.6) {
         medium.push(item);
       } else {
         low.push(item);

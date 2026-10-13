@@ -65,17 +65,17 @@ function InternalBrowserUI({ isReady, type }: { isReady: boolean; type: WindowTy
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent) => {
       // Cmd+D (Mac) or Ctrl+D (Windows/Linux) for bookmark
-      if ((e.metaKey || e.ctrlKey) && e.key === 'd') {
+      if ((e.metaKey || e.ctrlKey) && e.key === "d") {
         e.preventDefault();
-        
+
         // Don't bookmark internal pages
-        if (!addressUrl || addressUrl.startsWith('flow://') || addressUrl.startsWith('flow-internal://')) {
-          toast.error('Cannot bookmark internal pages');
+        if (!addressUrl || addressUrl.startsWith("flow://") || addressUrl.startsWith("flow-internal://")) {
+          toast.error("Cannot bookmark internal pages");
           return;
         }
 
         if (!currentSpace?.profileId || !currentSpace?.id) {
-          toast.error('Cannot bookmark - missing profile or space');
+          toast.error("Cannot bookmark - missing profile or space");
           return;
         }
 
@@ -83,21 +83,21 @@ function InternalBrowserUI({ isReady, type }: { isReady: boolean; type: WindowTy
           // Check if already bookmarked
           const existingBookmarks = await flow.bookmarks.getByUrl(addressUrl);
           const bookmark = existingBookmarks.find(
-            b => b.profileId === currentSpace.profileId && b.spaceId === currentSpace.id
+            (b) => b.profileId === currentSpace.profileId && b.spaceId === currentSpace.id
           );
 
           if (bookmark) {
             // Remove bookmark
             const success = await flow.bookmarks.delete(bookmark.id);
             if (success) {
-              toast.success('Bookmark removed');
-              window.dispatchEvent(new CustomEvent('bookmarkChanged'));
+              toast.success("Bookmark removed");
+              window.dispatchEvent(new CustomEvent("bookmarkChanged"));
             } else {
-              toast.error('Failed to remove bookmark');
+              toast.error("Failed to remove bookmark");
             }
           } else {
             // Add bookmark
-            let title = focusedTab?.title || '';
+            let title = focusedTab?.title || "";
             if (!title) {
               try {
                 title = new URL(addressUrl).hostname;
@@ -114,22 +114,22 @@ function InternalBrowserUI({ isReady, type }: { isReady: boolean; type: WindowTy
             });
 
             if (newBookmark) {
-              toast.success('Bookmark added');
-              window.dispatchEvent(new CustomEvent('bookmarkChanged'));
+              toast.success("Bookmark added");
+              window.dispatchEvent(new CustomEvent("bookmarkChanged"));
             } else {
-              toast.error('Failed to add bookmark');
+              toast.error("Failed to add bookmark");
             }
           }
         } catch (error) {
-          console.error('Failed to toggle bookmark:', error);
-          toast.error('Failed to update bookmark');
+          console.error("Failed to toggle bookmark:", error);
+          toast.error("Failed to update bookmark");
         }
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener("keydown", handleKeyDown);
     };
   }, [addressUrl, focusedTab, currentSpace]);
 

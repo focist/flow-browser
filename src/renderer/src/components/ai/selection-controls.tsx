@@ -1,4 +1,4 @@
-import { Button } from '../ui/button';
+import { Button } from "../ui/button";
 
 interface SelectionControlsProps {
   onSelectAll: () => void;
@@ -14,12 +14,7 @@ interface SelectionControlsProps {
  * - Select All disabled when all items are selected
  * - Deselect All disabled when no items are selected
  */
-export function SelectionControls({
-  onSelectAll,
-  onDeselectAll,
-  selectedCount,
-  totalCount
-}: SelectionControlsProps) {
+export function SelectionControls({ onSelectAll, onDeselectAll, selectedCount, totalCount }: SelectionControlsProps) {
   return (
     <div className="flex gap-2 min-w-0">
       <Button

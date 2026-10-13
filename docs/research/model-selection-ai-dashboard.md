@@ -143,7 +143,7 @@ is wrong independent of the mid-2026 model churn.
 ## Open Questions
 
 - **Per-run vs per-session vs persistent override** — the code makes per-run
-  *possible to add* but doesn't decide *which* the product wants. Still a product
+  _possible to add_ but doesn't decide _which_ the product wants. Still a product
   call for the owner; the brief's Unknown stands.
 - **Replace vs diff on reprocess** — reprocessing currently overwrites the
   bookmark's labels with the new run's output; whether a different-model rerun

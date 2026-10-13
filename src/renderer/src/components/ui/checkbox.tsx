@@ -1,8 +1,8 @@
-import * as React from "react"
-import { Check } from "lucide-react"
-import { cn } from "@/lib/utils"
+import * as React from "react";
+import { Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-interface CheckboxProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'> {
+interface CheckboxProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "type"> {
   onCheckedChange?: (checked: boolean, event?: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
@@ -15,7 +15,7 @@ const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
       // Inject the mouse event's shiftKey state into the native event
       // This allows shift-click range selection to work properly
       if (lastMouseEventRef.current) {
-        Object.defineProperty(event.nativeEvent, 'shiftKey', {
+        Object.defineProperty(event.nativeEvent, "shiftKey", {
           value: lastMouseEventRef.current.shiftKey,
           writable: false,
           configurable: true
@@ -34,7 +34,7 @@ const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
           className="sr-only"
           ref={(node) => {
             inputRef.current = node;
-            if (typeof ref === 'function') {
+            if (typeof ref === "function") {
               ref(node);
             } else if (ref) {
               (ref as React.MutableRefObject<HTMLInputElement | null>).current = node;
@@ -55,14 +55,12 @@ const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
             inputRef.current?.click();
           }}
         >
-          {props.checked && (
-            <Check className="h-3 w-3 text-primary-foreground" />
-          )}
+          {props.checked && <Check className="h-3 w-3 text-primary-foreground" />}
         </div>
       </div>
-    )
+    );
   }
-)
-Checkbox.displayName = "Checkbox"
+);
+Checkbox.displayName = "Checkbox";
 
-export { Checkbox }
+export { Checkbox };

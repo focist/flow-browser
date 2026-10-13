@@ -6,21 +6,21 @@
  * uses the non-billable `GET /v1/models` endpoint.
  */
 
-import axios, { AxiosInstance } from 'axios';
-import { LLMProvider, LLMRequest, LLMResponse, LLMStreamChunk, ModelMetadata, ProviderMetadata } from './base-provider';
-import { getCatalogModels, getDefaultModelId } from '../model-catalog';
+import axios, { AxiosInstance } from "axios";
+import { LLMProvider, LLMRequest, LLMResponse, LLMStreamChunk, ModelMetadata, ProviderMetadata } from "./base-provider";
+import { getCatalogModels, getDefaultModelId } from "../model-catalog";
 
 export class AnthropicProvider extends LLMProvider {
   readonly metadata: ProviderMetadata = {
-    id: 'anthropic',
-    name: 'Anthropic',
-    description: 'Claude AI models by Anthropic',
-    website: 'https://anthropic.com',
-    documentationUrl: 'https://docs.anthropic.com',
+    id: "anthropic",
+    name: "Anthropic",
+    description: "Claude AI models by Anthropic",
+    website: "https://anthropic.com",
+    documentationUrl: "https://docs.anthropic.com",
     requiresApiKey: true,
     supportsBatch: true,
     supportsStreaming: true,
-    defaultModel: getDefaultModelId('anthropic')
+    defaultModel: getDefaultModelId("anthropic")
   };
 
   private client: AxiosInstance;
@@ -29,11 +29,11 @@ export class AnthropicProvider extends LLMProvider {
     super(config);
 
     this.client = axios.create({
-      baseURL: config.baseUrl || 'https://api.anthropic.com/v1',
+      baseURL: config.baseUrl || "https://api.anthropic.com/v1",
       headers: {
-        'x-api-key': config.apiKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json'
+        "x-api-key": config.apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json"
       },
       timeout: 60000
     });
@@ -46,11 +46,11 @@ export class AnthropicProvider extends LLMProvider {
 
   async checkConnection(): Promise<{ ok: true } | { ok: false; error: string }> {
     if (!this.apiKey) {
-      return { ok: false, error: 'No API key configured' };
+      return { ok: false, error: "No API key configured" };
     }
     try {
       // Non-billable: lists models, never runs inference.
-      await this.client.get('/models');
+      await this.client.get("/models");
       return { ok: true };
     } catch (error) {
       return { ok: false, error: this.normalizeError(error).message };
@@ -63,22 +63,22 @@ export class AnthropicProvider extends LLMProvider {
     const maxAttempts = 3;
 
     // Extract system message
-    const systemMessage = request.messages.find(m => m.role === 'system');
-    const userMessages = request.messages.filter(m => m.role !== 'system');
+    const systemMessage = request.messages.find((m) => m.role === "system");
+    const userMessages = request.messages.filter((m) => m.role !== "system");
 
     while (attempt < maxAttempts) {
       try {
         // Current Claude models reject non-default temperature/top_p, so no
         // sampling parameters are sent.
-        const response = await this.client.post('/messages', {
+        const response = await this.client.post("/messages", {
           model,
           max_tokens: request.maxTokens ?? 1000,
           system: systemMessage?.content,
-          messages: userMessages.map(m => ({
-            role: m.role === 'assistant' ? 'assistant' : 'user',
+          messages: userMessages.map((m) => ({
+            role: m.role === "assistant" ? "assistant" : "user",
             content: m.content
           })),
-          tools: request.tools?.map(tool => ({
+          tools: request.tools?.map((tool) => ({
             name: tool.name,
             description: tool.description,
             input_schema: tool.parameters
@@ -97,12 +97,12 @@ export class AnthropicProvider extends LLMProvider {
         type ContentBlock = { type: string; text?: string; name?: string; input?: Record<string, unknown> };
         const content = response.data.content as ContentBlock[];
         const textContent = content
-          .filter((c) => c.type === 'text')
-          .map((c) => c.text ?? '')
-          .join('');
+          .filter((c) => c.type === "text")
+          .map((c) => c.text ?? "")
+          .join("");
 
         // Extract tool calls
-        const toolUse = content.filter((c) => c.type === 'tool_use');
+        const toolUse = content.filter((c) => c.type === "tool_use");
 
         return {
           id: response.data.id,
@@ -121,7 +121,7 @@ export class AnthropicProvider extends LLMProvider {
           },
           latencyMs,
           toolCalls: toolUse.map((tu) => ({
-            name: tu.name ?? '',
+            name: tu.name ?? "",
             arguments: tu.input ?? {}
           }))
         };
@@ -135,41 +135,45 @@ export class AnthropicProvider extends LLMProvider {
       }
     }
 
-    throw new Error('Max retry attempts exceeded');
+    throw new Error("Max retry attempts exceeded");
   }
 
   async *stream(request: LLMRequest, model: string): AsyncGenerator<LLMStreamChunk> {
-    const systemMessage = request.messages.find(m => m.role === 'system');
-    const userMessages = request.messages.filter(m => m.role !== 'system');
+    const systemMessage = request.messages.find((m) => m.role === "system");
+    const userMessages = request.messages.filter((m) => m.role !== "system");
 
-    const response = await this.client.post('/messages', {
-      model,
-      max_tokens: request.maxTokens ?? 1000,
-      system: systemMessage?.content,
-      messages: userMessages,
-      stream: true
-    }, {
-      responseType: 'stream'
-    });
+    const response = await this.client.post(
+      "/messages",
+      {
+        model,
+        max_tokens: request.maxTokens ?? 1000,
+        system: systemMessage?.content,
+        messages: userMessages,
+        stream: true
+      },
+      {
+        responseType: "stream"
+      }
+    );
 
-    let buffer = '';
+    let buffer = "";
 
     for await (const chunk of response.data) {
       buffer += chunk.toString();
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
 
       for (const line of lines) {
-        if (line.startsWith('data: ')) {
+        if (line.startsWith("data: ")) {
           const data = line.slice(6);
 
           try {
             const parsed = JSON.parse(data);
 
-            if (parsed.type === 'content_block_delta' && parsed.delta?.type === 'text_delta') {
+            if (parsed.type === "content_block_delta" && parsed.delta?.type === "text_delta") {
               yield { delta: parsed.delta.text, isComplete: false };
-            } else if (parsed.type === 'message_stop') {
-              yield { delta: '', isComplete: true };
+            } else if (parsed.type === "message_stop") {
+              yield { delta: "", isComplete: true };
               return;
             }
           } catch {
@@ -181,20 +185,24 @@ export class AnthropicProvider extends LLMProvider {
   }
 
   async listModels(): Promise<ModelMetadata[]> {
-    return getCatalogModels('anthropic');
+    return getCatalogModels("anthropic");
   }
 
   async getModel(modelId: string): Promise<ModelMetadata | null> {
     const models = await this.listModels();
-    return models.find(m => m.id === modelId) || null;
+    return models.find((m) => m.id === modelId) || null;
   }
 
-  private normalizeFinishReason(reason: string): LLMResponse['finishReason'] {
+  private normalizeFinishReason(reason: string): LLMResponse["finishReason"] {
     switch (reason) {
-      case 'end_turn': return 'stop';
-      case 'max_tokens': return 'length';
-      case 'tool_use': return 'tool_calls';
-      default: return 'stop';
+      case "end_turn":
+        return "stop";
+      case "max_tokens":
+        return "length";
+      case "tool_use":
+        return "tool_calls";
+      default:
+        return "stop";
     }
   }
 }

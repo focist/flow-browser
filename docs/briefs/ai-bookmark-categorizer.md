@@ -38,8 +38,8 @@ Shipped and working today:
 - Description generation, duplicate detection (local Levenshtein + URL
   normalization), and an HTML content fetcher.
 - Three-column labeling dashboard (`components/ai/ai-labeling-dashboard.tsx`
-  + ~16 sibling components), pattern detection, and bulk auto-apply with
-  toast undo.
+  - ~16 sibling components), pattern detection, and bulk auto-apply with
+    toast undo.
 - Provider abstraction over OpenAI + Anthropic (`src/main/modules/ai/`,
   untracked in git but load-bearing — imported by `ai-service.ts`).
 

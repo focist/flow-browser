@@ -1,11 +1,11 @@
-import React from 'react';
-import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
-import { ScrollArea } from '../ui/scroll-area';
-import { motion, AnimatePresence } from 'motion/react';
-import { Check, Tag, Sparkles, TrendingUp } from 'lucide-react';
-import type { LabelPattern, CategoryPattern } from '../../hooks/use-pattern-detection';
-import { getCategoryStyles } from '../../lib/label-styles';
+import React from "react";
+import { Button } from "../ui/button";
+import { Badge } from "../ui/badge";
+import { ScrollArea } from "../ui/scroll-area";
+import { motion, AnimatePresence } from "motion/react";
+import { Check, Tag, Sparkles, TrendingUp } from "lucide-react";
+import type { LabelPattern, CategoryPattern } from "../../hooks/use-pattern-detection";
+import { getCategoryStyles } from "../../lib/label-styles";
 
 interface LabelSuggestionsColumnProps {
   labelPatterns: LabelPattern[];
@@ -27,7 +27,14 @@ interface PatternItemProps {
   isDimmed?: boolean;
 }
 
-const PatternItem: React.FC<PatternItemProps> = ({ pattern, onApply, isProcessing, onHover, isHighlighted = false, isDimmed = false }) => {
+const PatternItem: React.FC<PatternItemProps> = ({
+  pattern,
+  onApply,
+  isProcessing,
+  onHover,
+  isHighlighted = false,
+  isDimmed = false
+}) => {
   const patternId = `${pattern.label}::${pattern.category}`;
 
   return (
@@ -37,10 +44,8 @@ const PatternItem: React.FC<PatternItemProps> = ({ pattern, onApply, isProcessin
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
       className={`p-3 border rounded-lg bg-card hover:bg-accent/30 transition-all duration-200 overflow-hidden ${
-        isHighlighted ? 'ring-2 ring-blue-500/50 bg-blue-50 dark:bg-blue-950/20' : ''
-      } ${
-        isDimmed ? 'opacity-40' : 'opacity-100'
-      }`}
+        isHighlighted ? "ring-2 ring-blue-500/50 bg-blue-50 dark:bg-blue-950/20" : ""
+      } ${isDimmed ? "opacity-40" : "opacity-100"}`}
       onMouseEnter={() => onHover?.(patternId)}
       onMouseLeave={() => onHover?.(null)}
       onFocus={() => onHover?.(patternId)}
@@ -63,16 +68,10 @@ const PatternItem: React.FC<PatternItemProps> = ({ pattern, onApply, isProcessin
 
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted-foreground">
-          {pattern.count} bookmark{pattern.count !== 1 ? 's' : ''}
+          {pattern.count} bookmark{pattern.count !== 1 ? "s" : ""}
         </span>
         <div className="flex gap-1">
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 px-2 text-xs"
-            onClick={onApply}
-            disabled={isProcessing}
-          >
+          <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={onApply} disabled={isProcessing}>
             <Check className="h-3 w-3 mr-1" />
             Apply All
           </Button>
@@ -104,15 +103,15 @@ const CategorySection: React.FC<CategorySectionProps> = ({
   hoveredBookmarkId
 }) => {
   const categoryIcons = {
-    topic: '🏷️',
-    type: '📁',
-    priority: '⭐'
+    topic: "🏷️",
+    type: "📁",
+    priority: "⭐"
   };
 
   const categoryNames = {
-    topic: 'Topics',
-    type: 'Types',
-    priority: 'Priority'
+    topic: "Topics",
+    type: "Types",
+    priority: "Priority"
   };
 
   return (
@@ -126,7 +125,8 @@ const CategorySection: React.FC<CategorySectionProps> = ({
           <div className="text-left">
             <h3 className="font-medium text-sm">{categoryNames[category.category]}</h3>
             <p className="text-xs text-muted-foreground">
-              {category.labels.length} pattern{category.labels.length !== 1 ? 's' : ''} • {category.totalBookmarks} bookmark{category.totalBookmarks !== 1 ? 's' : ''}
+              {category.labels.length} pattern{category.labels.length !== 1 ? "s" : ""} • {category.totalBookmarks}{" "}
+              bookmark{category.totalBookmarks !== 1 ? "s" : ""}
             </p>
           </div>
         </div>
@@ -144,16 +144,8 @@ const CategorySection: React.FC<CategorySectionProps> = ({
             <Check className="h-3 w-3 mr-1" />
             Apply All
           </Button>
-          <motion.div
-            animate={{ rotate: expanded ? 180 : 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            <svg
-              className="h-4 w-4 text-muted-foreground"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+          <motion.div animate={{ rotate: expanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
+            <svg className="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </motion.div>
@@ -164,7 +156,7 @@ const CategorySection: React.FC<CategorySectionProps> = ({
         {expanded && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
+            animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="space-y-2 pl-2"
@@ -209,8 +201,8 @@ export const LabelSuggestionsColumn: React.FC<LabelSuggestionsColumnProps> = ({
     priority: true
   });
 
-  const toggleCategory = (category: 'topic' | 'type' | 'priority') => {
-    setExpandedCategories(prev => ({ ...prev, [category]: !prev[category] }));
+  const toggleCategory = (category: "topic" | "type" | "priority") => {
+    setExpandedCategories((prev) => ({ ...prev, [category]: !prev[category] }));
   };
 
   const topPatterns = labelPatterns.slice(0, 5);
@@ -228,7 +220,7 @@ export const LabelSuggestionsColumn: React.FC<LabelSuggestionsColumnProps> = ({
           <div className="flex items-center gap-2 p-2 rounded bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
             <Sparkles className="h-4 w-4 text-blue-600 dark:text-blue-400" />
             <p className="text-xs text-blue-800 dark:text-blue-200">
-              {selectedBookmarkCount} bookmark{selectedBookmarkCount !== 1 ? 's' : ''} selected
+              {selectedBookmarkCount} bookmark{selectedBookmarkCount !== 1 ? "s" : ""} selected
             </p>
           </div>
         )}
@@ -280,7 +272,7 @@ export const LabelSuggestionsColumn: React.FC<LabelSuggestionsColumnProps> = ({
                       onApplyCategory={() => onApplyCategory(category)}
                       isProcessing={isProcessing}
                       expanded={expandedCategories[category.category as keyof typeof expandedCategories]}
-                      onToggleExpanded={() => toggleCategory(category.category as 'topic' | 'type' | 'priority')}
+                      onToggleExpanded={() => toggleCategory(category.category as "topic" | "type" | "priority")}
                       onPatternHover={onPatternHover}
                       hoveredBookmarkId={hoveredBookmarkId}
                     />

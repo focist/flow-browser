@@ -26,11 +26,11 @@ export async function copyTextToClipboard(text: string, hasToast = true) {
     if (writeSuccess) {
       toast.success("Copied to clipboard!", {
         // Enhanced green styling for copy success (was default green)
-        className: 'bg-green-50 border-green-200 text-green-800',
+        className: "bg-green-50 border-green-200 text-green-800",
         style: {
-          backgroundColor: '#f0fdf4',
-          borderColor: '#bbf7d0',
-          color: '#166534'
+          backgroundColor: "#f0fdf4",
+          borderColor: "#bbf7d0",
+          color: "#166534"
         }
       });
     } else {

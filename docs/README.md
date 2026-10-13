@@ -5,6 +5,7 @@ This directory contains comprehensive documentation for Flow Browser development
 ## Documentation Structure
 
 ### 📚 [API Documentation](./api/)
+
 Technical API documentation for Flow Browser components and interfaces.
 
 - [Browser API](./api/browser.md) - Main browser controller API
@@ -12,28 +13,33 @@ Technical API documentation for Flow Browser components and interfaces.
 - [Tabs](./api/tabs/) - Tab management API
 
 ### 🎨 [Design Documentation](./design/)
+
 UX/UI design specifications and user experience planning documents.
 
 - [AI Auto-Apply UX Design](./design/AI_AUTO_APPLY_UX_DESIGN.md) - Specification for automatically applying AI-generated labels
 - [AI Labeling UX Plan](./design/AI_LABELING_UX_PLAN.md) - Comprehensive redesign of bookmark AI analysis workflow
 
 ### 🛠️ [Development Documentation](./development/)
+
 Development phases, technical implementation details, and bug analysis.
 
 - [Bookmarks Development Phases](./development/BOOKMARKS_PHASES.md) - Complete development roadmap for bookmark features
 - [AI Context Menu Bug Analysis](./development/AI_ANALYZE_BUG.md) - Detailed analysis and solution for AI analysis context menu issue
 
 ### 🤖 [AI Documentation](./ai/)
+
 AI and machine learning feature specifications and technical designs.
 
 - [Phase 3 AI Design](./ai/PHASE_3_AI_DESIGN.md) - Technical architecture for AI categorization and reminder systems
 
 ### 🧩 [Component Documentation](./components/)
+
 Documentation for React components and UI elements.
 
 - [Portal Component](./components/portal.md) - Portal component usage and implementation
 
 ### 🤝 [Contributing Documentation](./contributing/)
+
 Guides for contributors and development setup.
 
 - [Dependencies](./contributing/dependencies.md) - Project dependency management
@@ -41,6 +47,7 @@ Guides for contributors and development setup.
 - [Updating Electron](./contributing/updating-electron.md) - Electron version update procedures
 
 ### 📖 [Reference Documentation](./references/)
+
 Technical reference materials and implementation details.
 
 - [Logs](./references/logs.md) - Logging system reference

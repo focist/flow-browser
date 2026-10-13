@@ -1,10 +1,10 @@
-import React from 'react';
-import { Badge } from '../ui/badge';
-import { ScrollArea } from '../ui/scroll-area';
-import { Progress } from '../ui/progress';
-import { Sparkles, BarChart3, Package } from 'lucide-react';
-import type { BulkOperationProgress } from '../../hooks/use-bulk-operations';
-import type { DashboardBookmark } from '../../hooks/use-dashboard-state';
+import React from "react";
+import { Badge } from "../ui/badge";
+import { ScrollArea } from "../ui/scroll-area";
+import { Progress } from "../ui/progress";
+import { Sparkles, BarChart3, Package } from "lucide-react";
+import type { BulkOperationProgress } from "../../hooks/use-bulk-operations";
+import type { DashboardBookmark } from "../../hooks/use-dashboard-state";
 
 interface BulkActionsColumnProps {
   selectedBookmarks: DashboardBookmark[];
@@ -24,7 +24,6 @@ interface BulkActionsColumnProps {
     totalDomains: number;
   };
 }
-
 
 interface StatItemProps {
   label: string;
@@ -69,13 +68,13 @@ export const BulkActionsColumn: React.FC<BulkActionsColumnProps> = ({
     let mediumConfidence = 0;
     let lowConfidence = 0;
 
-    selectedBookmarks.forEach(b => {
+    selectedBookmarks.forEach((b) => {
       const labels = [...b.autoAppliedLabels, ...b.remainingLabels];
       totalLabels += labels.length;
 
-      labels.forEach(l => {
+      labels.forEach((l) => {
         if (l.confidence >= 0.85) highConfidence++;
-        else if (l.confidence >= 0.60) mediumConfidence++;
+        else if (l.confidence >= 0.6) mediumConfidence++;
         else lowConfidence++;
       });
     });
@@ -83,9 +82,7 @@ export const BulkActionsColumn: React.FC<BulkActionsColumnProps> = ({
     return { totalLabels, highConfidence, mediumConfidence, lowConfidence };
   }, [selectedBookmarks, hasSelection]);
 
-  const progressPercentage = progress
-    ? Math.round((progress.completed / progress.total) * 100)
-    : 0;
+  const progressPercentage = progress ? Math.round((progress.completed / progress.total) * 100) : 0;
 
   return (
     <div className="flex flex-col h-full">
@@ -96,13 +93,11 @@ export const BulkActionsColumn: React.FC<BulkActionsColumnProps> = ({
           <div className="flex items-center gap-2 p-2 rounded bg-primary/10 border border-primary/20">
             <Sparkles className="h-4 w-4 text-primary" />
             <p className="text-xs font-medium">
-              {selectedCount} bookmark{selectedCount !== 1 ? 's' : ''} selected
+              {selectedCount} bookmark{selectedCount !== 1 ? "s" : ""} selected
             </p>
           </div>
         ) : (
-          <p className="text-xs text-muted-foreground">
-            Select bookmarks to perform bulk operations
-          </p>
+          <p className="text-xs text-muted-foreground">Select bookmarks to perform bulk operations</p>
         )}
       </div>
 
@@ -117,11 +112,7 @@ export const BulkActionsColumn: React.FC<BulkActionsColumnProps> = ({
                 <Badge variant="secondary">{progressPercentage}%</Badge>
               </div>
               <Progress value={progressPercentage} className="h-2" />
-              {progress.current && (
-                <p className="text-xs text-muted-foreground truncate">
-                  {progress.current}
-                </p>
-              )}
+              {progress.current && <p className="text-xs text-muted-foreground truncate">{progress.current}</p>}
               <p className="text-xs text-muted-foreground">
                 {progress.completed} of {progress.total} completed
               </p>
@@ -167,22 +158,10 @@ export const BulkActionsColumn: React.FC<BulkActionsColumnProps> = ({
               <h3 className="font-medium text-sm">Overall Statistics</h3>
             </div>
             <div className="space-y-2">
-              <StatItem
-                label="Unique Labels"
-                value={stats.uniqueLabels}
-              />
-              <StatItem
-                label="Avg Labels/Bookmark"
-                value={stats.avgLabelsPerBookmark.toFixed(1)}
-              />
-              <StatItem
-                label="High Conf. Patterns"
-                value={stats.highConfidencePatterns}
-              />
-              <StatItem
-                label="Domains"
-                value={stats.totalDomains}
-              />
+              <StatItem label="Unique Labels" value={stats.uniqueLabels} />
+              <StatItem label="Avg Labels/Bookmark" value={stats.avgLabelsPerBookmark.toFixed(1)} />
+              <StatItem label="High Conf. Patterns" value={stats.highConfidencePatterns} />
+              <StatItem label="Domains" value={stats.totalDomains} />
             </div>
           </div>
         </div>

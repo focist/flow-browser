@@ -1,6 +1,6 @@
-import { useState, useCallback } from 'react';
-import type { Bookmark } from '~/types/bookmarks';
-import type { CategoryAnalysis, BookmarkLabel } from '~/flow/interfaces/ai';
+import { useState, useCallback } from "react";
+import type { Bookmark } from "~/types/bookmarks";
+import type { CategoryAnalysis, BookmarkLabel } from "~/flow/interfaces/ai";
 
 export interface DashboardBookmark {
   bookmark: Bookmark;
@@ -12,8 +12,8 @@ export interface DashboardBookmark {
 export interface DashboardState {
   bookmarks: DashboardBookmark[];
   selectedBookmarkIds: Set<string>;
-  filterMode: 'all' | 'high' | 'medium' | 'low' | 'no_suggestions';
-  sortBy: 'confidence' | 'title' | 'added';
+  filterMode: "all" | "high" | "medium" | "low" | "no_suggestions";
+  sortBy: "confidence" | "title" | "added";
   isProcessing: boolean;
 }
 
@@ -21,43 +21,39 @@ export const useDashboardState = () => {
   const [state, setState] = useState<DashboardState>({
     bookmarks: [],
     selectedBookmarkIds: new Set(),
-    filterMode: 'all',
-    sortBy: 'confidence',
+    filterMode: "all",
+    sortBy: "confidence",
     isProcessing: false
   });
 
   const setBookmarks = useCallback((bookmarks: DashboardBookmark[]) => {
-    setState(prev => ({ ...prev, bookmarks }));
+    setState((prev) => ({ ...prev, bookmarks }));
   }, []);
 
   const addBookmark = useCallback((bookmark: DashboardBookmark) => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       bookmarks: [...prev.bookmarks, bookmark]
     }));
   }, []);
 
   const removeBookmark = useCallback((bookmarkId: string) => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
-      bookmarks: prev.bookmarks.filter(b => b.bookmark.id !== bookmarkId),
-      selectedBookmarkIds: new Set(
-        Array.from(prev.selectedBookmarkIds).filter(id => id !== bookmarkId)
-      )
+      bookmarks: prev.bookmarks.filter((b) => b.bookmark.id !== bookmarkId),
+      selectedBookmarkIds: new Set(Array.from(prev.selectedBookmarkIds).filter((id) => id !== bookmarkId))
     }));
   }, []);
 
   const updateBookmark = useCallback((bookmarkId: string, updates: Partial<DashboardBookmark>) => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
-      bookmarks: prev.bookmarks.map(b =>
-        b.bookmark.id === bookmarkId ? { ...b, ...updates } : b
-      )
+      bookmarks: prev.bookmarks.map((b) => (b.bookmark.id === bookmarkId ? { ...b, ...updates } : b))
     }));
   }, []);
 
   const toggleBookmarkSelection = useCallback((bookmarkId: string) => {
-    setState(prev => {
+    setState((prev) => {
       const newSelected = new Set(prev.selectedBookmarkIds);
       if (newSelected.has(bookmarkId)) {
         newSelected.delete(bookmarkId);
@@ -69,43 +65,43 @@ export const useDashboardState = () => {
   }, []);
 
   const selectAllBookmarks = useCallback(() => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
-      selectedBookmarkIds: new Set(prev.bookmarks.map(b => b.bookmark.id))
+      selectedBookmarkIds: new Set(prev.bookmarks.map((b) => b.bookmark.id))
     }));
   }, []);
 
   const clearSelection = useCallback(() => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       selectedBookmarkIds: new Set()
     }));
   }, []);
 
   const setSelectedBookmarkIds = useCallback((ids: Set<string>) => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       selectedBookmarkIds: ids
     }));
   }, []);
 
-  const setFilterMode = useCallback((mode: DashboardState['filterMode']) => {
-    setState(prev => ({ ...prev, filterMode: mode }));
+  const setFilterMode = useCallback((mode: DashboardState["filterMode"]) => {
+    setState((prev) => ({ ...prev, filterMode: mode }));
   }, []);
 
-  const setSortBy = useCallback((sortBy: DashboardState['sortBy']) => {
-    setState(prev => ({ ...prev, sortBy }));
+  const setSortBy = useCallback((sortBy: DashboardState["sortBy"]) => {
+    setState((prev) => ({ ...prev, sortBy }));
   }, []);
 
   const setProcessing = useCallback((isProcessing: boolean) => {
-    setState(prev => ({ ...prev, isProcessing }));
+    setState((prev) => ({ ...prev, isProcessing }));
   }, []);
 
   // Helper to get confidence level
-  const getConfidenceLevel = useCallback((confidence: number): 'high' | 'medium' | 'low' => {
-    if (confidence >= 0.85) return 'high';
-    if (confidence >= 0.60) return 'medium';
-    return 'low';
+  const getConfidenceLevel = useCallback((confidence: number): "high" | "medium" | "low" => {
+    if (confidence >= 0.85) return "high";
+    if (confidence >= 0.6) return "medium";
+    return "low";
   }, []);
 
   // Get filtered bookmarks based on current filter mode
@@ -113,26 +109,26 @@ export const useDashboardState = () => {
     let filtered = state.bookmarks;
 
     switch (state.filterMode) {
-      case 'high':
-        filtered = filtered.filter(b => {
-          const maxConfidence = Math.max(...b.remainingLabels.map(l => l.confidence), 0);
-          return getConfidenceLevel(maxConfidence) === 'high';
+      case "high":
+        filtered = filtered.filter((b) => {
+          const maxConfidence = Math.max(...b.remainingLabels.map((l) => l.confidence), 0);
+          return getConfidenceLevel(maxConfidence) === "high";
         });
         break;
-      case 'medium':
-        filtered = filtered.filter(b => {
-          const maxConfidence = Math.max(...b.remainingLabels.map(l => l.confidence), 0);
-          return getConfidenceLevel(maxConfidence) === 'medium';
+      case "medium":
+        filtered = filtered.filter((b) => {
+          const maxConfidence = Math.max(...b.remainingLabels.map((l) => l.confidence), 0);
+          return getConfidenceLevel(maxConfidence) === "medium";
         });
         break;
-      case 'low':
-        filtered = filtered.filter(b => {
-          const maxConfidence = Math.max(...b.remainingLabels.map(l => l.confidence), 0);
-          return getConfidenceLevel(maxConfidence) === 'low';
+      case "low":
+        filtered = filtered.filter((b) => {
+          const maxConfidence = Math.max(...b.remainingLabels.map((l) => l.confidence), 0);
+          return getConfidenceLevel(maxConfidence) === "low";
         });
         break;
-      case 'no_suggestions':
-        filtered = filtered.filter(b => b.remainingLabels.length === 0 && b.autoAppliedLabels.length === 0);
+      case "no_suggestions":
+        filtered = filtered.filter((b) => b.remainingLabels.length === 0 && b.autoAppliedLabels.length === 0);
         break;
       default:
         // 'all' - no filtering
@@ -141,18 +137,20 @@ export const useDashboardState = () => {
 
     // Sort filtered bookmarks
     switch (state.sortBy) {
-      case 'confidence':
+      case "confidence":
         filtered.sort((a, b) => {
-          const aMax = Math.max(...a.remainingLabels.map(l => l.confidence), 0);
-          const bMax = Math.max(...b.remainingLabels.map(l => l.confidence), 0);
+          const aMax = Math.max(...a.remainingLabels.map((l) => l.confidence), 0);
+          const bMax = Math.max(...b.remainingLabels.map((l) => l.confidence), 0);
           return bMax - aMax; // Descending
         });
         break;
-      case 'title':
+      case "title":
         filtered.sort((a, b) => a.bookmark.title.localeCompare(b.bookmark.title));
         break;
-      case 'added':
-        filtered.sort((a, b) => new Date(b.bookmark.dateAdded || 0).getTime() - new Date(a.bookmark.dateAdded || 0).getTime());
+      case "added":
+        filtered.sort(
+          (a, b) => new Date(b.bookmark.dateAdded || 0).getTime() - new Date(a.bookmark.dateAdded || 0).getTime()
+        );
         break;
     }
 
@@ -161,7 +159,7 @@ export const useDashboardState = () => {
 
   // Get selected bookmarks
   const getSelectedBookmarks = useCallback(() => {
-    return state.bookmarks.filter(b => state.selectedBookmarkIds.has(b.bookmark.id));
+    return state.bookmarks.filter((b) => state.selectedBookmarkIds.has(b.bookmark.id));
   }, [state.bookmarks, state.selectedBookmarkIds]);
 
   // Get bookmarks grouped by confidence level
@@ -173,11 +171,11 @@ export const useDashboardState = () => {
       none: [] as DashboardBookmark[]
     };
 
-    state.bookmarks.forEach(b => {
+    state.bookmarks.forEach((b) => {
       if (b.remainingLabels.length === 0 && b.autoAppliedLabels.length === 0) {
         groups.none.push(b);
       } else {
-        const maxConfidence = Math.max(...b.remainingLabels.map(l => l.confidence), 0);
+        const maxConfidence = Math.max(...b.remainingLabels.map((l) => l.confidence), 0);
         const level = getConfidenceLevel(maxConfidence);
         groups[level].push(b);
       }

@@ -20,23 +20,23 @@ export function BookmarkButton() {
       setCurrentBookmarkId(null);
       return;
     }
-    
+
     // Don't check for flow:// or flow-internal:// URLs
-    if (addressUrl.startsWith('flow://') || addressUrl.startsWith('flow-internal://')) {
+    if (addressUrl.startsWith("flow://") || addressUrl.startsWith("flow-internal://")) {
       setIsBookmarked(false);
       setCurrentBookmarkId(null);
       return;
     }
-    
+
     try {
       // Get all bookmarks for this URL (exclude deleted ones)
       const existingBookmarks = await flow.bookmarks.getByUrl(addressUrl);
-      
+
       // Find bookmark for current profile and space that isn't deleted
       const bookmark = existingBookmarks.find(
-        b => b.profileId === currentSpace.profileId && b.spaceId === currentSpace.id && !b.deletedAt
+        (b) => b.profileId === currentSpace.profileId && b.spaceId === currentSpace.id && !b.deletedAt
       );
-      
+
       if (bookmark) {
         setIsBookmarked(true);
         setCurrentBookmarkId(bookmark.id);
@@ -45,7 +45,7 @@ export function BookmarkButton() {
         setCurrentBookmarkId(null);
       }
     } catch (error) {
-      console.error('Failed to check bookmark status:', error);
+      console.error("Failed to check bookmark status:", error);
       setIsBookmarked(false);
       setCurrentBookmarkId(null);
     }
@@ -58,15 +58,15 @@ export function BookmarkButton() {
   const handleBookmarkClick = async (e: React.MouseEvent) => {
     // Prevent the click from bubbling up to the address bar
     e.stopPropagation();
-    
+
     if (!addressUrl || !currentSpace?.profileId || !currentSpace?.id) {
-      toast.error('Cannot bookmark this page - missing profile or space');
+      toast.error("Cannot bookmark this page - missing profile or space");
       return;
     }
 
     // Don't bookmark flow:// URLs
-    if (addressUrl.startsWith('flow://') || addressUrl.startsWith('flow-internal://')) {
-      toast.error('Cannot bookmark internal pages');
+    if (addressUrl.startsWith("flow://") || addressUrl.startsWith("flow-internal://")) {
+      toast.error("Cannot bookmark internal pages");
       return;
     }
 
@@ -80,35 +80,35 @@ export function BookmarkButton() {
           const bookmarkId = currentBookmarkId;
           setIsBookmarked(false);
           setCurrentBookmarkId(null);
-          
+
           // Show undo toast
-          toast.success('Bookmark moved to trash', {
+          toast.success("Bookmark moved to trash", {
             action: {
-              label: 'Undo',
+              label: "Undo",
               onClick: async () => {
                 try {
                   await flow.bookmarks.restore(bookmarkId);
                   // Refresh bookmark status
                   await checkBookmarkStatus();
                   // Notify bookmark manager to refresh
-                  window.dispatchEvent(new CustomEvent('bookmarkChanged'));
-                  toast.success('Bookmark restored');
+                  window.dispatchEvent(new CustomEvent("bookmarkChanged"));
+                  toast.success("Bookmark restored");
                 } catch (error) {
-                  console.error('Failed to restore bookmark:', error);
-                  toast.error('Failed to restore bookmark');
+                  console.error("Failed to restore bookmark:", error);
+                  toast.error("Failed to restore bookmark");
                 }
               }
             }
           });
-          
+
           // Notify bookmark manager to refresh
-          window.dispatchEvent(new CustomEvent('bookmarkChanged'));
+          window.dispatchEvent(new CustomEvent("bookmarkChanged"));
         } else {
-          toast.error('Failed to remove bookmark');
+          toast.error("Failed to remove bookmark");
         }
       } else {
         // Add bookmark
-        let title = focusedTab?.title || '';
+        let title = focusedTab?.title || "";
         if (!title) {
           try {
             title = new URL(addressUrl).hostname;
@@ -116,34 +116,34 @@ export function BookmarkButton() {
             title = addressUrl;
           }
         }
-        
+
         const newBookmark = await flow.bookmarks.create({
           url: addressUrl,
           title: title,
           profileId: currentSpace.profileId,
           spaceId: currentSpace.id
         });
-        
+
         if (newBookmark) {
           setIsBookmarked(true);
           setCurrentBookmarkId(newBookmark.id);
-          toast.success('Bookmark added');
+          toast.success("Bookmark added");
           // Notify bookmark manager to refresh
-          window.dispatchEvent(new CustomEvent('bookmarkChanged'));
+          window.dispatchEvent(new CustomEvent("bookmarkChanged"));
         } else {
-          toast.error('Failed to add bookmark');
+          toast.error("Failed to add bookmark");
         }
       }
     } catch (error) {
-      console.error('Failed to toggle bookmark:', error);
-      toast.error(isBookmarked ? 'Failed to remove bookmark' : 'Failed to add bookmark');
+      console.error("Failed to toggle bookmark:", error);
+      toast.error(isBookmarked ? "Failed to remove bookmark" : "Failed to add bookmark");
     } finally {
       setIsLoading(false);
     }
   };
 
   // Don't show for flow:// or flow-internal:// URLs or when there's no URL
-  if (!addressUrl || addressUrl.startsWith('flow://') || addressUrl.startsWith('flow-internal://')) {
+  if (!addressUrl || addressUrl.startsWith("flow://") || addressUrl.startsWith("flow-internal://")) {
     return null;
   }
 
