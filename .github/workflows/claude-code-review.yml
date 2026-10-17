@@ -30,7 +30,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          fetch-depth: 1
+          # Full history, so the reviewer can diff the PR against its base branch
+          # with git. A depth-1 checkout has only the head commit and nothing to
+          # diff against.
+          fetch-depth: 0
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -97,8 +100,16 @@ jobs:
             MUST omit it — silence over a guess. An unverified assertion presented as a finding
             is itself a defect in the review and must never drive a "CHANGES REQUESTED".
 
-            1. Gather context: read the PR title, description, and list of changed files using `gh pr view` and `gh pr diff`
-            2. For each changed file, read and analyze the file
+            HOW TO READ THE CHANGES: the full git history is checked out. Get the complete
+            diff with `git diff origin/${{ github.base_ref }}...HEAD`, the commits with
+            `git log origin/${{ github.base_ref }}..HEAD`, and one commit with `git show <sha>`.
+            `gh pr view` and `gh pr diff` also work. Run each command on its own: pipes (`|`),
+            `&&`, `;` and redirects are not permitted and the whole command will be denied.
+            Review the entire diff. Do not review only a slice of a file, and do not say a
+            command was blocked unless you actually ran it and it was denied.
+
+            1. Gather context: read the PR title and description with `gh pr view`, and the full diff and commit list with the git commands above
+            2. For each changed file, read every changed hunk in the diff, plus whatever surrounding code you need to understand it
             3. Review each changed file for: code quality and best practices, potential bugs or issues, security concerns, performance considerations
             4. Assess overall test coverage implications
             5. Post a comprehensive review comment using `gh pr comment` using EXACTLY this format:
@@ -155,5 +166,5 @@ jobs:
             Only post GitHub comments — do not submit review text as messages.
 
           claude_args: >-
-            --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(git ls-remote:*),Bash(gh api:*),Bash(gh release:*),Bash(bun info:*)"
+            --allowedTools "Bash(gh pr comment:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(git ls-remote:*),Bash(gh api:*),Bash(gh release:*),Bash(bun info:*)"
             --disallowedTools "Edit,Write,MultiEdit,NotebookEdit,Bash(git add:*),Bash(git commit:*),Bash(git rm:*),Bash(git push:*),Bash(git-push.sh:*)"
